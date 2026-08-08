@@ -1,0 +1,56 @@
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { installIntegrations, removeIntegrations } from "./index.js";
+
+const directories: string[] = [];
+afterEach(async () => {
+  while (directories.length > 0) {
+    const directory = directories.pop();
+    if (directory !== undefined)
+      await rm(directory, { recursive: true, force: true });
+  }
+});
+
+describe("host integrations", () => {
+  it("installs exact Claude /share and explicit Codex $agentshare idempotently", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-integration-"));
+    directories.push(root);
+    const roots = {
+      codexSkills: join(root, "codex"),
+      claudeSkills: join(root, "claude"),
+    };
+    await installIntegrations(roots);
+    await installIntegrations(roots);
+    expect(
+      await readFile(join(roots.claudeSkills, "share", "SKILL.md"), "utf8"),
+    ).toContain("name: share");
+    expect(
+      await readFile(
+        join(roots.codexSkills, "agentshare", "agents", "openai.yaml"),
+        "utf8",
+      ),
+    ).toContain("allow_implicit_invocation: false");
+    await removeIntegrations(roots);
+  });
+
+  it("refuses to overwrite unmanaged skills", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-integration-"));
+    directories.push(root);
+    const roots = {
+      codexSkills: join(root, "codex"),
+      claudeSkills: join(root, "claude"),
+    };
+    const path = join(roots.claudeSkills, "share", "SKILL.md");
+    await writeFile(path, "unmanaged", { encoding: "utf8", flag: "wx" }).catch(
+      async () => {
+        await import("node:fs/promises").then(({ mkdir }) =>
+          mkdir(join(roots.claudeSkills, "share"), { recursive: true }),
+        );
+        await writeFile(path, "unmanaged", "utf8");
+      },
+    );
+    await expect(installIntegrations(roots)).rejects.toThrow("unmanaged");
+  });
+});

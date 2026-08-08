@@ -1,0 +1,14 @@
+{
+  "name": "@agentshare/edge-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy:temporary": "wrangler deploy --temporary"
+  },
+  "dependencies": {
+    "@agentshare/contracts": "0.1.0",
+    "@agentshare/web": "0.1.0"
+  }
+}

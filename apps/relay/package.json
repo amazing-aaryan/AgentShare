@@ -1,0 +1,21 @@
+{
+  "name": "@agentshare/relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsx watch src/start.ts",
+    "start": "node dist/start.js"
+  },
+  "dependencies": {
+    "@agentshare/acb": "0.1.0",
+    "@agentshare/contracts": "0.1.0",
+    "@agentshare/web": "0.1.0"
+  }
+}

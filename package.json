@@ -1,0 +1,39 @@
+{
+  "name": "agentshare-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b && npm run bundle:cli",
+    "bundle:cli": "esbuild packages/cli/src/bin.ts --bundle --platform=node --format=esm --target=node22 --outfile=packages/cli/dist/bin.js",
+    "clean": "tsc -b --clean",
+    "dev:relay": "npm run dev --workspace @agentshare/relay",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --pretty false",
+    "start:relay": "npm run start --workspace @agentshare/relay"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@cloudflare/workers-types": "^5.20260808.1",
+    "@types/node": "^22.15.0",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.0.1",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.11",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.120.0"
+  }
+}

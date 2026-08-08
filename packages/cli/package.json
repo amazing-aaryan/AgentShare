@@ -1,0 +1,31 @@
+{
+  "name": "agentshare",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Encrypted Codex and Claude context handoff CLI",
+  "license": "Apache-2.0",
+  "bin": {
+    "agentshare": "./dist/bin.js"
+  },
+  "files": [
+    "dist/bin.js",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@agentshare/acb": "0.1.0",
+    "@agentshare/adapter-claude": "0.1.0",
+    "@agentshare/adapter-codex": "0.1.0",
+    "@agentshare/contracts": "0.1.0",
+    "@agentshare/integrations": "0.1.0",
+    "@agentshare/relay": "0.1.0",
+    "@agentshare/scanner": "0.1.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amazing-aaryan/AgentShare.git"
+  }
+}

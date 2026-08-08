@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../contracts" },
+    { "path": "../acb" },
+    { "path": "../adapter-codex" },
+    { "path": "../adapter-claude" },
+    { "path": "../integrations" },
+    { "path": "../scanner" },
+    { "path": "../../apps/relay" }
+  ]
+}
