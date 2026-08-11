@@ -14,7 +14,10 @@ import {
 } from "@agentshare/acb";
 import { exportCurrentClaudeSession } from "@agentshare/adapter-claude";
 import { exportCurrentCodexSession } from "@agentshare/adapter-codex";
-import type { AcbManifest } from "@agentshare/contracts";
+import type {
+  AcbManifest,
+  AuthoritativeMetadata,
+} from "@agentshare/contracts";
 import {
   reviewInventory,
   reviewPayload,
@@ -173,19 +176,9 @@ async function loadManifest(options: ShareOptions): Promise<AcbManifest> {
 
 export async function openCommand(target: TargetAgent): Promise<void> {
   const link = await readHiddenLine("AgentShare link: ");
-  const parsed = parseShareUrl(link);
-  const client = new RelayClient(new URL(parsed.safeUrl).origin);
-  const metadata = await client.metadata(parsed.shareId, parsed.readCapability);
-  const envelope = await client.download(parsed.shareId, parsed.readCapability);
-  const manifest = decodeAcb(
-    decryptBundle(
-      envelope,
-      metadata.metadata,
-      keyFromFragment(parsed.fragmentKey),
-    ),
-  );
+  const { manifest, metadata } = await openShare(link);
   process.stdout.write(
-    `Opened ${manifest.title} from ${manifest.sourceAgent}; expires ${metadata.metadata.expiresAt}\n`,
+    `Opened ${manifest.title} from ${manifest.sourceAgent}; expires ${metadata.expiresAt}\n`,
   );
 
   const input = createInterface({
@@ -205,6 +198,27 @@ export async function openCommand(target: TargetAgent): Promise<void> {
   } finally {
     input.close();
   }
+}
+
+export async function openShare(link: string): Promise<{
+  manifest: AcbManifest;
+  metadata: AuthoritativeMetadata;
+}> {
+  const parsed = parseShareUrl(link);
+  const client = new RelayClient(new URL(parsed.safeUrl).origin);
+  const response = await client.metadata(
+    parsed.shareId,
+    parsed.readCapability,
+  );
+  const envelope = await client.download(parsed.shareId, parsed.readCapability);
+  const manifest = decodeAcb(
+    decryptBundle(
+      envelope,
+      response.metadata,
+      keyFromFragment(parsed.fragmentKey),
+    ),
+  );
+  return { manifest, metadata: response.metadata };
 }
 
 export async function revokeCommand(statePath?: string): Promise<void> {
