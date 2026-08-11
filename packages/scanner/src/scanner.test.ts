@@ -77,6 +77,9 @@ describe("final payload scanner", () => {
     ["trailing comma", (url: string) => `${url},`],
     ["trailing semicolon", (url: string) => `${url};`],
     ["trailing question mark", (url: string) => `${url}?`],
+    ["inline code", (url: string) => `\`${url}\``],
+    ["bold emphasis", (url: string) => `**${url}**`],
+    ["mixed Markdown", (url: string) => `***\`${url}\`***`],
   ])("redacts capability URLs wrapped with %s", (_name, wrap) => {
     const capability = `https://relay.example/s/${"s".repeat(24)}#r=${"r".repeat(43)}&k=${"k".repeat(43)}`;
     const wrapped = wrap(capability);
@@ -106,6 +109,37 @@ describe("final payload scanner", () => {
     expect(serialized).not.toContain("r".repeat(43));
     expect(serialized).not.toContain("k".repeat(43));
   });
+
+  it.each([
+    ["malformed Base64", { contentBase64: "%%%" }],
+    ["wrong byte length", { byteLength: 999 }],
+    ["wrong SHA-256", { sha256: "f".repeat(64) }],
+  ])(
+    "rejects original text-resource integrity failure: %s",
+    (_name, override) => {
+      const content = Buffer.from("verified resource", "utf8");
+      const input: AcbManifest = {
+        version: "acb-v1",
+        title: "Synthetic",
+        sourceAgent: "generic",
+        exportedAt: "2026-08-08T12:00:00.000Z",
+        events: [],
+        resources: [
+          {
+            id: "resource-1",
+            mediaType: "text/plain",
+            byteLength: content.byteLength,
+            sha256:
+              "a15886b7b2516c46b49eb97c66581f80df5633aa5269763980ce621b5e884b18",
+            contentBase64: content.toString("base64"),
+            ...override,
+          },
+        ],
+      };
+
+      expect(() => scanAndRedact(input)).toThrow();
+    },
+  );
 
   it("reviews text and binary resources without exposing binary Base64", () => {
     const text = Buffer.from("inspectable text", "utf8");

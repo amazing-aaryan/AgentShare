@@ -67,6 +67,22 @@ function createRequest(
   });
 }
 
+function controlEnv(releaseStatus: () => number) {
+  return {
+    CONTROL: {
+      idFromName: () => ({ name: "global" }),
+      get: () => ({
+        fetch: (request: Request) =>
+          Promise.resolve(
+            new Response(null, {
+              status: request.method === "DELETE" ? releaseStatus() : 201,
+            }),
+          ),
+      }),
+    },
+  } as unknown as ConstructorParameters<typeof ShareObject>[1];
+}
+
 describe("production edge relay lifecycle", () => {
   it("keeps an expired share ID tombstoned", async () => {
     const storage = new MemoryStorage();
@@ -134,6 +150,48 @@ describe("production edge relay lifecycle", () => {
 
     expect((await object.fetch(request())).status).toBe(200);
     expect((await object.fetch(request())).status).toBe(200);
+  });
+
+  it("retries quota release after a revoked record is persisted", async () => {
+    let releases = 0;
+    const object = new ShareObject(
+      { storage: new MemoryStorage() } as unknown as DurableObjectState,
+      controlEnv(() => (++releases === 1 ? 503 : 204)),
+    );
+    const shareId = randomCapability(18);
+    const revoke = randomCapability();
+    await object.fetch(
+      createRequest(shareId, randomCapability(), randomCapability(), revoke),
+    );
+    const request = () =>
+      new Request(`https://relay.test/v1/shares/${shareId}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${revoke}` },
+      });
+
+    expect((await object.fetch(request())).status).toBe(503);
+    expect((await object.fetch(request())).status).toBe(200);
+    expect(releases).toBe(2);
+  });
+
+  it("retries quota release when an expiry alarm is retried", async () => {
+    let releases = 0;
+    const object = new ShareObject(
+      { storage: new MemoryStorage() } as unknown as DurableObjectState,
+      controlEnv(() => (++releases === 1 ? 503 : 204)),
+    );
+    await object.fetch(
+      createRequest(
+        randomCapability(18),
+        randomCapability(),
+        randomCapability(),
+        randomCapability(),
+      ),
+    );
+
+    await expect(object.alarm()).rejects.toThrow();
+    await expect(object.alarm()).resolves.toBeUndefined();
+    expect(releases).toBe(2);
   });
 
   it("serializes concurrent creates for the same share ID", async () => {
