@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { assertResourceIntegrity } from "@agentshare/acb";
 import { acbManifestSchema, type AcbManifest } from "@agentshare/contracts";
 
 export type SecretFinding = {
@@ -37,20 +38,11 @@ const PATTERNS: ReadonlyArray<{ kind: string; pattern: RegExp }> = [
 ];
 
 const HTTP_URL = /https?:\/\/[^\s<>"']+/giu;
-const TRAILING_URL_PUNCTUATION = new Set([
-  ".",
-  ",",
-  ";",
-  ":",
-  "!",
-  "?",
-  ")",
-  "]",
-  "}",
-]);
+const CAPABILITY_TOKEN_CHARACTER = /^[A-Za-z0-9_-]$/u;
 
 export function scanAndRedact(input: AcbManifest): ScanResult {
   const manifest = structuredClone(acbManifestSchema.parse(input));
+  assertResourceIntegrity(manifest);
   const findings: SecretFinding[] = [];
 
   manifest.title = redact(manifest.title, "title", findings);
@@ -136,7 +128,7 @@ function capabilityUrlWithTrailingText(
       return { trailing: candidate.slice(end) };
     }
     const last = candidate[end - 1];
-    if (last === undefined || !TRAILING_URL_PUNCTUATION.has(last)) return;
+    if (last === undefined || CAPABILITY_TOKEN_CHARACTER.test(last)) return;
     end -= 1;
   }
   return undefined;

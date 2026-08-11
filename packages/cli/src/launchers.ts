@@ -7,6 +7,14 @@ import { join } from "node:path";
 export type TargetAgent = "codex" | "claude";
 export type TargetResult = { exitCode: number; output: string };
 
+type TargetChildLifecycle = {
+  once(event: "error", listener: (error: Error) => void): TargetChildLifecycle;
+  once(
+    event: "close",
+    listener: (code: number | null) => void,
+  ): TargetChildLifecycle;
+};
+
 const SUPPORTED_VERSIONS: Record<TargetAgent, RegExp> = {
   codex: /^codex-cli 0\.145\./u,
   claude: /^2\.1\.210(?:\s|$)/u,
@@ -111,18 +119,27 @@ export async function runTarget(
     let output = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
-      process.stdout.write(chunk);
+      if (!process.stdout.write(chunk)) {
+        child.stdout.pause();
+        process.stdout.once("drain", () => child.stdout.resume());
+      }
       output = `${output}${chunk}`.slice(-16_000);
     });
     child.stdin.end(prompt);
-    const exitCode = await new Promise<number>((resolve, reject) => {
-      child.once("error", reject);
-      child.once("exit", (code) => resolve(code ?? 1));
-    });
+    const exitCode = await waitForTargetClose(child);
     return { exitCode, output: output.trim() };
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
+}
+
+export function waitForTargetClose(
+  child: TargetChildLifecycle,
+): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
 }
 
 export function supportsTargetVersion(

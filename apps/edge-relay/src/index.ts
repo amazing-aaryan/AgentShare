@@ -122,7 +122,11 @@ export class ShareObject {
       if (!(await authorize(record.revokeTokenDigest, request))) {
         return error("UNAUTHORIZED", "Invalid capability", 401);
       }
-      if (record.status === "revoked") return json(toMetadata(record));
+      if (record.status === "revoked") {
+        return (await this.releaseCapacity(record.metadata.shareId))
+          ? json(toMetadata(record))
+          : error("INTERNAL", "Capacity release unavailable", 503);
+      }
       if (effectiveStatus(record) === "expired") {
         return error("EXPIRED", "Share expired", 410);
       }
@@ -164,7 +168,12 @@ export class ShareObject {
   private async expire(): Promise<void> {
     const record = await this.state.storage.get<RelayRecord>("record");
     if (record === undefined) return;
-    if (record.status === "expired" || record.status === "revoked") return;
+    if (record.status === "expired" || record.status === "revoked") {
+      if (!(await this.releaseCapacity(record.metadata.shareId))) {
+        throw new Error("Capacity release unavailable");
+      }
+      return;
+    }
     const chunks = await this.state.storage.list({ prefix: "blob:" });
     const withoutUpload: RelayRecord = {
       metadata: record.metadata,
@@ -180,7 +189,9 @@ export class ShareObject {
         status: record.status === "revoked" ? "revoked" : "expired",
       });
     });
-    await this.releaseCapacity(record.metadata.shareId);
+    if (!(await this.releaseCapacity(record.metadata.shareId))) {
+      throw new Error("Capacity release unavailable");
+    }
   }
 
   private async serialize<T>(operation: () => Promise<T>): Promise<T> {
@@ -408,8 +419,9 @@ export class ShareObject {
       if (chunks.size > 0) await transaction.delete([...chunks.keys()]);
       await transaction.put("record", revoked);
     });
-    await this.releaseCapacity(record.metadata.shareId);
-    return json(toMetadata(revoked));
+    return (await this.releaseCapacity(record.metadata.shareId))
+      ? json(toMetadata(revoked))
+      : error("INTERNAL", "Capacity release unavailable", 503);
   }
 
   private async reserveCapacity(
@@ -450,14 +462,15 @@ export class ShareObject {
       : error("CAPACITY", "Public relay is at ciphertext capacity", 503);
   }
 
-  private async releaseCapacity(shareId: string): Promise<void> {
+  private async releaseCapacity(shareId: string): Promise<boolean> {
     const control = this.control();
-    if (control === undefined) return;
-    await control.fetch(
+    if (control === undefined) return true;
+    const response = await control.fetch(
       new Request(`https://control/v1/reservations/${shareId}`, {
         method: "DELETE",
       }),
     );
+    return response.ok;
   }
 
   private control(): DurableObjectStub | undefined {

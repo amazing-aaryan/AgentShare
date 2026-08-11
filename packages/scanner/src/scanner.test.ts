@@ -1,6 +1,11 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { AcbManifest } from "@agentshare/contracts";
 import { reviewInventory, reviewPayload, scanAndRedact } from "./index.js";
+
+function sha256(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
 
 describe("final payload scanner", () => {
   it("redacts event and text-resource secrets", () => {
@@ -25,7 +30,7 @@ describe("final payload scanner", () => {
           id: "resource-1",
           mediaType: "text/plain",
           byteLength: resource.byteLength,
-          sha256: "a".repeat(64),
+          sha256: sha256(resource),
           contentBase64: resource.toString("base64"),
         },
       ],
@@ -163,7 +168,7 @@ describe("final payload scanner", () => {
           id: "text",
           mediaType: "text/plain",
           byteLength: text.byteLength,
-          sha256: "a".repeat(64),
+          sha256: sha256(text),
           contentBase64: text.toString("base64"),
           sourcePath: "notes.txt",
         },
@@ -171,7 +176,7 @@ describe("final payload scanner", () => {
           id: "binary",
           mediaType: "application/octet-stream",
           byteLength: binary.byteLength,
-          sha256: "b".repeat(64),
+          sha256: sha256(binary),
           contentBase64: binary.toString("base64"),
         },
       ],

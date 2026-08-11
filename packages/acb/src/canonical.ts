@@ -90,7 +90,7 @@ export function sha256Hex(bytes: Uint8Array): string {
 const CANONICAL_BASE64 =
   /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
 
-function assertResourceIntegrity(manifest: AcbManifest): void {
+export function assertResourceIntegrity(manifest: AcbManifest): void {
   for (const resource of manifest.resources) {
     if (!CANONICAL_BASE64.test(resource.contentBase64)) {
       throw new Error(`Resource ${resource.id} has invalid Base64 content`);
