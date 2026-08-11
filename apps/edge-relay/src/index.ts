@@ -164,6 +164,7 @@ export class ShareObject {
   private async expire(): Promise<void> {
     const record = await this.state.storage.get<RelayRecord>("record");
     if (record === undefined) return;
+    if (record.status === "expired" || record.status === "revoked") return;
     const chunks = await this.state.storage.list({ prefix: "blob:" });
     const withoutUpload: RelayRecord = {
       metadata: record.metadata,
@@ -199,7 +200,11 @@ export class ShareObject {
   private async create(request: CreateShareRequest): Promise<Response> {
     const existing = await this.state.storage.get<RelayRecord>("record");
     if (existing !== undefined) {
-      if (existing.status === "expired" || existing.status === "revoked") {
+      if (effectiveStatus(existing) === "expired") {
+        await this.expire();
+        return error("CONFLICT", "Share ID has already been consumed", 409);
+      }
+      if (existing.status === "revoked") {
         return error("CONFLICT", "Share ID has already been consumed", 409);
       }
       const same =

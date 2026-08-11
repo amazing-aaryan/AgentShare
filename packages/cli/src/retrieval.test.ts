@@ -11,7 +11,7 @@ describe("recipient conversation continuity", () => {
       "follow-up",
       [{ citation: "session#event-0", text: "evidence", score: 1 }],
       history,
-    ]) as string;
+    ]);
 
     expect(prompt).toContain("question-11");
     expect(prompt).toContain("answer-11");

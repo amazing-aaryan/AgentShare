@@ -67,16 +67,9 @@ export function createRelayHandler(
         );
       }
       if (request.method === "PUT" && action === "blob") {
-        const contentLength = Number(
-          request.headers.get("content-length") ?? "0",
-        );
-        if (contentLength > MAX_CIPHERTEXT_BYTES) {
-          return withCors(
-            error("PAYLOAD_TOO_LARGE", "Ciphertext exceeds relay limit", 413),
-            options,
-          );
-        }
-        const blob = new Uint8Array(await request.arrayBuffer());
+        const received = await readBoundedBody(request);
+        if (received instanceof Response) return withCors(received, options);
+        const blob = received;
         const descriptor = uploadDescriptorSchema.parse({
           ciphertextSha256: request.headers.get("x-agentshare-sha256"),
           ciphertextBytes: blob.byteLength,
@@ -107,6 +100,42 @@ export function createRelayHandler(
       return withCors(mapError(caught), options);
     }
   };
+}
+
+async function readBoundedBody(
+  request: Request,
+): Promise<Uint8Array | Response> {
+  const declaredHeader = request.headers.get("content-length");
+  const declared = declaredHeader === null ? undefined : Number(declaredHeader);
+  if (
+    declared !== undefined &&
+    (!Number.isInteger(declared) || declared <= 0)
+  ) {
+    return error("BAD_REQUEST", "Invalid Content-Length", 400);
+  }
+  if (declared !== undefined && declared > MAX_CIPHERTEXT_BYTES) {
+    return error("PAYLOAD_TOO_LARGE", "Ciphertext exceeds relay limit", 413);
+  }
+  if (request.body === null)
+    return error("BAD_REQUEST", "Missing ciphertext", 400);
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_CIPHERTEXT_BYTES) {
+      await reader.cancel();
+      return error("PAYLOAD_TOO_LARGE", "Ciphertext exceeds relay limit", 413);
+    }
+    chunks.push(value);
+  }
+  if (declared !== undefined && total !== declared) {
+    return error("BAD_REQUEST", "Content-Length mismatch", 400);
+  }
+  return Buffer.concat(chunks, total);
 }
 
 function sharePage(): Response {

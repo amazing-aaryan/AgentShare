@@ -18,7 +18,11 @@ import {
   scanAndRedact,
 } from "@agentshare/scanner";
 import { manifestFromTextFile } from "./manifest.js";
-import { evidencePrompt, retrieveEvidence } from "./retrieval.js";
+import {
+  evidencePrompt,
+  retrieveEvidence,
+  type ConversationTurn,
+} from "./retrieval.js";
 import { openShare } from "./handoff.js";
 import { runTarget, type TargetAgent } from "./launchers.js";
 import { RelayClient, RelayClientError } from "./relay-client.js";
@@ -271,15 +275,23 @@ export async function openCommand(target: TargetAgent): Promise<void> {
     input: process.stdin,
     output: process.stdout,
   });
+  const history: ConversationTurn[] = [];
   try {
     while (true) {
       const query = (await input.question("agentshare> ")).trim();
       if (query === "/exit" || query === "/quit") break;
       if (query.length === 0) continue;
       const evidence = retrieveEvidence(manifest, query);
-      const exitCode = await runTarget(target, evidencePrompt(query, evidence));
-      if (exitCode !== 0)
-        process.stderr.write(`${target} exited with code ${exitCode}\n`);
+      const result = await runTarget(
+        target,
+        evidencePrompt(query, evidence, history),
+      );
+      if (result.exitCode !== 0) {
+        process.stderr.write(`${target} exited with code ${result.exitCode}\n`);
+        continue;
+      }
+      history.push({ user: query, assistant: result.output });
+      if (history.length > 8) history.shift();
     }
   } finally {
     input.close();

@@ -5,6 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 export type TargetAgent = "codex" | "claude";
+export type TargetResult = { exitCode: number; output: string };
 
 const SUPPORTED_VERSIONS: Record<TargetAgent, RegExp> = {
   codex: /^codex-cli 0\.145\./u,
@@ -88,7 +89,7 @@ export function claudeArgs(): string[] {
 export async function runTarget(
   target: TargetAgent,
   prompt: string,
-): Promise<number> {
+): Promise<TargetResult> {
   const workspace = await mkdtemp(join(tmpdir(), "agentshare-query-"));
   try {
     const executable = resolveAgentExecutable(target);
@@ -103,15 +104,22 @@ export async function runTarget(
       {
         cwd: workspace,
         env: safeEnvironment(),
-        stdio: ["pipe", "inherit", "inherit"],
+        stdio: ["pipe", "pipe", "inherit"],
         windowsHide: true,
       },
     );
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      process.stdout.write(chunk);
+      output = `${output}${chunk}`.slice(-16_000);
+    });
     child.stdin.end(prompt);
-    return await new Promise<number>((resolve, reject) => {
+    const exitCode = await new Promise<number>((resolve, reject) => {
       child.once("error", reject);
       child.once("exit", (code) => resolve(code ?? 1));
     });
+    return { exitCode, output: output.trim() };
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

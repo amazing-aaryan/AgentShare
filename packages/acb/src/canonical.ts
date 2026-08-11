@@ -48,12 +48,15 @@ function serialize(value: JsonValue): string {
 
 export function encodeAcb(manifest: AcbManifest): Uint8Array {
   const parsed = acbManifestSchema.parse(manifest);
+  assertResourceIntegrity(parsed);
   return Buffer.from(canonicalJson(parsed), "utf8");
 }
 
 export function decodeAcb(bytes: Uint8Array): AcbManifest {
   const value: unknown = JSON.parse(Buffer.from(bytes).toString("utf8"));
-  return acbManifestSchema.parse(value);
+  const manifest = acbManifestSchema.parse(value);
+  assertResourceIntegrity(manifest);
+  return manifest;
 }
 
 export function logicalFingerprint(manifest: AcbManifest): string {
@@ -82,4 +85,22 @@ export function canonicalAad(metadata: AuthoritativeMetadata): Uint8Array {
 
 export function sha256Hex(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+const CANONICAL_BASE64 =
+  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
+
+function assertResourceIntegrity(manifest: AcbManifest): void {
+  for (const resource of manifest.resources) {
+    if (!CANONICAL_BASE64.test(resource.contentBase64)) {
+      throw new Error(`Resource ${resource.id} has invalid Base64 content`);
+    }
+    const content = Buffer.from(resource.contentBase64, "base64");
+    if (content.byteLength !== resource.byteLength) {
+      throw new Error(`Resource ${resource.id} byte length mismatch`);
+    }
+    if (sha256Hex(content) !== resource.sha256) {
+      throw new Error(`Resource ${resource.id} SHA-256 mismatch`);
+    }
+  }
 }

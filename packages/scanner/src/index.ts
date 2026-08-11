@@ -37,6 +37,17 @@ const PATTERNS: ReadonlyArray<{ kind: string; pattern: RegExp }> = [
 ];
 
 const HTTP_URL = /https?:\/\/[^\s<>"']+/giu;
+const TRAILING_URL_PUNCTUATION = new Set([
+  ".",
+  ",",
+  ";",
+  ":",
+  "!",
+  "?",
+  ")",
+  "]",
+  "}",
+]);
 
 export function scanAndRedact(input: AcbManifest): ScanResult {
   const manifest = structuredClone(acbManifestSchema.parse(input));
@@ -94,13 +105,14 @@ function redact(
   findings: SecretFinding[],
 ): string {
   let result = text.replace(HTTP_URL, (candidate) => {
-    if (!isAgentShareCapabilityUrl(candidate)) return candidate;
+    const capability = capabilityUrlWithTrailingText(candidate);
+    if (capability === undefined) return candidate;
     findings.push({
       kind: "agentshare-capability-url",
       location,
       redactedPreview: "https://...[REDACTED]",
     });
-    return "[REDACTED:agentshare-capability-url]";
+    return `[REDACTED:agentshare-capability-url]${capability.trailing}`;
   });
   for (const { kind, pattern } of PATTERNS) {
     result = result.replace(pattern, (match) => {
@@ -113,6 +125,21 @@ function redact(
     });
   }
   return result;
+}
+
+function capabilityUrlWithTrailingText(
+  candidate: string,
+): { trailing: string } | undefined {
+  let end = candidate.length;
+  while (end > 0) {
+    if (isAgentShareCapabilityUrl(candidate.slice(0, end))) {
+      return { trailing: candidate.slice(end) };
+    }
+    const last = candidate[end - 1];
+    if (last === undefined || !TRAILING_URL_PUNCTUATION.has(last)) return;
+    end -= 1;
+  }
+  return undefined;
 }
 
 function isAgentShareCapabilityUrl(candidate: string): boolean {

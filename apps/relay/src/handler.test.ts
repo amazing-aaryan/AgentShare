@@ -122,18 +122,15 @@ describe("relay handler", () => {
         sent += chunk.byteLength;
       },
     });
-    const request = new Request(
-      `http://relay.test/v1/shares/${shareId}/blob`,
-      {
-        method: "PUT",
-        headers: {
-          authorization: `Bearer ${upload}`,
-          "x-agentshare-sha256": "a".repeat(64),
-        },
-        body,
-        duplex: "half",
-      } as RequestInit & { duplex: "half" },
-    );
+    const request = new Request(`http://relay.test/v1/shares/${shareId}/blob`, {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${upload}`,
+        "x-agentshare-sha256": "a".repeat(64),
+      },
+      body,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
     Object.defineProperty(request, "arrayBuffer", {
       value: () => Promise.reject(new Error("request buffering is forbidden")),
     });

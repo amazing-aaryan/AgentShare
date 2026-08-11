@@ -7,5 +7,6 @@ coverage/
 !.env.example
 .agentshare/
 .wrangler/
+.codex/
 artifacts/
 chat-transcript.md

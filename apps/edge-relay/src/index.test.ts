@@ -101,9 +101,8 @@ describe("production edge relay lifecycle", () => {
       const upload = randomCapability();
       const revoke = randomCapability();
       expect(
-        (
-          await object.fetch(createRequest(shareId, read, upload, revoke))
-        ).status,
+        (await object.fetch(createRequest(shareId, read, upload, revoke)))
+          .status,
       ).toBe(201);
 
       vi.setSystemTime(new Date("2026-08-08T12:01:00.000Z"));
