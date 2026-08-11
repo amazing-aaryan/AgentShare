@@ -13,7 +13,7 @@ npx wrangler deploy --config apps/edge-relay/wrangler.jsonc
 Set the returned Workers URL for creators:
 
 ```powershell
-$env:AGENTSHARE_RELAY = "https://agentshare-relay.<account>.workers.dev"
+$env:AGENTSHARE_RELAY = "https://agentshare-relay.carnation-vermicelli.workers.dev"
 agentshare share --current --source codex
 ```
 

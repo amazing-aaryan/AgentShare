@@ -15,14 +15,22 @@ AES-256-GCM encryption, blind relay APIs, idempotent sharing, revocation, a
 recipient page, global creator skills, isolated recipient launchers, and a
 SQLite-backed Cloudflare Durable Object relay.
 
-The in-memory relay is for local development. The edge relay passes local
-create/upload/download/revoke tests and Cloudflare's deployment dry run. A
-permanent public endpoint still requires an authenticated Cloudflare account. Do
-not use with production secrets before an independent security review.
+The in-memory relay is for local development. The durable production relay is
+live at `https://agentshare-relay.carnation-vermicelli.workers.dev`. It stores
+only encrypted payloads and capability digests. Do not use with production
+secrets before an independent security review.
 
 ## Development
 
 Requires Node.js 22 or newer.
+
+Install the public CLI and creator integrations:
+
+```powershell
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.1/agentshare-0.1.1.tgz
+agentshare init
+agentshare share --current --source codex
+```
 
 ```powershell
 npm ci
@@ -46,15 +54,15 @@ recipient opens the link, copies the version-pinned connector command, runs it,
 then enters the original link through hidden terminal input.
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.0/agentshare-0.1.0.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.1/agentshare-0.1.1.tgz -- agentshare open --target codex
 ```
 
 This version-pinned command installs the CLI from the public GitHub release.
 Browsers cannot securely launch an uninstalled CLI, so AgentShare avoids custom
 protocol links that would expose capability material in process arguments.
 
-Creators can select a hosted relay with `--relay URL` or the `AGENTSHARE_RELAY`
-environment variable.
+The public relay is the default. Creators can override it with `--relay URL` or
+the `AGENTSHARE_RELAY` environment variable.
 
 See [the reviewed blueprint](plans/agentshare-v0-blueprint.md) and
 [host capability ADR](docs/adr/0001-host-capability-gates.md).

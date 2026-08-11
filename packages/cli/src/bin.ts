@@ -17,7 +17,7 @@ try {
       relayOrigin:
         option(args, "--relay") ??
         process.env.AGENTSHARE_RELAY ??
-        "http://127.0.0.1:8787",
+        "https://agentshare-relay.carnation-vermicelli.workers.dev",
       ttlSeconds: Number(option(args, "--ttl") ?? "3600"),
       sourceAgent: sourceAgent(option(args, "--source") ?? "generic"),
       yes: args.includes("--yes"),

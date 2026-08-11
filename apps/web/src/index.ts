@@ -1,6 +1,6 @@
 export function renderSharePage(): string {
   const cliCommand =
-    "npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.0/agentshare-0.1.0.tgz -- agentshare open --target ";
+    "npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.1/agentshare-0.1.1.tgz -- agentshare open --target ";
   return `<!doctype html>
 <html lang="en">
 <head>
