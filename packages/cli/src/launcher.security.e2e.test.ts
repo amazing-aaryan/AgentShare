@@ -3,7 +3,13 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { AcbManifest } from "@agentshare/contracts";
 import { runTarget, type TargetAgent } from "./launchers.js";
+import {
+  evidencePrompt,
+  retrieveEvidence,
+  type ConversationTurn,
+} from "./retrieval.js";
 
 const runRealAgents = process.env.AGENTSHARE_REAL_AGENT_E2E === "1";
 
@@ -41,6 +47,47 @@ describe.skipIf(!runRealAgents)("real target isolation", () => {
         await new Promise<void>((resolve) => server.close(() => resolve()));
         await rm(directory, { recursive: true, force: true });
       }
+    }, 120_000);
+
+    it(`${target} preserves a grounded two-turn follow-up`, async () => {
+      const manifest: AcbManifest = {
+        version: "acb-v1",
+        title: "Continuity fixture",
+        sourceAgent: "generic",
+        exportedAt: "2026-08-08T12:00:00.000Z",
+        events: [
+          {
+            sequence: 0,
+            role: "assistant",
+            kind: "message",
+            text: "Project codename is ORBIT because deployments must be deterministic.",
+            sourceId: "fixture",
+          },
+        ],
+        resources: [],
+      };
+      const firstQuestion = "What is the project codename?";
+      const firstEvidence = retrieveEvidence(manifest, firstQuestion);
+      const first = await runTarget(
+        target,
+        evidencePrompt(firstQuestion, firstEvidence),
+      );
+      expect(first.exitCode).toBe(0);
+      expect(first.output).toMatch(/ORBIT/iu);
+
+      const history: ConversationTurn[] = [
+        { user: firstQuestion, assistant: first.output },
+      ];
+      const followUp = "Why was that name chosen?";
+      const secondEvidence = retrieveEvidence(manifest, followUp, 8, history);
+      const second = await runTarget(
+        target,
+        evidencePrompt(followUp, secondEvidence, history),
+      );
+
+      expect(second.exitCode).toBe(0);
+      expect(second.output).toMatch(/deterministic/iu);
+      expect(second.output).toMatch(/fixture#event-0/iu);
     }, 120_000);
   }
 });
