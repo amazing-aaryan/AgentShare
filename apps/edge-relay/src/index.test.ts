@@ -7,6 +7,7 @@ const MAX_ACTIVE_SHARES = 5_000;
 class MemoryStorage {
   readonly values = new Map<string, unknown>();
   failNextAlarm = false;
+  failNextRecordDelete = false;
   failNextRecordPutAfterWrite = false;
 
   get<T>(key: string): Promise<T | undefined> {
@@ -48,8 +49,12 @@ class MemoryStorage {
   }
 
   delete(keys: string | string[]): Promise<void> {
-    for (const key of typeof keys === "string" ? [keys] : keys)
-      this.values.delete(key);
+    const selected = typeof keys === "string" ? [keys] : keys;
+    if (selected.includes("record") && this.failNextRecordDelete) {
+      this.failNextRecordDelete = false;
+      return Promise.reject(new Error("synthetic record delete failure"));
+    }
+    for (const key of selected) this.values.delete(key);
     return Promise.resolve();
   }
 
@@ -287,6 +292,30 @@ describe("production edge relay lifecycle", () => {
     expect(releases).toBe(1);
   });
 
+  it("preserves alarm and capacity when a partial record cannot be deleted", async () => {
+    const storage = new MemoryStorage();
+    storage.failNextRecordPutAfterWrite = true;
+    storage.failNextRecordDelete = true;
+    let releases = 0;
+    const object = new ShareObject(
+      { storage } as unknown as DurableObjectState,
+      controlEnv(() => {
+        releases += 1;
+        return 204;
+      }),
+    );
+    const shareId = randomCapability(18);
+    const read = randomCapability();
+    const upload = randomCapability();
+    const revoke = randomCapability();
+    const request = () => createRequest(shareId, read, upload, revoke);
+
+    expect((await object.fetch(request())).status).toBe(500);
+    expect(storage.values.has("record")).toBe(true);
+    expect(releases).toBe(0);
+    expect((await object.fetch(request())).status).toBe(200);
+  });
+
   it("streams multi-chunk uploads without buffering the request", async () => {
     const storage = new MemoryStorage();
     const object = new ShareObject({
@@ -368,6 +397,31 @@ describe("production edge relay lifecycle", () => {
       );
     const responses = await Promise.all([reserve(), reserve()]);
     expect(responses.map(({ status }) => status).sort()).toEqual([201, 503]);
+  });
+
+  it("refreshes expiry when a reservation PUT is retried", async () => {
+    const storage = new MemoryStorage();
+    const control = new RelayControl({
+      storage,
+    } as unknown as DurableObjectState);
+    const shareId = randomCapability(18);
+    const reserve = (expiresAt: string) =>
+      control.fetch(
+        new Request(`https://control/v1/reservations/${shareId}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ expiresAt }),
+        }),
+      );
+    const firstExpiry = "2099-01-01T00:01:00.000Z";
+    const retriedExpiry = "2099-01-01T00:02:00.000Z";
+
+    expect((await reserve(firstExpiry)).status).toBe(201);
+    expect((await reserve(retriedExpiry)).status).toBe(201);
+    const quota = storage.values.get("quota") as {
+      entries: Record<string, { expiresAt: string }>;
+    };
+    expect(quota.entries[shareId]?.expiresAt).toBe(retriedExpiry);
   });
 
   it("rejects rate-limited creates before allocating a Durable Object", async () => {
