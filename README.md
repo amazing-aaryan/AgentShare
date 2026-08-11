@@ -133,6 +133,18 @@ npm run test:edge-runtime
 npm audit --audit-level=high
 ```
 
+Before a release, run the fail-closed live gate against the production relay and
+authenticated Codex and Claude Code CLIs:
+
+```powershell
+$env:AGENTSHARE_E2E_RELAY="https://agentshare-relay.carnation-vermicelli.workers.dev"
+npm run test:release
+```
+
+The gate tests both agents by default. To record a partial diagnostic run, set
+`AGENTSHARE_REAL_AGENT_TARGETS` to `codex` or `claude`; a partial run is not a
+full cross-agent release pass.
+
 For local relay development:
 
 ```powershell
