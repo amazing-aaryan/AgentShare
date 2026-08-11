@@ -69,4 +69,41 @@ describe("final payload scanner", () => {
     expect(JSON.stringify(result.manifest)).not.toContain(capability);
     expect(JSON.stringify(result.manifest)).not.toContain(bearer);
   });
+
+  it.each([
+    ["parentheses", (url: string) => `(${url})`],
+    ["brackets", (url: string) => `[${url}]`],
+    ["trailing period", (url: string) => `${url}.`],
+    ["trailing comma", (url: string) => `${url},`],
+    ["trailing semicolon", (url: string) => `${url};`],
+    ["trailing question mark", (url: string) => `${url}?`],
+  ])("redacts capability URLs wrapped with %s", (_name, wrap) => {
+    const capability = `https://relay.example/s/${"s".repeat(24)}#r=${"r".repeat(43)}&k=${"k".repeat(43)}`;
+    const wrapped = wrap(capability);
+    const input: AcbManifest = {
+      version: "acb-v1",
+      title: "Synthetic",
+      sourceAgent: "generic",
+      exportedAt: "2026-08-08T12:00:00.000Z",
+      events: [
+        {
+          sequence: 0,
+          role: "user",
+          kind: "message",
+          text: `Prior handoff: ${wrapped}`,
+          sourceId: "wrapped-capability",
+        },
+      ],
+      resources: [],
+    };
+
+    const result = scanAndRedact(input);
+    const serialized = JSON.stringify(result.manifest);
+
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({ kind: "agentshare-capability-url" }),
+    );
+    expect(serialized).not.toContain("r".repeat(43));
+    expect(serialized).not.toContain("k".repeat(43));
+  });
 });

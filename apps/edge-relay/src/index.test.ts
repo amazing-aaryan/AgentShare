@@ -1,5 +1,5 @@
 import { capabilityDigest, randomCapability, sha256Hex } from "@agentshare/acb";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import worker, { RelayControl, ShareObject } from "./index.js";
 
 const MAX_ACTIVE_SHARES = 5_000;
@@ -86,6 +86,35 @@ describe("production edge relay lifecycle", () => {
       createRequest(shareId, read, randomCapability(), randomCapability()),
     );
     expect(recreated.status).toBe(409);
+  });
+
+  it("tombstones a logically expired share before its alarm runs", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-08T12:00:00.000Z"));
+    try {
+      const storage = new MemoryStorage();
+      const object = new ShareObject({
+        storage,
+      } as unknown as DurableObjectState);
+      const shareId = randomCapability(18);
+      const read = randomCapability();
+      const upload = randomCapability();
+      const revoke = randomCapability();
+      expect(
+        (
+          await object.fetch(createRequest(shareId, read, upload, revoke))
+        ).status,
+      ).toBe(201);
+
+      vi.setSystemTime(new Date("2026-08-08T12:01:00.000Z"));
+      const retried = await object.fetch(
+        createRequest(shareId, read, upload, revoke),
+      );
+
+      expect(retried.status).toBe(409);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("makes authenticated revoke retries idempotent", async () => {

@@ -81,4 +81,30 @@ describe("ACB", () => {
     expect(parsed.safeUrl).not.toContain(parsed.fragmentKey);
     expect(parsed.safeUrl).not.toContain(parsed.readCapability);
   });
+
+  it.each([
+    ["malformed Base64", { contentBase64: "%%%" }],
+    ["wrong byte length", { byteLength: 999 }],
+    ["wrong SHA-256", { sha256: "f".repeat(64) }],
+  ])("rejects resource content with %s", (_name, override) => {
+    const content = Buffer.from("verified resource", "utf8");
+    const invalid = {
+      ...manifest,
+      resources: [
+        {
+          id: "resource-1",
+          mediaType: "text/plain",
+          byteLength: content.byteLength,
+          sha256:
+            "a15886b7b2516c46b49eb97c66581f80df5633aa5269763980ce621b5e884b18",
+          contentBase64: content.toString("base64"),
+          ...override,
+        },
+      ],
+    };
+
+    expect(() =>
+      decodeAcb(Buffer.from(JSON.stringify(invalid), "utf8")),
+    ).toThrow();
+  });
 });
