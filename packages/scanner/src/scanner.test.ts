@@ -194,4 +194,27 @@ describe("final payload scanner", () => {
     );
     expect(payload).not.toContain(binary.toString("base64"));
   });
+
+  it("rejects secrets hidden behind a binary media type", () => {
+    const capability = `https://relay.example/s/${"s".repeat(24)}#r=${"r".repeat(43)}&k=${"k".repeat(43)}`;
+    const binary = Buffer.from(`\x89PNG\r\n${capability}`, "latin1");
+    const input: AcbManifest = {
+      version: "acb-v1",
+      title: "Synthetic",
+      sourceAgent: "generic",
+      exportedAt: "2026-08-08T12:00:00.000Z",
+      events: [],
+      resources: [
+        {
+          id: "laundered",
+          mediaType: "image/png",
+          byteLength: binary.byteLength,
+          sha256: sha256(binary),
+          contentBase64: binary.toString("base64"),
+        },
+      ],
+    };
+
+    expect(() => scanAndRedact(input)).toThrow(/binary resource.*secret/iu);
+  });
 });

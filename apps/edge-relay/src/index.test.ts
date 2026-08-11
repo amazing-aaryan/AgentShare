@@ -6,20 +6,31 @@ const MAX_ACTIVE_SHARES = 5_000;
 
 class MemoryStorage {
   readonly values = new Map<string, unknown>();
+  failNextAlarm = false;
+  failNextRecordPutAfterWrite = false;
 
   get<T>(key: string): Promise<T | undefined> {
     return Promise.resolve(this.values.get(key) as T | undefined);
   }
 
   put(key: string | Record<string, unknown>, value?: unknown): Promise<void> {
-    if (typeof key === "string") this.values.set(key, value);
-    else
+    if (typeof key === "string") {
+      this.values.set(key, value);
+      if (key === "record" && this.failNextRecordPutAfterWrite) {
+        this.failNextRecordPutAfterWrite = false;
+        return Promise.reject(new Error("synthetic record write failure"));
+      }
+    } else
       for (const [name, item] of Object.entries(key))
         this.values.set(name, item);
     return Promise.resolve();
   }
 
   setAlarm(): Promise<void> {
+    if (this.failNextAlarm) {
+      this.failNextAlarm = false;
+      return Promise.reject(new Error("synthetic alarm failure"));
+    }
     return Promise.resolve();
   }
 
@@ -36,8 +47,9 @@ class MemoryStorage {
     return Promise.resolve();
   }
 
-  delete(keys: string[]): Promise<void> {
-    for (const key of keys) this.values.delete(key);
+  delete(keys: string | string[]): Promise<void> {
+    for (const key of typeof keys === "string" ? [keys] : keys)
+      this.values.delete(key);
     return Promise.resolve();
   }
 
@@ -219,6 +231,42 @@ describe("production edge relay lifecycle", () => {
       ),
     ]);
     expect([first.status, second.status].sort()).toEqual([201, 409]);
+  });
+
+  it("rolls back a record when alarm setup fails", async () => {
+    const storage = new MemoryStorage();
+    storage.failNextAlarm = true;
+    const object = new ShareObject({
+      storage,
+    } as unknown as DurableObjectState);
+    const request = createRequest(
+      randomCapability(18),
+      randomCapability(),
+      randomCapability(),
+      randomCapability(),
+    );
+
+    expect((await object.fetch(request.clone())).status).toBe(500);
+    expect(storage.values.has("record")).toBe(false);
+    expect((await object.fetch(request)).status).toBe(201);
+  });
+
+  it("rolls back a partially applied record write", async () => {
+    const storage = new MemoryStorage();
+    storage.failNextRecordPutAfterWrite = true;
+    const object = new ShareObject({
+      storage,
+    } as unknown as DurableObjectState);
+    const request = createRequest(
+      randomCapability(18),
+      randomCapability(),
+      randomCapability(),
+      randomCapability(),
+    );
+
+    expect((await object.fetch(request.clone())).status).toBe(500);
+    expect(storage.values.has("record")).toBe(false);
+    expect((await object.fetch(request)).status).toBe(201);
   });
 
   it("streams multi-chunk uploads without buffering the request", async () => {
