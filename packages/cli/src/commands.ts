@@ -281,7 +281,7 @@ export async function openCommand(target: TargetAgent): Promise<void> {
       const query = (await input.question("agentshare> ")).trim();
       if (query === "/exit" || query === "/quit") break;
       if (query.length === 0) continue;
-      const evidence = retrieveEvidence(manifest, query);
+      const evidence = retrieveEvidence(manifest, query, 8, history);
       const result = await runTarget(
         target,
         evidencePrompt(query, evidence, history),
