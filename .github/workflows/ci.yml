@@ -21,7 +21,7 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npm run build
-      - run: npm test
+      - run: npm run test:coverage
       - run:
           npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
       - run: npm audit --audit-level=high
