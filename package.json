@@ -19,14 +19,16 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false",
     "start:relay": "npm run start --workspace @agentshare/relay"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@cloudflare/workers-types": "^5.20260808.1",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.15.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "esbuild": "^0.28.1",
     "eslint": "^10.0.1",
     "prettier": "^3.9.6",

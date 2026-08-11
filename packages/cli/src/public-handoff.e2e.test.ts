@@ -8,10 +8,10 @@ import {
   InMemoryRelayStore,
   startNodeServer,
 } from "@agentshare/relay";
-import { openShare, shareCommand } from "../packages/cli/src/commands.js";
-import { RelayClient } from "../packages/cli/src/relay-client.js";
-import { retrieveEvidence } from "../packages/cli/src/retrieval.js";
-import { loadState } from "../packages/cli/src/state.js";
+import { openShare, shareCommand } from "./commands.js";
+import { RelayClient } from "./relay-client.js";
+import { retrieveEvidence } from "./retrieval.js";
+import { loadState } from "./state.js";
 
 describe("complete AgentShare handoff", () => {
   it("publishes, opens, queries, and revokes one encrypted context bundle", async () => {
@@ -24,18 +24,25 @@ describe("complete AgentShare handoff", () => {
       "utf8",
     );
 
-    const server = startNodeServer(
-      createRelayHandler(new InMemoryRelayStore()),
-      0,
-    );
-    await new Promise<void>((resolve) => server.once("listening", resolve));
+    const configuredOrigin = process.env.AGENTSHARE_E2E_RELAY;
+    const server =
+      configuredOrigin === undefined
+        ? startNodeServer(createRelayHandler(new InMemoryRelayStore()), 0)
+        : undefined;
+    if (server !== undefined) {
+      await new Promise<void>((resolve) => server.once("listening", resolve));
+    }
 
     try {
-      const address = server.address();
-      if (address === null || typeof address === "string") {
-        throw new Error("Missing E2E relay address");
-      }
-      const origin = `http://127.0.0.1:${address.port}`;
+      const address = server?.address();
+      const origin =
+        configuredOrigin ??
+        (address !== null &&
+        address !== undefined &&
+        typeof address !== "string"
+          ? `http://127.0.0.1:${address.port}`
+          : undefined);
+      if (origin === undefined) throw new Error("Missing E2E relay address");
       const url = await shareCommand({
         inputPath,
         relayOrigin: origin,
@@ -68,7 +75,9 @@ describe("complete AgentShare handoff", () => {
 
       await expect(openShare(url)).rejects.toMatchObject({ status: 410 });
     } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      if (server !== undefined) {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
       await rm(directory, { recursive: true, force: true });
     }
   });
