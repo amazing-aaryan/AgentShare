@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible AgentShare defect using synthetic data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value:
+        Do not include credentials, capability URLs, private source, or
+        decrypted bundles.
+  - type: input
+    id: version
+    attributes:
+      label: AgentShare version
+      placeholder: v0.1.3
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction
+      description: Provide minimal steps using synthetic, non-sensitive data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: sensitive
+    attributes:
+      label: Data safety
+      options:
+        - label:
+            I removed all secrets, capability URLs, private source, and
+            decrypted context.
+          required: true

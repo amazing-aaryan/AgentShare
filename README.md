@@ -28,7 +28,7 @@ Requires Node.js 22 or newer.
 Install the public CLI and creator integrations:
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.2/agentshare-0.1.2.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.3/agentshare-0.1.3.tgz
 agentshare init
 agentshare share --current --source codex
 ```
@@ -55,7 +55,7 @@ recipient opens the link, copies the version-pinned connector command, runs it,
 then enters the original link through hidden terminal input.
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.2/agentshare-0.1.2.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.3/agentshare-0.1.3.tgz -- agentshare open --target codex
 ```
 
 This version-pinned command installs the CLI from an immutable public GitHub
@@ -66,9 +66,10 @@ arguments.
 The public relay is the default. Creators can override it with `--relay URL` or
 the `AGENTSHARE_RELAY` environment variable.
 
-See [the reviewed blueprint](plans/agentshare-v0-blueprint.md) and
-[host capability ADR](docs/adr/0001-host-capability-gates.md).
+See [the reviewed blueprint](plans/agentshare-v0-blueprint.md),
+[host capability ADR](docs/adr/0001-host-capability-gates.md), and
+[contribution guide](CONTRIBUTING.md).
 
 ## License
 
-Apache-2.0.
+[Apache-2.0](LICENSE).

@@ -1,7 +1,13 @@
 # Security Policy
 
-AgentShare is pre-release and does not yet provide a production security
-guarantee. Report vulnerabilities privately to the repository maintainers.
+AgentShare is a public beta and does not yet provide a production security
+guarantee. Report vulnerabilities through
+[GitHub private vulnerability reporting](https://github.com/amazing-aaryan/AgentShare/security/advisories/new),
+not a public issue.
+
+## Supported Versions
+
+Only the latest published `0.1.x` release receives security fixes.
 
 Do not include secrets, capability URLs, decrypted bundles, or private source in
 reports. Include affected version, reproducible steps using synthetic data, and

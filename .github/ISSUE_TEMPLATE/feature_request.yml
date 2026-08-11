@@ -1,0 +1,27 @@
+name: Feature request
+description: Propose a scoped AgentShare improvement.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is blocked or inefficient?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security impact
+      description:
+        Note changes to plaintext, capabilities, relay trust, or agent
+        isolation.
+    validations:
+      required: true
