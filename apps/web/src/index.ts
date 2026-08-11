@@ -1,6 +1,6 @@
 export function renderSharePage(): string {
   const cliCommand =
-    "npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.4/agentshare-0.1.4.tgz -- agentshare open --target ";
+    "npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.5/agentshare-0.1.5.tgz -- agentshare open --target ";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -94,25 +94,21 @@ export function renderSharePage(): string {
         button.textContent = "Copied";
         setTimeout(() => { button.textContent = idleText; }, 1600);
       };
-      const legacyCopy = (value) => {
-        const input = document.createElement("textarea");
-        input.value = value;
-        input.setAttribute("readonly", "");
-        input.style.position = "fixed";
-        input.style.opacity = "0";
-        document.body.appendChild(input);
-        input.select();
-        const copied = document.execCommand("copy");
-        input.remove();
-        return copied;
+      const selectCommand = () => {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(command);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand("copy");
+        copy.textContent = "Command selected";
       };
       copy.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(command.textContent);
           finishCopy(copy, "Copy command");
         } catch {
-          if (legacyCopy(command.textContent)) finishCopy(copy, "Copy command");
-          else copy.textContent = "Copy failed";
+          selectCommand();
         }
       });
       copyLink.addEventListener("click", async () => {
@@ -120,15 +116,12 @@ export function renderSharePage(): string {
           await navigator.clipboard.writeText(capabilityLink);
           finishCopy(copyLink, "Copy secure link");
         } catch {
-          if (legacyCopy(capabilityLink)) {
-            finishCopy(copyLink, "Copy secure link");
-            return;
-          }
           manualLink.hidden = false;
           manualLinkValue.value = capabilityLink;
           manualLinkValue.focus();
           manualLinkValue.select();
-          copyLink.textContent = "Select secure link";
+          document.execCommand("copy");
+          copyLink.textContent = "Secure link selected";
         }
       });
       if (!read || !key || !match) {

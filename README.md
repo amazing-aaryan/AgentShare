@@ -28,7 +28,7 @@ Requires Node.js 22 or newer.
 Install the public CLI and creator integrations:
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.4/agentshare-0.1.4.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.5/agentshare-0.1.5.tgz
 agentshare init
 agentshare share --current --source codex
 ```
@@ -55,7 +55,7 @@ recipient opens the link, copies the version-pinned connector command, runs it,
 then enters the original link through hidden terminal input.
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.4/agentshare-0.1.4.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.5/agentshare-0.1.5.tgz -- agentshare open --target codex
 ```
 
 This version-pinned command installs the CLI from an immutable public GitHub
