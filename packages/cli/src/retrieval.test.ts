@@ -63,4 +63,39 @@ describe("recipient conversation continuity", () => {
     expect(prompt).toContain("No prior turns.");
     expect(prompt).not.toContain("x".repeat(100));
   });
+
+  it("uses recent user turns to retrieve evidence for a follow-up question", () => {
+    const manifest: AcbManifest = {
+      version: "acb-v1",
+      title: "Follow-up",
+      sourceAgent: "generic",
+      exportedAt: "2026-08-08T12:00:00.000Z",
+      events: [
+        {
+          sequence: 0,
+          role: "assistant",
+          kind: "message",
+          text: "The parser uses canonical ordering for deterministic output.",
+          sourceId: "session",
+        },
+      ],
+      resources: [],
+    };
+    const history = [
+      {
+        user: "How does canonical ordering make the parser deterministic?",
+        assistant: "It fixes object-key order.",
+      },
+    ];
+    const evidence = Reflect.apply(retrieveEvidence, undefined, [
+      manifest,
+      "Why?",
+      8,
+      history,
+    ]);
+
+    expect(evidence).toEqual([
+      expect.objectContaining({ citation: "session#event-0" }),
+    ]);
+  });
 });
