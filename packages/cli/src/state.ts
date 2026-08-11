@@ -153,7 +153,7 @@ async function acquireLock(path: string): Promise<() => Promise<void>> {
       await handle.close();
       return () => rm(path, { force: true });
     } catch (error) {
-      if (!isAlreadyExists(error)) throw error;
+      if (!isLockContention(error)) throw error;
       let age: number;
       try {
         age = Date.now() - (await stat(path)).mtimeMs;
@@ -171,6 +171,10 @@ async function acquireLock(path: string): Promise<() => Promise<void>> {
   throw new Error(`Timed out acquiring AgentShare state lock: ${path}`);
 }
 
-function isAlreadyExists(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "EEXIST";
+function isLockContention(error: unknown): error is NodeJS.ErrnoException {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    ["EEXIST", "EPERM", "EBUSY"].includes(String(error.code))
+  );
 }

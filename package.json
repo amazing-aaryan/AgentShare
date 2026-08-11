@@ -17,7 +17,7 @@
     "dev:relay": "npm run dev --workspace @agentshare/relay",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint .",
+    "lint": "tsc -b --pretty false && eslint .",
     "test": "vitest run",
     "test:edge-runtime": "node scripts/test-edge-runtime.mjs",
     "test:package": "node scripts/test-package.mjs",
