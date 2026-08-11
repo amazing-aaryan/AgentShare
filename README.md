@@ -141,9 +141,10 @@ $env:AGENTSHARE_E2E_RELAY="https://agentshare-relay.carnation-vermicelli.workers
 npm run test:release
 ```
 
-The gate tests both agents by default. To record a partial diagnostic run, set
-`AGENTSHARE_REAL_AGENT_TARGETS` to `codex` or `claude`; a partial run is not a
-full cross-agent release pass.
+The release gate always tests both agents. For a clearly labeled partial
+diagnostic, set `AGENTSHARE_REAL_AGENT_TARGETS` to exactly `codex` or `claude`
+and run `npm run test:live:diagnostic`; a partial diagnostic is not a full
+cross-agent release pass.
 
 For local relay development:
 

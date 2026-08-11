@@ -249,11 +249,33 @@ export class ShareObject {
     const reservation = await this.reserveCapacity(metadata);
     if (reservation !== undefined) return reservation;
     try {
-      await this.state.storage.put("record", record);
       await this.state.storage.setAlarm(Date.parse(metadata.expiresAt));
-    } catch (error) {
-      await this.releaseCapacity(metadata.shareId);
-      throw error;
+      await this.state.storage.put("record", record);
+    } catch (cause) {
+      const failures: unknown[] = [cause];
+      try {
+        await this.state.storage.delete("record");
+      } catch (error) {
+        failures.push(error);
+      }
+      try {
+        await this.state.storage.deleteAlarm();
+      } catch (error) {
+        failures.push(error);
+      }
+      try {
+        if (!(await this.releaseCapacity(metadata.shareId))) {
+          failures.push(new Error("Capacity release unavailable"));
+        }
+      } catch (error) {
+        failures.push(error);
+      }
+      if (failures.length > 1) {
+        throw new AggregateError(failures, "Share creation rollback failed", {
+          cause,
+        });
+      }
+      throw cause;
     }
     return json(toMetadata(record), 201);
   }

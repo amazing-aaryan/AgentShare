@@ -20,6 +20,7 @@
     "lint": "tsc -b --pretty false && eslint .",
     "test": "vitest run",
     "test:edge-runtime": "node scripts/test-edge-runtime.mjs",
+    "test:live:diagnostic": "node scripts/test-live-diagnostic.mjs",
     "test:package": "node scripts/test-package.mjs",
     "test:release": "node scripts/test-release.mjs",
     "test:coverage": "vitest run --coverage",

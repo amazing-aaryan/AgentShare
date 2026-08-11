@@ -239,16 +239,15 @@ describe("production edge relay lifecycle", () => {
     const object = new ShareObject({
       storage,
     } as unknown as DurableObjectState);
-    const request = createRequest(
-      randomCapability(18),
-      randomCapability(),
-      randomCapability(),
-      randomCapability(),
-    );
+    const shareId = randomCapability(18);
+    const read = randomCapability();
+    const upload = randomCapability();
+    const revoke = randomCapability();
+    const request = () => createRequest(shareId, read, upload, revoke);
 
-    expect((await object.fetch(request.clone())).status).toBe(500);
+    expect((await object.fetch(request())).status).toBe(500);
     expect(storage.values.has("record")).toBe(false);
-    expect((await object.fetch(request)).status).toBe(201);
+    expect((await object.fetch(request())).status).toBe(201);
   });
 
   it("rolls back a partially applied record write", async () => {
@@ -257,16 +256,35 @@ describe("production edge relay lifecycle", () => {
     const object = new ShareObject({
       storage,
     } as unknown as DurableObjectState);
-    const request = createRequest(
-      randomCapability(18),
-      randomCapability(),
-      randomCapability(),
-      randomCapability(),
-    );
+    const shareId = randomCapability(18);
+    const read = randomCapability();
+    const upload = randomCapability();
+    const revoke = randomCapability();
+    const request = () => createRequest(shareId, read, upload, revoke);
 
-    expect((await object.fetch(request.clone())).status).toBe(500);
+    expect((await object.fetch(request())).status).toBe(500);
     expect(storage.values.has("record")).toBe(false);
-    expect((await object.fetch(request)).status).toBe(201);
+    expect((await object.fetch(request())).status).toBe(201);
+  });
+
+  it("recovers when create rollback cannot release capacity", async () => {
+    const storage = new MemoryStorage();
+    storage.failNextAlarm = true;
+    let releases = 0;
+    const object = new ShareObject(
+      { storage } as unknown as DurableObjectState,
+      controlEnv(() => (++releases === 1 ? 503 : 204)),
+    );
+    const shareId = randomCapability(18);
+    const read = randomCapability();
+    const upload = randomCapability();
+    const revoke = randomCapability();
+    const request = () => createRequest(shareId, read, upload, revoke);
+
+    expect((await object.fetch(request())).status).toBe(500);
+    expect(storage.values.has("record")).toBe(false);
+    expect((await object.fetch(request())).status).toBe(201);
+    expect(releases).toBe(1);
   });
 
   it("streams multi-chunk uploads without buffering the request", async () => {

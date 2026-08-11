@@ -73,6 +73,17 @@ export function scanAndRedact(input: AcbManifest): ScanResult {
       !resource.mediaType.startsWith("text/") &&
       resource.mediaType !== "application/json"
     ) {
+      const binaryFindings: SecretFinding[] = [];
+      redact(
+        Buffer.from(resource.contentBase64, "base64").toString("latin1"),
+        `resources[${index}].content`,
+        binaryFindings,
+      );
+      if (binaryFindings.length > 0) {
+        throw new Error(
+          `Binary resource ${resource.id} contains a suspected secret and cannot be shared`,
+        );
+      }
       return scannedMetadata;
     }
     const original = Buffer.from(resource.contentBase64, "base64").toString(

@@ -192,10 +192,7 @@ async function captureProcess(
   child.stderr.setEncoding("utf8");
   child.stdout.on("data", (chunk: string) => (stdout += chunk));
   child.stderr.on("data", (chunk: string) => (stderr += chunk));
-  const exitCode = await new Promise<number>((resolve, reject) => {
-    child.once("error", reject);
-    child.once("exit", (code) => resolve(code ?? 1));
-  });
+  const exitCode = await waitForTargetClose(child);
   if (exitCode !== 0) {
     throw new Error(`Unable to inspect target version: ${stderr.trim()}`);
   }

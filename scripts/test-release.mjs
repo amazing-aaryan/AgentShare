@@ -6,16 +6,9 @@ if (!relay) {
   process.exit(1);
 }
 
-const targets = (process.env.AGENTSHARE_REAL_AGENT_TARGETS ?? "codex,claude")
-  .split(",")
-  .map((target) => target.trim())
-  .filter(Boolean);
-const invalidTargets = targets.filter(
-  (target) => target !== "codex" && target !== "claude",
-);
-if (targets.length === 0 || invalidTargets.length > 0) {
+if (process.env.AGENTSHARE_REAL_AGENT_TARGETS !== undefined) {
   console.error(
-    "AGENTSHARE_REAL_AGENT_TARGETS must contain codex, claude, or both.",
+    "test:release always runs both agents; use test:live:diagnostic for a partial run.",
   );
   process.exit(1);
 }
@@ -33,7 +26,7 @@ const result = spawnSync(
     env: {
       ...process.env,
       AGENTSHARE_REAL_AGENT_E2E: "1",
-      AGENTSHARE_REAL_AGENT_TARGETS: targets.join(","),
+      AGENTSHARE_REAL_AGENT_TARGETS: "codex,claude",
     },
     stdio: "inherit",
   },
