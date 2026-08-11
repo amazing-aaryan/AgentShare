@@ -1,74 +1,142 @@
 # AgentShare
 
-Send encrypted coding-agent context to a coworker's Codex or Claude session.
+Send encrypted coding-agent context to a coworker's Codex or Claude Code
+session. AgentShare reviews and encrypts context locally; the public relay sees
+only ciphertext.
 
-AgentShare packages selected context into a deterministic Agent Context Bundle
-(ACB), scans and reviews the final plaintext, encrypts it locally, and uploads
-only ciphertext to a blind relay. The recipient opens the capability link using
-a temporary query-only connector.
+## Requirements
 
-## Status
+- Node.js 22 or newer
+- Codex CLI or Claude Code
+- A terminal where your AI agent may run approved commands
 
-Release-ready MVP. Current build includes Codex and Claude transcript adapters,
-final-payload review and secret redaction, deterministic ACB encoding, local
-AES-256-GCM encryption, blind relay APIs, idempotent sharing, revocation, a
-recipient page, global creator skills, isolated recipient launchers, and a
-SQLite-backed Cloudflare Durable Object relay.
+AgentShare is a public beta. Do not share production credentials, regulated
+data, or other high-risk material before an independent security review.
 
-The in-memory relay is for local development. The durable production relay is
-live at `https://agentshare-relay.carnation-vermicelli.workers.dev`. It stores
-only encrypted payloads and capability digests. The service is a public beta; do
-not share production credentials or regulated data before an independent
-security review.
+## Let Your AI Agent Install It
 
-## Development
+Paste this message into Codex or Claude Code:
 
-Requires Node.js 22 or newer.
+```text
+Install AgentShare v0.1.6 from its immutable GitHub release.
 
-Install the public CLI and creator integrations:
+1. Confirm Node.js 22 or newer is installed.
+2. Run:
+   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.6/agentshare-0.1.6.tgz
+3. Run:
+   agentshare init
+4. Run `agentshare` and confirm the CLI usage appears.
+5. Do not share any context yet. Tell me which integration files were installed and remind me to start a new agent session.
+```
+
+`agentshare init` installs an explicit creator skill for both supported hosts.
+Start a new Codex or Claude Code session afterward so the host discovers it.
+
+## Manual Installation
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.5/agentshare-0.1.5.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.6/agentshare-0.1.6.tgz
 agentshare init
+agentshare
+```
+
+Expected creator commands:
+
+| Host        | Command       |
+| ----------- | ------------- |
+| Codex       | `$agentshare` |
+| Claude Code | `/share`      |
+
+These commands are explicit-only. AgentShare does not share a session unless you
+invoke one of them and approve the reviewed payload.
+
+## Create a Share Link
+
+1. Open the Codex or Claude Code session containing the context.
+2. Type `$agentshare` in Codex or `/share` in Claude Code.
+3. Review the normalized context, redactions, fingerprint, expiry, and size.
+4. Approve the terminal prompt.
+5. Send the resulting capability link to your coworker.
+
+If the skill is unavailable, use the CLI directly:
+
+```powershell
 agentshare share --current --source codex
 ```
 
+For Claude Code, replace `codex` with `claude`.
+
+## Open a Coworker's Link
+
+The recipient does not need to install AgentShare globally.
+
+1. Open the capability link in a browser.
+2. Choose Codex or Claude Code.
+3. Copy and run the version-pinned command shown on the page.
+4. Copy the secure link and paste it into the hidden terminal prompt.
+5. Ask questions in the isolated agent session that opens.
+
+If browser policy blocks clipboard access, AgentShare reveals and selects the
+secure link. Press `Ctrl+C` or `Cmd+C`, then paste it into the terminal prompt.
+
+Equivalent Codex command:
+
 ```powershell
-npm ci
-npm run lint
-npm run typecheck
-npm test
-npm run build
-npm run start:relay
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.6/agentshare-0.1.6.tgz -- agentshare open --target codex
 ```
 
-In another terminal:
+Replace `codex` with `claude` to open Claude Code.
+
+## Update or Remove
+
+Update by installing the newer immutable release and repairing integrations:
 
 ```powershell
-npm install --global ./packages/cli
-agentshare init
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.6/agentshare-0.1.6.tgz
+agentshare repair
+```
+
+Remove integrations and the CLI:
+
+```powershell
+agentshare remove
+npm uninstall --global agentshare
+```
+
+## How It Works
+
+AgentShare packages selected context into a deterministic Agent Context Bundle
+(ACB), scans and reviews the final plaintext, encrypts it locally with
+AES-256-GCM, and uploads only ciphertext to a blind relay. Capability keys stay
+in the URL fragment and never reach the relay. Shares support expiry,
+idempotency, and revocation.
+
+The public relay is `https://agentshare-relay.carnation-vermicelli.workers.dev`.
+Creators can override it with `--relay URL` or `AGENTSHARE_RELAY`.
+
+## Development
+
+```powershell
+npm ci
+npm run format:check
+npm run lint
+npm run build
+npm run test:coverage
+npm run test:package
+npm run test:edge-runtime
+npm audit --audit-level=high
+```
+
+For local relay development:
+
+```powershell
+npm run start:relay
 agentshare share --current --source codex --relay http://127.0.0.1:8787
 ```
 
-Codex creators invoke `$agentshare`; Claude Code creators invoke `/share`. A
-recipient opens the link, copies the version-pinned connector command, runs it,
-then enters the original link through hidden terminal input.
-
-```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.5/agentshare-0.1.5.tgz -- agentshare open --target codex
-```
-
-This version-pinned command installs the CLI from an immutable public GitHub
-release. Browsers cannot securely launch an uninstalled CLI, so AgentShare
-avoids custom protocol links that would expose capability material in process
-arguments.
-
-The public relay is the default. Creators can override it with `--relay URL` or
-the `AGENTSHARE_RELAY` environment variable.
-
-See [the reviewed blueprint](plans/agentshare-v0-blueprint.md),
-[host capability ADR](docs/adr/0001-host-capability-gates.md), and
-[contribution guide](CONTRIBUTING.md).
+See the [reviewed blueprint](plans/agentshare-v0-blueprint.md),
+[host capability ADR](docs/adr/0001-host-capability-gates.md),
+[contribution guide](CONTRIBUTING.md), and [security policy](SECURITY.md).
 
 ## License
 
