@@ -1,6 +1,6 @@
 export function renderSharePage(): string {
   const cliCommand =
-    "npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.3/agentshare-0.1.3.tgz -- agentshare open --target ";
+    "npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.4/agentshare-0.1.4.tgz -- agentshare open --target ";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -30,6 +30,10 @@ export function renderSharePage(): string {
     code { min-width: 0; overflow-wrap: anywhere; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
     .copy { min-width: 112px; height: 38px; border: 0; border-radius: 4px; color: #fff; background: #f05a3c; font: 650 14px/1 inherit; cursor: pointer; }
     .copy-link { margin-top: 10px; color: #18181b; background: #e4e4df; }
+    .manual-link { margin-top: 12px; }
+    .manual-link[hidden] { display: none; }
+    .manual-link label { display: block; margin-bottom: 6px; color: #52525b; font-size: 13px; }
+    .manual-link input { width: 100%; padding: 10px; border: 1px solid #b9b9b3; border-radius: 4px; background: #fff; font: 13px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
     .copy:disabled { color: #8a8a84; background: #ecece8; cursor: not-allowed; }
     .copy:focus-visible, .target:focus-visible { outline: 3px solid #4d8ee8; outline-offset: 2px; }
     .detail { display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin: 0; font-size: 14px; }
@@ -52,6 +56,7 @@ export function renderSharePage(): string {
       </div>
       <div class="command"><code id="command">${cliCommand}codex</code><button class="copy" id="copy">Copy command</button></div>
       <button class="copy copy-link" id="copy-link" disabled>Copy secure link</button>
+      <div class="manual-link" id="manual-link" hidden><label for="manual-link-value">Secure link</label><input id="manual-link-value" type="text" readonly></div>
       <div class="notice">Run the command, then paste the secure link at the hidden terminal prompt.</div>
     </section>
     <section>
@@ -73,6 +78,8 @@ export function renderSharePage(): string {
       const command = document.getElementById("command");
       const copy = document.getElementById("copy");
       const copyLink = document.getElementById("copy-link");
+      const manualLink = document.getElementById("manual-link");
+      const manualLinkValue = document.getElementById("manual-link-value");
       const status = document.getElementById("status");
       const dot = document.getElementById("dot");
       const expires = document.getElementById("expires");
@@ -83,15 +90,46 @@ export function renderSharePage(): string {
         document.querySelectorAll(".target").forEach((item) => item.setAttribute("aria-selected", String(item === button)));
         renderCommand();
       }));
+      const finishCopy = (button, idleText) => {
+        button.textContent = "Copied";
+        setTimeout(() => { button.textContent = idleText; }, 1600);
+      };
+      const legacyCopy = (value) => {
+        const input = document.createElement("textarea");
+        input.value = value;
+        input.setAttribute("readonly", "");
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        const copied = document.execCommand("copy");
+        input.remove();
+        return copied;
+      };
       copy.addEventListener("click", async () => {
-         await navigator.clipboard.writeText(command.textContent);
-         copy.textContent = "Copied";
-         setTimeout(() => { copy.textContent = "Copy command"; }, 1600);
+        try {
+          await navigator.clipboard.writeText(command.textContent);
+          finishCopy(copy, "Copy command");
+        } catch {
+          if (legacyCopy(command.textContent)) finishCopy(copy, "Copy command");
+          else copy.textContent = "Copy failed";
+        }
       });
       copyLink.addEventListener("click", async () => {
-        await navigator.clipboard.writeText(capabilityLink);
-        copyLink.textContent = "Copied";
-        setTimeout(() => { copyLink.textContent = "Copy secure link"; }, 1600);
+        try {
+          await navigator.clipboard.writeText(capabilityLink);
+          finishCopy(copyLink, "Copy secure link");
+        } catch {
+          if (legacyCopy(capabilityLink)) {
+            finishCopy(copyLink, "Copy secure link");
+            return;
+          }
+          manualLink.hidden = false;
+          manualLinkValue.value = capabilityLink;
+          manualLinkValue.focus();
+          manualLinkValue.select();
+          copyLink.textContent = "Select secure link";
+        }
       });
       if (!read || !key || !match) {
         status.textContent = "Invalid capability link";

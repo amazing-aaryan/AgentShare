@@ -10,7 +10,7 @@ describe("share page", () => {
     );
     expect(html).not.toContain("analytics");
     expect(html).toContain(
-      "agentshare-0.1.3.tgz -- agentshare open --target codex",
+      "agentshare-0.1.4.tgz -- agentshare open --target codex",
     );
   });
 
@@ -20,5 +20,8 @@ describe("share page", () => {
     expect(html).toContain("Copy secure link");
     expect(html).toContain("const capabilityLink = original.toString()");
     expect(html).toContain("navigator.clipboard.writeText(capabilityLink)");
+    expect(html).toContain('id="manual-link"');
+    expect(html).toContain('document.execCommand("copy")');
+    expect(html).toContain("Select secure link");
   });
 });
