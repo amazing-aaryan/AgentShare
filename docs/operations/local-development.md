@@ -47,12 +47,14 @@ after both confirmations.
 agentshare open --target codex
 ```
 
-Enter the link at the hidden prompt. `/exit` ends the REPL. Each Codex query
-runs with ephemeral state, ignored user config/rules, no shell, unified exec,
-patch, JavaScript, or code-mode tools, deny-all configured filesystem access,
-disabled network, web search, apps, hooks, plugins, and memories. Claude runs
-with no built-in tools, strict empty MCP config, no settings sources, no Chrome,
-no skills, and no session persistence.
+Enter the link at the hidden prompt. `/exit` ends the REPL. AgentShare retains
+the eight most recent user/assistant turns in memory for follow-up continuity.
+Each Codex model process still runs with ephemeral state, ignored user
+config/rules, no shell, unified exec, patch, JavaScript, or code-mode tools,
+deny-all configured filesystem access, disabled network, web search, apps,
+hooks, plugins, and memories. Claude runs with no built-in tools, strict empty
+MCP config, no settings sources, no Chrome, no skills, and no session
+persistence.
 
 ## Remaining Beta Work
 

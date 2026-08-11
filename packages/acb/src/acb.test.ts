@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AcbManifest, AuthoritativeMetadata } from "@agentshare/contracts";
 import {
   buildShareUrl,
+  canonicalJson,
   decodeAcb,
   decryptBundle,
   encodeAcb,
@@ -106,5 +107,22 @@ describe("ACB", () => {
     expect(() =>
       decodeAcb(Buffer.from(JSON.stringify(invalid), "utf8")),
     ).toThrow();
+  });
+
+  it("fails closed on malformed canonical, capability, key, and envelope input", () => {
+    expect(() => canonicalJson(Number.NaN)).toThrow("Non-finite");
+    expect(() => canonicalJson(undefined)).toThrow("Unsupported");
+    expect(() => parseShareUrl("https://share.example/s/missing")).toThrow(
+      "Invalid AgentShare capability URL",
+    );
+    expect(() => keyFromFragment("short")).toThrow(
+      "Invalid AgentShare fragment key",
+    );
+    expect(() =>
+      encryptBundle(encodeAcb(manifest), metadata, new Uint8Array(1)),
+    ).toThrow("AES-256");
+    expect(() =>
+      decryptBundle(new Uint8Array(), metadata, new Uint8Array(32)),
+    ).toThrow("Invalid AgentShare envelope");
   });
 });

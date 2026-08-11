@@ -137,4 +137,51 @@ describe("relay handler", () => {
 
     expect((await handler(request)).status).toBe(413);
   });
+
+  it("rejects invalid declared upload lengths before reading a body", async () => {
+    const handler = createRelayHandler(new InMemoryRelayStore());
+    const oversized = new Request("http://relay.test/v1/shares/unused/blob", {
+      method: "PUT",
+      headers: {
+        authorization: "Bearer unused",
+        "content-length": String(MAX_CIPHERTEXT_BYTES + 1),
+        "x-agentshare-sha256": "a".repeat(64),
+      },
+      body: new Uint8Array([1]),
+    });
+    Object.defineProperty(oversized, "arrayBuffer", {
+      value: () => Promise.reject(new Error("body must not be read")),
+    });
+
+    expect((await handler(oversized)).status).toBe(413);
+
+    const shareId = randomCapability(18);
+    const upload = randomCapability();
+    await handler(
+      new Request("http://relay.test/v1/shares", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          shareId,
+          requestedTtlSeconds: 60,
+          uploadTokenDigest: capabilityDigest(upload),
+          readTokenDigest: capabilityDigest(randomCapability()),
+          revokeTokenDigest: capabilityDigest(randomCapability()),
+        }),
+      }),
+    );
+    const response = await handler(
+      new Request(`http://relay.test/v1/shares/${shareId}/blob`, {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${upload}`,
+          "content-length": String(MAX_CIPHERTEXT_BYTES + 1),
+          "x-agentshare-sha256": "a".repeat(64),
+        },
+        body: new Uint8Array([1]),
+      }),
+    );
+
+    expect(response.status).toBe(413);
+  });
 });

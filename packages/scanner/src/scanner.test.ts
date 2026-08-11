@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AcbManifest } from "@agentshare/contracts";
-import { scanAndRedact } from "./index.js";
+import { reviewInventory, reviewPayload, scanAndRedact } from "./index.js";
 
 describe("final payload scanner", () => {
   it("redacts event and text-resource secrets", () => {
@@ -105,5 +105,54 @@ describe("final payload scanner", () => {
     );
     expect(serialized).not.toContain("r".repeat(43));
     expect(serialized).not.toContain("k".repeat(43));
+  });
+
+  it("reviews text and binary resources without exposing binary Base64", () => {
+    const text = Buffer.from("inspectable text", "utf8");
+    const binary = Buffer.from([0, 1, 2]);
+    const input: AcbManifest = {
+      version: "acb-v1",
+      title: "Synthetic",
+      sourceAgent: "generic",
+      exportedAt: "2026-08-08T12:00:00.000Z",
+      events: [
+        {
+          sequence: 0,
+          role: "assistant",
+          kind: "message",
+          text: "x".repeat(200),
+          sourceId: "event-1",
+        },
+      ],
+      resources: [
+        {
+          id: "text",
+          mediaType: "text/plain",
+          byteLength: text.byteLength,
+          sha256: "a".repeat(64),
+          contentBase64: text.toString("base64"),
+          sourcePath: "notes.txt",
+        },
+        {
+          id: "binary",
+          mediaType: "application/octet-stream",
+          byteLength: binary.byteLength,
+          sha256: "b".repeat(64),
+          contentBase64: binary.toString("base64"),
+        },
+      ],
+    };
+
+    const scanned = scanAndRedact(input).manifest;
+    const inventory = reviewInventory(scanned).join("\n");
+    const payload = reviewPayload(scanned);
+
+    expect(inventory).toContain("resource[binary] application/octet-stream");
+    expect(inventory).toContain("...");
+    expect(payload).toContain("inspectable text");
+    expect(payload).toContain(
+      "<3 bytes; base64 omitted from terminal display>",
+    );
+    expect(payload).not.toContain(binary.toString("base64"));
   });
 });

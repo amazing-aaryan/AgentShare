@@ -18,11 +18,11 @@ data, or other high-risk material before an independent security review.
 Paste this message into Codex or Claude Code:
 
 ```text
-Install AgentShare v0.1.6 from its immutable GitHub release.
+Install AgentShare v0.1.7 from its immutable GitHub release.
 
 1. Confirm Node.js 22 or newer is installed.
 2. Run:
-   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.6/agentshare-0.1.6.tgz
+   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz
 3. Run:
    agentshare init
 4. Run `agentshare` and confirm the CLI usage appears.
@@ -35,7 +35,7 @@ Start a new Codex or Claude Code session afterward so the host discovers it.
 ## Manual Installation
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.6/agentshare-0.1.6.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz
 agentshare init
 agentshare
 ```
@@ -82,7 +82,7 @@ secure link. Press `Ctrl+C` or `Cmd+C`, then paste it into the terminal prompt.
 Equivalent Codex command:
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.6/agentshare-0.1.6.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz -- agentshare open --target codex
 ```
 
 Replace `codex` with `claude` to open Claude Code.
@@ -92,7 +92,7 @@ Replace `codex` with `claude` to open Claude Code.
 Update by installing the newer immutable release and repairing integrations:
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.6/agentshare-0.1.6.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz
 agentshare repair
 ```
 
@@ -110,6 +110,12 @@ AgentShare packages selected context into a deterministic Agent Context Bundle
 AES-256-GCM, and uploads only ciphertext to a blind relay. Capability keys stay
 in the URL fragment and never reach the relay. Shares support expiry,
 idempotency, and revocation.
+
+The complete selected normalized transcript is transferred inside the encrypted
+bundle. Recipient questions use local lexical retrieval to select relevant
+excerpts for the isolated target model. The AgentShare REPL retains the eight
+most recent user/assistant turns for follow-up continuity; each underlying Codex
+or Claude process remains ephemeral and receives no relay capability.
 
 The public relay is `https://agentshare-relay.carnation-vermicelli.workers.dev`.
 Creators can override it with `--relay URL` or `AGENTSHARE_RELAY`.
