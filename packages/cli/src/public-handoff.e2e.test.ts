@@ -2,7 +2,12 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseShareUrl } from "@agentshare/acb";
+import {
+  capabilityDigest,
+  parseShareUrl,
+  randomCapability,
+  sha256Hex,
+} from "@agentshare/acb";
 import {
   createRelayHandler,
   InMemoryRelayStore,
@@ -12,6 +17,8 @@ import { openShare, shareCommand } from "./commands.js";
 import { RelayClient } from "./relay-client.js";
 import { retrieveEvidence } from "./retrieval.js";
 import { loadState } from "./state.js";
+
+const configuredOrigin = process.env.AGENTSHARE_E2E_RELAY;
 
 describe("complete AgentShare handoff", () => {
   it("publishes, opens, queries, and revokes one encrypted context bundle", async () => {
@@ -24,7 +31,6 @@ describe("complete AgentShare handoff", () => {
       "utf8",
     );
 
-    const configuredOrigin = process.env.AGENTSHARE_E2E_RELAY;
     const server =
       configuredOrigin === undefined
         ? startNodeServer(createRelayHandler(new InMemoryRelayStore()), 0)
@@ -94,4 +100,66 @@ describe("complete AgentShare handoff", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it.skipIf(configuredOrigin === undefined)(
+    "enforces production replay, expiry, and concurrent upload semantics",
+    async () => {
+      if (configuredOrigin === undefined) return;
+      const client = new RelayClient(configuredOrigin);
+      const shareId = randomCapability(18);
+      const upload = randomCapability();
+      const read = randomCapability();
+      const revoke = randomCapability();
+      await client.create({
+        shareId,
+        requestedTtlSeconds: 60,
+        uploadTokenDigest: capabilityDigest(upload),
+        readTokenDigest: capabilityDigest(read),
+        revokeTokenDigest: capabilityDigest(revoke),
+      });
+      const envelope = Buffer.from("synthetic encrypted envelope", "utf8");
+      const uploadRequest = {
+        shareId,
+        uploadCapability: upload,
+        ciphertextSha256: sha256Hex(envelope),
+        envelope,
+      };
+
+      await Promise.all([
+        client.upload(uploadRequest),
+        client.upload(uploadRequest),
+      ]);
+      await expect(
+        client.upload({
+          ...uploadRequest,
+          ciphertextSha256: sha256Hex(Buffer.from("different", "utf8")),
+          envelope: Buffer.from("different", "utf8"),
+        }),
+      ).rejects.toMatchObject({ status: 409 });
+      await expect(client.download(shareId, read)).resolves.toEqual(envelope);
+      await client.revoke(shareId, revoke);
+
+      const expiringId = randomCapability(18);
+      const expiringUpload = randomCapability();
+      const expiringRead = randomCapability();
+      const expiringRevoke = randomCapability();
+      const expiringRequest = {
+        shareId: expiringId,
+        requestedTtlSeconds: 1,
+        uploadTokenDigest: capabilityDigest(expiringUpload),
+        readTokenDigest: capabilityDigest(expiringRead),
+        revokeTokenDigest: capabilityDigest(expiringRevoke),
+      };
+      await client.create(expiringRequest);
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+
+      await expect(
+        client.metadata(expiringId, expiringRead),
+      ).rejects.toMatchObject({ status: 410 });
+      await expect(client.create(expiringRequest)).rejects.toMatchObject({
+        status: 409,
+      });
+    },
+    30_000,
+  );
 });
