@@ -253,22 +253,26 @@ export class ShareObject {
       await this.state.storage.put("record", record);
     } catch (cause) {
       const failures: unknown[] = [cause];
+      let recordDeleted = false;
       try {
         await this.state.storage.delete("record");
+        recordDeleted = true;
       } catch (error) {
         failures.push(error);
       }
-      try {
-        await this.state.storage.deleteAlarm();
-      } catch (error) {
-        failures.push(error);
-      }
-      try {
-        if (!(await this.releaseCapacity(metadata.shareId))) {
-          failures.push(new Error("Capacity release unavailable"));
+      if (recordDeleted) {
+        try {
+          await this.state.storage.deleteAlarm();
+        } catch (error) {
+          failures.push(error);
         }
-      } catch (error) {
-        failures.push(error);
+        try {
+          if (!(await this.releaseCapacity(metadata.shareId))) {
+            failures.push(new Error("Capacity release unavailable"));
+          }
+        } catch (error) {
+          failures.push(error);
+        }
       }
       if (failures.length > 1) {
         throw new AggregateError(failures, "Share creation rollback failed", {
@@ -531,6 +535,13 @@ export class RelayControl {
           return error("CAPACITY", "Active share capacity reached", 503);
         }
         quota.entries[shareId] = { expiresAt, bytes: 0 };
+      } else {
+        quota.entries[shareId].expiresAt = new Date(
+          Math.max(
+            Date.parse(quota.entries[shareId].expiresAt),
+            Date.parse(expiresAt),
+          ),
+        ).toISOString();
       }
       await this.save(quota);
       return json({ reserved: true }, 201);
