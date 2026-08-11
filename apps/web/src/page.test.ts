@@ -13,4 +13,12 @@ describe("share page", () => {
       "agentshare-0.1.2.tgz -- agentshare open --target codex",
     );
   });
+
+  it("lets the recipient recover the capability link after history scrubbing", () => {
+    const html = renderSharePage();
+    expect(html).toContain('id="copy-link"');
+    expect(html).toContain("Copy secure link");
+    expect(html).toContain("const capabilityLink = original.toString()");
+    expect(html).toContain("navigator.clipboard.writeText(capabilityLink)");
+  });
 });
