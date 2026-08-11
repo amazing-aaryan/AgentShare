@@ -28,7 +28,9 @@ export function renderSharePage(): string {
     .target[aria-selected="true"] { border-color: #18181b; background: #18181b; color: #fff; }
     .command { min-height: 58px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; padding: 10px 10px 10px 16px; border: 1px solid #b9b9b3; border-radius: 6px; background: #fff; }
     code { min-width: 0; overflow-wrap: anywhere; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
-    .copy { min-width: 74px; height: 38px; border: 0; border-radius: 4px; color: #fff; background: #f05a3c; font: 650 14px/1 inherit; cursor: pointer; }
+    .copy { min-width: 112px; height: 38px; border: 0; border-radius: 4px; color: #fff; background: #f05a3c; font: 650 14px/1 inherit; cursor: pointer; }
+    .copy-link { margin-top: 10px; color: #18181b; background: #e4e4df; }
+    .copy:disabled { color: #8a8a84; background: #ecece8; cursor: not-allowed; }
     .copy:focus-visible, .target:focus-visible { outline: 3px solid #4d8ee8; outline-offset: 2px; }
     .detail { display: grid; grid-template-columns: 120px 1fr; gap: 10px; margin: 0; font-size: 14px; }
     dt { color: #71717a; }
@@ -48,8 +50,9 @@ export function renderSharePage(): string {
         <button class="target" role="tab" data-target="codex" aria-selected="true">Codex</button>
         <button class="target" role="tab" data-target="claude" aria-selected="false">Claude Code</button>
       </div>
-      <div class="command"><code id="command">${cliCommand}codex</code><button class="copy" id="copy">Copy</button></div>
-      <div class="notice">Terminal requests the capability link through hidden input. Use the original link; never add it to the command.</div>
+      <div class="command"><code id="command">${cliCommand}codex</code><button class="copy" id="copy">Copy command</button></div>
+      <button class="copy copy-link" id="copy-link" disabled>Copy secure link</button>
+      <div class="notice">Run the command, then paste the secure link at the hidden terminal prompt.</div>
     </section>
     <section>
       <h2>Share</h2>
@@ -60,6 +63,7 @@ export function renderSharePage(): string {
     (() => {
       "use strict";
       const original = new URL(window.location.href);
+      const capabilityLink = original.toString();
       const fragment = new URLSearchParams(original.hash.slice(1));
       const read = fragment.get("r") || original.searchParams.get("r");
       const key = fragment.get("k");
@@ -68,6 +72,7 @@ export function renderSharePage(): string {
       let target = "codex";
       const command = document.getElementById("command");
       const copy = document.getElementById("copy");
+      const copyLink = document.getElementById("copy-link");
       const status = document.getElementById("status");
       const dot = document.getElementById("dot");
       const expires = document.getElementById("expires");
@@ -79,9 +84,14 @@ export function renderSharePage(): string {
         renderCommand();
       }));
       copy.addEventListener("click", async () => {
-        await navigator.clipboard.writeText(command.textContent);
-        copy.textContent = "Copied";
-        setTimeout(() => { copy.textContent = "Copy"; }, 1600);
+         await navigator.clipboard.writeText(command.textContent);
+         copy.textContent = "Copied";
+         setTimeout(() => { copy.textContent = "Copy command"; }, 1600);
+      });
+      copyLink.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(capabilityLink);
+        copyLink.textContent = "Copied";
+        setTimeout(() => { copyLink.textContent = "Copy secure link"; }, 1600);
       });
       if (!read || !key || !match) {
         status.textContent = "Invalid capability link";
@@ -89,6 +99,7 @@ export function renderSharePage(): string {
         expires.textContent = "Unavailable";
         return;
       }
+      copyLink.disabled = false;
       fetch("/v1/shares/" + encodeURIComponent(decodeURIComponent(match[1])) + "/meta", {
         headers: { authorization: "Bearer " + read }, cache: "no-store", credentials: "omit"
       }).then(async (response) => {
