@@ -76,7 +76,9 @@ describe("ACB", () => {
     });
     const parsed = parseShareUrl(link);
     expect(keyFromFragment(parsed.fragmentKey)).toEqual(encrypted.key);
+    expect(new URL(link).search).toBe("");
     expect(parsed.safeUrl).not.toContain("#");
     expect(parsed.safeUrl).not.toContain(parsed.fragmentKey);
+    expect(parsed.safeUrl).not.toContain(parsed.readCapability);
   });
 });

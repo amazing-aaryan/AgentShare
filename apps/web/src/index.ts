@@ -1,6 +1,6 @@
 export function renderSharePage(): string {
   const cliCommand =
-    "npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.1/agentshare-0.1.1.tgz -- agentshare open --target ";
+    "npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.2/agentshare-0.1.2.tgz -- agentshare open --target ";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -60,8 +60,9 @@ export function renderSharePage(): string {
     (() => {
       "use strict";
       const original = new URL(window.location.href);
-      const read = original.searchParams.get("r");
-      const key = new URLSearchParams(original.hash.slice(1)).get("k");
+      const fragment = new URLSearchParams(original.hash.slice(1));
+      const read = fragment.get("r") || original.searchParams.get("r");
+      const key = fragment.get("k");
       const match = /^\\/s\\/([^/]+)$/.exec(original.pathname);
       history.replaceState(null, "", original.pathname);
       let target = "codex";

@@ -3,6 +3,7 @@ import {
   decryptBundle,
   keyFromFragment,
   parseShareUrl,
+  sha256Hex,
 } from "@agentshare/acb";
 import type { AcbManifest, AuthoritativeMetadata } from "@agentshare/contracts";
 import { RelayClient } from "./relay-client.js";
@@ -15,6 +16,12 @@ export async function openShare(link: string): Promise<{
   const client = new RelayClient(new URL(parsed.safeUrl).origin);
   const response = await client.metadata(parsed.shareId, parsed.readCapability);
   const envelope = await client.download(parsed.shareId, parsed.readCapability);
+  const descriptorMatches =
+    response.upload?.ciphertextBytes === envelope.byteLength &&
+    response.upload.ciphertextSha256 === sha256Hex(envelope);
+  if (response.status !== "available" || !descriptorMatches) {
+    throw new Error("Relay ciphertext descriptor mismatch");
+  }
   const manifest = decodeAcb(
     decryptBundle(
       envelope,

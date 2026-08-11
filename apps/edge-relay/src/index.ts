@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   createShareRequestSchema,
   MAX_CIPHERTEXT_BYTES,
@@ -13,9 +14,23 @@ import { renderSharePage } from "@agentshare/web";
 
 type Env = {
   SHARES: DurableObjectNamespace;
+  CONTROL: DurableObjectNamespace;
+  CREATE_RATE_LIMITER: RateLimiter;
+  UPLOAD_RATE_LIMITER: RateLimiter;
 };
 
 const CHUNK_BYTES = 1_500_000;
+const MAX_ACTIVE_SHARES = 5_000;
+const MAX_ACTIVE_CIPHERTEXT_BYTES = 4_000_000_000;
+
+type RateLimiter = {
+  limit(input: { key: string }): Promise<{ success: boolean }>;
+};
+
+type QuotaState = {
+  entries: Record<string, { expiresAt: string; bytes: number }>;
+  totalBytes: number;
+};
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -28,6 +43,9 @@ export default {
 
     let shareId: string | undefined;
     if (request.method === "POST" && url.pathname === "/v1/shares") {
+      if (!(await allow(env.CREATE_RATE_LIMITER, request, "create"))) {
+        return cors(error("RATE_LIMITED", "Create rate limit exceeded", 429));
+      }
       const clone = request.clone();
       try {
         const body: unknown = await clone.json();
@@ -44,20 +62,31 @@ export default {
 
     if (shareId === undefined)
       return cors(error("NOT_FOUND", "Route not found", 404));
+    if (request.method === "PUT" && url.pathname.endsWith("/blob")) {
+      if (!(await allow(env.UPLOAD_RATE_LIMITER, request, "upload"))) {
+        return cors(error("RATE_LIMITED", "Upload rate limit exceeded", 429));
+      }
+    }
     const stub = env.SHARES.get(env.SHARES.idFromName(shareId));
     return cors(await stub.fetch(request));
   },
 };
 
 export class ShareObject {
-  constructor(private readonly state: DurableObjectState) {}
+  private lifecycleTail: Promise<void> = Promise.resolve();
+
+  constructor(
+    private readonly state: DurableObjectState,
+    private readonly env?: Env,
+  ) {}
 
   async fetch(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
       if (request.method === "POST" && url.pathname === "/v1/shares") {
         const body: unknown = await request.json();
-        return await this.create(createShareRequestSchema.parse(body));
+        const parsed = createShareRequestSchema.parse(body);
+        return await this.serialize(() => this.create(parsed));
       }
 
       const match = /^\/v1\/shares\/([^/]+)(?:\/(blob|meta))?$/u.exec(
@@ -67,43 +96,10 @@ export class ShareObject {
         return error("NOT_FOUND", "Route not found", 404);
       const shareId = decodeURIComponent(match[1]);
       const action = match[2];
-      const record = await this.state.storage.get<RelayRecord>("record");
-      if (record?.metadata.shareId !== shareId) {
-        return error("NOT_FOUND", "Share not found", 404);
-      }
-
-      const status = effectiveStatus(record);
-      if (status === "expired") return error("EXPIRED", "Share expired", 410);
-      if (status === "revoked") return error("REVOKED", "Share revoked", 410);
-
-      if (request.method === "GET" && action === "meta") {
-        if (!(await authorize(record.readTokenDigest, request))) {
-          return error("UNAUTHORIZED", "Invalid capability", 401);
-        }
-        return json(toMetadata(record));
-      }
-      if (request.method === "GET" && action === "blob") {
-        if (!(await authorize(record.readTokenDigest, request))) {
-          return error("UNAUTHORIZED", "Invalid capability", 401);
-        }
-        if (record.status !== "available" || record.upload === undefined) {
-          return error("NOT_FOUND", "Ciphertext is not available", 404);
-        }
-        return this.download(record.upload.ciphertextBytes);
-      }
-      if (request.method === "PUT" && action === "blob") {
-        if (!(await authorize(record.uploadTokenDigest, request))) {
-          return error("UNAUTHORIZED", "Invalid capability", 401);
-        }
-        return await this.upload(record, request);
-      }
-      if (request.method === "DELETE" && action === undefined) {
-        if (!(await authorize(record.revokeTokenDigest, request))) {
-          return error("UNAUTHORIZED", "Invalid capability", 401);
-        }
-        return await this.revoke(record);
-      }
-      return error("NOT_FOUND", "Route not found", 404);
+      const handle = () => this.handleExisting(request, shareId, action);
+      return request.method === "PUT" || request.method === "DELETE"
+        ? await this.serialize(handle)
+        : await handle();
     } catch (caught) {
       if (isZodError(caught) || caught instanceof SyntaxError) {
         return error("BAD_REQUEST", "Invalid request", 400);
@@ -112,13 +108,100 @@ export class ShareObject {
     }
   }
 
+  private async handleExisting(
+    request: Request,
+    shareId: string,
+    action: string | undefined,
+  ): Promise<Response> {
+    const record = await this.state.storage.get<RelayRecord>("record");
+    if (record?.metadata.shareId !== shareId) {
+      return error("NOT_FOUND", "Share not found", 404);
+    }
+
+    if (request.method === "DELETE" && action === undefined) {
+      if (!(await authorize(record.revokeTokenDigest, request))) {
+        return error("UNAUTHORIZED", "Invalid capability", 401);
+      }
+      if (record.status === "revoked") return json(toMetadata(record));
+      if (effectiveStatus(record) === "expired") {
+        return error("EXPIRED", "Share expired", 410);
+      }
+      return await this.revoke(record);
+    }
+
+    const status = effectiveStatus(record);
+    if (status === "expired") return error("EXPIRED", "Share expired", 410);
+    if (status === "revoked") return error("REVOKED", "Share revoked", 410);
+
+    if (request.method === "GET" && action === "meta") {
+      if (!(await authorize(record.readTokenDigest, request))) {
+        return error("UNAUTHORIZED", "Invalid capability", 401);
+      }
+      return json(toMetadata(record));
+    }
+    if (request.method === "GET" && action === "blob") {
+      if (!(await authorize(record.readTokenDigest, request))) {
+        return error("UNAUTHORIZED", "Invalid capability", 401);
+      }
+      if (record.status !== "available" || record.upload === undefined) {
+        return error("NOT_FOUND", "Ciphertext is not available", 404);
+      }
+      return this.download(record.upload.ciphertextBytes);
+    }
+    if (request.method === "PUT" && action === "blob") {
+      if (!(await authorize(record.uploadTokenDigest, request))) {
+        return error("UNAUTHORIZED", "Invalid capability", 401);
+      }
+      return await this.upload(record, request);
+    }
+    return error("NOT_FOUND", "Route not found", 404);
+  }
+
   async alarm(): Promise<void> {
-    await this.state.storage.deleteAll();
+    await this.serialize(() => this.expire());
+  }
+
+  private async expire(): Promise<void> {
+    const record = await this.state.storage.get<RelayRecord>("record");
+    if (record === undefined) return;
+    const chunks = await this.state.storage.list({ prefix: "blob:" });
+    const withoutUpload: RelayRecord = {
+      metadata: record.metadata,
+      uploadTokenDigest: record.uploadTokenDigest,
+      readTokenDigest: record.readTokenDigest,
+      revokeTokenDigest: record.revokeTokenDigest,
+      status: record.status,
+    };
+    await this.state.storage.transaction(async (transaction) => {
+      if (chunks.size > 0) await transaction.delete([...chunks.keys()]);
+      await transaction.put("record", {
+        ...withoutUpload,
+        status: record.status === "revoked" ? "revoked" : "expired",
+      });
+    });
+    await this.releaseCapacity(record.metadata.shareId);
+  }
+
+  private async serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.lifecycleTail;
+    let release!: () => void;
+    this.lifecycleTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
   }
 
   private async create(request: CreateShareRequest): Promise<Response> {
     const existing = await this.state.storage.get<RelayRecord>("record");
     if (existing !== undefined) {
+      if (existing.status === "expired" || existing.status === "revoked") {
+        return error("CONFLICT", "Share ID has already been consumed", 409);
+      }
       const same =
         existing.uploadTokenDigest === request.uploadTokenDigest &&
         existing.readTokenDigest === request.readTokenDigest &&
@@ -147,8 +230,15 @@ export class ShareObject {
       revokeTokenDigest: request.revokeTokenDigest,
       status: "awaiting-upload",
     };
-    await this.state.storage.put("record", record);
-    await this.state.storage.setAlarm(Date.parse(metadata.expiresAt));
+    const reservation = await this.reserveCapacity(metadata);
+    if (reservation !== undefined) return reservation;
+    try {
+      await this.state.storage.put("record", record);
+      await this.state.storage.setAlarm(Date.parse(metadata.expiresAt));
+    } catch (error) {
+      await this.releaseCapacity(metadata.shareId);
+      throw error;
+    }
     return json(toMetadata(record), 201);
   }
 
@@ -156,18 +246,17 @@ export class ShareObject {
     record: RelayRecord,
     request: Request,
   ): Promise<Response> {
-    const length = Number(request.headers.get("content-length") ?? "0");
-    if (length > MAX_CIPHERTEXT_BYTES) {
+    const declaredLength = Number(request.headers.get("content-length"));
+    if (!Number.isInteger(declaredLength) || declaredLength <= 0) {
+      return error("BAD_REQUEST", "Content-Length is required", 400);
+    }
+    if (declaredLength > MAX_CIPHERTEXT_BYTES) {
       return error("PAYLOAD_TOO_LARGE", "Ciphertext exceeds relay limit", 413);
     }
-    const bytes = new Uint8Array(await request.arrayBuffer());
     const descriptor = uploadDescriptorSchema.parse({
       ciphertextSha256: request.headers.get("x-agentshare-sha256"),
-      ciphertextBytes: bytes.byteLength,
+      ciphertextBytes: declaredLength,
     });
-    if ((await sha256Hex(bytes)) !== descriptor.ciphertextSha256) {
-      return error("BAD_REQUEST", "Ciphertext hash mismatch", 400);
-    }
     if (record.status === "available") {
       const same =
         record.upload?.ciphertextSha256 === descriptor.ciphertextSha256 &&
@@ -177,22 +266,100 @@ export class ShareObject {
         : error("CONFLICT", "Share already contains another blob", 409);
     }
 
-    const chunks: Record<string, Uint8Array> = {};
-    for (
-      let offset = 0, index = 0;
-      offset < bytes.byteLength;
-      offset += CHUNK_BYTES, index += 1
-    ) {
-      chunks[chunkKey(index)] = bytes.slice(offset, offset + CHUNK_BYTES);
+    const streamed = await this.storeUpload(
+      request,
+      descriptor.ciphertextSha256,
+    );
+    if (streamed instanceof Response) return streamed;
+    if (streamed.bytes !== descriptor.ciphertextBytes) {
+      await this.deleteChunks(streamed.keys);
+      return error("BAD_REQUEST", "Content-Length mismatch", 400);
     }
-    await this.state.storage.put(chunks);
+    if (streamed.digest !== descriptor.ciphertextSha256) {
+      await this.deleteChunks(streamed.keys);
+      return error("BAD_REQUEST", "Ciphertext hash mismatch", 400);
+    }
+    const capacity = await this.reserveBytes(
+      record,
+      descriptor.ciphertextBytes,
+    );
+    if (capacity !== undefined) {
+      await this.deleteChunks(streamed.keys);
+      return capacity;
+    }
     const available: RelayRecord = {
       ...record,
       status: "available",
       upload: descriptor,
     };
-    await this.state.storage.put("record", available);
+    await this.state.storage.transaction(async (transaction) => {
+      await transaction.put("record", available);
+    });
     return json(toMetadata(available));
+  }
+
+  private async storeUpload(
+    request: Request,
+    expectedDigest: string,
+  ): Promise<{ bytes: number; digest: string; keys: string[] } | Response> {
+    if (!/^[a-f0-9]{64}$/u.test(expectedDigest) || request.body === null) {
+      return error("BAD_REQUEST", "Invalid upload", 400);
+    }
+    const reader = request.body.getReader();
+    const hash = createHash("sha256");
+    const keys: string[] = [];
+    let total = 0;
+    let index = 0;
+    let pending = new Uint8Array(CHUNK_BYTES);
+    let pendingBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > MAX_CIPHERTEXT_BYTES) {
+          await reader.cancel();
+          await this.deleteChunks(keys);
+          return error(
+            "PAYLOAD_TOO_LARGE",
+            "Ciphertext exceeds relay limit",
+            413,
+          );
+        }
+        hash.update(value);
+        let offset = 0;
+        while (offset < value.byteLength) {
+          const copied = Math.min(
+            CHUNK_BYTES - pendingBytes,
+            value.byteLength - offset,
+          );
+          pending.set(value.subarray(offset, offset + copied), pendingBytes);
+          pendingBytes += copied;
+          offset += copied;
+          if (pendingBytes === CHUNK_BYTES) {
+            const key = chunkKey(index);
+            await this.state.storage.put(key, pending);
+            keys.push(key);
+            index += 1;
+            pending = new Uint8Array(CHUNK_BYTES);
+            pendingBytes = 0;
+          }
+        }
+      }
+      if (pendingBytes > 0) {
+        const key = chunkKey(index);
+        await this.state.storage.put(key, pending.slice(0, pendingBytes));
+        keys.push(key);
+      }
+      return { bytes: total, digest: hash.digest("hex"), keys };
+    } catch (caught) {
+      await this.deleteChunks(keys);
+      throw caught;
+    }
+  }
+
+  private async deleteChunks(keys: string[]): Promise<void> {
+    if (keys.length > 0) await this.state.storage.delete(keys);
   }
 
   private download(ciphertextBytes: number): Response {
@@ -225,7 +392,6 @@ export class ShareObject {
 
   private async revoke(record: RelayRecord): Promise<Response> {
     const chunks = await this.state.storage.list({ prefix: "blob:" });
-    if (chunks.size > 0) await this.state.storage.delete([...chunks.keys()]);
     const revoked: RelayRecord = {
       metadata: record.metadata,
       uploadTokenDigest: record.uploadTokenDigest,
@@ -233,8 +399,180 @@ export class ShareObject {
       revokeTokenDigest: record.revokeTokenDigest,
       status: "revoked",
     };
-    await this.state.storage.put("record", revoked);
+    await this.state.storage.transaction(async (transaction) => {
+      if (chunks.size > 0) await transaction.delete([...chunks.keys()]);
+      await transaction.put("record", revoked);
+    });
+    await this.releaseCapacity(record.metadata.shareId);
     return json(toMetadata(revoked));
+  }
+
+  private async reserveCapacity(
+    metadata: AuthoritativeMetadata,
+  ): Promise<Response | undefined> {
+    const control = this.control();
+    if (control === undefined) return undefined;
+    const response = await control.fetch(
+      new Request(`https://control/v1/reservations/${metadata.shareId}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expiresAt: metadata.expiresAt }),
+      }),
+    );
+    return response.ok
+      ? undefined
+      : error("CAPACITY", "Public relay is at active-share capacity", 503);
+  }
+
+  private async reserveBytes(
+    record: RelayRecord,
+    bytes: number,
+  ): Promise<Response | undefined> {
+    const control = this.control();
+    if (control === undefined) return undefined;
+    const response = await control.fetch(
+      new Request(
+        `https://control/v1/reservations/${record.metadata.shareId}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ bytes }),
+        },
+      ),
+    );
+    return response.ok
+      ? undefined
+      : error("CAPACITY", "Public relay is at ciphertext capacity", 503);
+  }
+
+  private async releaseCapacity(shareId: string): Promise<void> {
+    const control = this.control();
+    if (control === undefined) return;
+    await control.fetch(
+      new Request(`https://control/v1/reservations/${shareId}`, {
+        method: "DELETE",
+      }),
+    );
+  }
+
+  private control(): DurableObjectStub | undefined {
+    return this.env?.CONTROL.get(this.env.CONTROL.idFromName("global"));
+  }
+}
+
+export class RelayControl {
+  private operationTail: Promise<void> = Promise.resolve();
+
+  constructor(private readonly state: DurableObjectState) {}
+
+  async fetch(request: Request): Promise<Response> {
+    return this.serialize(() => this.handleFetch(request));
+  }
+
+  private async handleFetch(request: Request): Promise<Response> {
+    const match = /^\/v1\/reservations\/([A-Za-z0-9_-]{20,100})$/u.exec(
+      new URL(request.url).pathname,
+    );
+    if (match?.[1] === undefined)
+      return error("NOT_FOUND", "Route not found", 404);
+    const shareId = match[1];
+    const quota = await this.loadPruned();
+    if (request.method === "PUT") {
+      const body: unknown = await request.json();
+      const expiresAt = field(body, "expiresAt");
+      if (
+        typeof expiresAt !== "string" ||
+        !Number.isFinite(Date.parse(expiresAt))
+      ) {
+        return error("BAD_REQUEST", "Invalid reservation expiry", 400);
+      }
+      if (quota.entries[shareId] === undefined) {
+        if (Object.keys(quota.entries).length >= MAX_ACTIVE_SHARES) {
+          return error("CAPACITY", "Active share capacity reached", 503);
+        }
+        quota.entries[shareId] = { expiresAt, bytes: 0 };
+      }
+      await this.save(quota);
+      return json({ reserved: true }, 201);
+    }
+    if (request.method === "PATCH") {
+      const body: unknown = await request.json();
+      const bytes = field(body, "bytes");
+      const entry = quota.entries[shareId];
+      if (entry === undefined)
+        return error("NOT_FOUND", "Reservation not found", 404);
+      if (typeof bytes !== "number" || !Number.isInteger(bytes) || bytes <= 0) {
+        return error("BAD_REQUEST", "Invalid reservation size", 400);
+      }
+      const nextTotal = quota.totalBytes - entry.bytes + bytes;
+      if (nextTotal > MAX_ACTIVE_CIPHERTEXT_BYTES) {
+        return error("CAPACITY", "Ciphertext capacity reached", 503);
+      }
+      entry.bytes = bytes;
+      quota.totalBytes = nextTotal;
+      await this.save(quota);
+      return json({ reserved: true });
+    }
+    if (request.method === "DELETE") {
+      const entry = quota.entries[shareId];
+      if (entry !== undefined) {
+        quota.totalBytes -= entry.bytes;
+        quota.entries = Object.fromEntries(
+          Object.entries(quota.entries).filter(([id]) => id !== shareId),
+        );
+        await this.save(quota);
+      }
+      return json({ released: true });
+    }
+    return error("NOT_FOUND", "Route not found", 404);
+  }
+
+  async alarm(): Promise<void> {
+    await this.serialize(async () => this.save(await this.loadPruned()));
+  }
+
+  private async serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.operationTail;
+    let release!: () => void;
+    this.operationTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
+
+  private async loadPruned(): Promise<QuotaState> {
+    const stored = (await this.state.storage.get<QuotaState>("quota")) ?? {
+      entries: {},
+      totalBytes: 0,
+    };
+    const now = Date.now();
+    const entries = Object.fromEntries(
+      Object.entries(stored.entries).filter(
+        ([, entry]) => Date.parse(entry.expiresAt) > now,
+      ),
+    );
+    return {
+      entries,
+      totalBytes: Object.values(entries).reduce(
+        (total, entry) => total + entry.bytes,
+        0,
+      ),
+    };
+  }
+
+  private async save(quota: QuotaState): Promise<void> {
+    quota.totalBytes = Math.max(0, quota.totalBytes);
+    await this.state.storage.put("quota", quota);
+    const expiries = Object.values(quota.entries).map((entry) =>
+      Date.parse(entry.expiresAt),
+    );
+    if (expiries.length === 0) await this.state.storage.deleteAlarm();
+    else await this.state.storage.setAlarm(Math.min(...expiries));
   }
 }
 
@@ -277,6 +615,15 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
     .join("");
 }
 
+async function allow(
+  limiter: RateLimiter,
+  request: Request,
+  operation: string,
+): Promise<boolean> {
+  const actor = request.headers.get("cf-connecting-ip") ?? "unknown";
+  return (await limiter.limit({ key: `${operation}:${actor}` })).success;
+}
+
 function constantTimeEqual(left: string, right: string): boolean {
   if (left.length !== right.length) return false;
   let difference = 0;
@@ -288,6 +635,11 @@ function constantTimeEqual(left: string, right: string): boolean {
 
 function chunkKey(index: number): string {
   return `blob:${String(index).padStart(5, "0")}`;
+}
+
+function field(value: unknown, key: string): unknown {
+  if (typeof value !== "object" || value === null) return undefined;
+  return Reflect.get(value, key);
 }
 
 function json(value: unknown, status = 200): Response {

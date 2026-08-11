@@ -48,15 +48,14 @@ agentshare open --target codex
 ```
 
 Enter the link at the hidden prompt. `/exit` ends the REPL. Each Codex query
-runs with ephemeral state, ignored user config/rules, all discovered user skills
-disabled, deny-all filesystem access, disabled network, web search, apps, hooks,
-and memories. Claude runs with no built-in tools, strict empty MCP config, no
-settings sources, no Chrome, no skills, and no session persistence.
+runs with ephemeral state, ignored user config/rules, no shell, unified exec,
+patch, JavaScript, or code-mode tools, deny-all configured filesystem access,
+disabled network, web search, apps, hooks, plugins, and memories. Claude runs
+with no built-in tools, strict empty MCP config, no settings sources, no Chrome,
+no skills, and no session persistence.
 
-## Release Blockers
+## Remaining Beta Work
 
-- Replace in-memory relay with durable expiring D1/R2 or equivalent storage.
-- Publish `agentshare` to npm and update the pinned share-page version.
-- Deploy relay/page on HTTPS with access-log redaction and retention controls.
-- Complete current-version Claude OAuth and launcher smoke tests.
+- Publish `agentshare` to npm; current installs use immutable GitHub assets.
+- Complete current-version Claude OAuth smoke tests on each release.
 - Run external security review and full cross-platform CI.

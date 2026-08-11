@@ -22,9 +22,10 @@ Security invariants:
   local file; Windows protection inherits the user's directory ACL.
 - Decrypted recipient context exists in process memory and may appear in OS swap
   or crash dumps. AgentShare does not claim secure memory erasure.
-- Codex currently parses metadata from malformed global skill files before
-  honoring explicit disable overrides; those skills are not injected. Valid
-  discovered user skills are disabled per invocation.
+- Codex may enumerate skill metadata during startup, but AgentShare disables its
+  shell, unified exec, patch, JavaScript, code-mode, search, app, and plugin
+  tool surfaces before handing it untrusted context. Launchers fail closed on
+  unreviewed Codex or Claude versions.
 - Capability links can leak through clipboard managers or browser history. The
   share page immediately removes query and fragment data from visible history,
   uses `no-referrer`, loads no third-party assets, and sends no analytics.

@@ -74,6 +74,19 @@ describe("complete AgentShare handoff", () => {
       );
 
       await expect(openShare(url)).rejects.toMatchObject({ status: 410 });
+
+      const replacement = await shareCommand({
+        inputPath,
+        relayOrigin: origin,
+        ttlSeconds: 60,
+        sourceAgent: "generic",
+        yes: true,
+        statePath,
+      });
+      expect(replacement).not.toBe(url);
+      await expect(openShare(replacement)).resolves.toMatchObject({
+        manifest: { title: "session.md" },
+      });
     } finally {
       if (server !== undefined) {
         await new Promise<void>((resolve) => server.close(() => resolve()));

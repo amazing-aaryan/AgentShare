@@ -6,6 +6,7 @@ import {
   encryptBundle,
   keyToFragment,
   logicalFingerprint,
+  parseShareUrl,
   randomCapability,
 } from "@agentshare/acb";
 import { exportCurrentClaudeSession } from "@agentshare/adapter-claude";
@@ -20,8 +21,14 @@ import { manifestFromTextFile } from "./manifest.js";
 import { evidencePrompt, retrieveEvidence } from "./retrieval.js";
 import { openShare } from "./handoff.js";
 import { runTarget, type TargetAgent } from "./launchers.js";
-import { RelayClient } from "./relay-client.js";
-import { findReusableShare, findShareByUrl, saveShare } from "./state.js";
+import { RelayClient, RelayClientError } from "./relay-client.js";
+import {
+  findReusableShare,
+  findShareByUrl,
+  removeShareByUrl,
+  saveShare,
+  type LocalShare,
+} from "./state.js";
 import { confirm, readHiddenLine } from "./terminal.js";
 
 export type ShareOptions = {
@@ -48,7 +55,14 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
       client.origin,
       options.statePath,
     );
-    if (reusable !== undefined) return reusable.url;
+    if (reusable !== undefined) {
+      const resumed = await resumeReusableShare(
+        reusable,
+        client,
+        options.statePath,
+      );
+      if (resumed !== undefined) return resumed;
+    }
   }
 
   process.stdout.write(`${reviewInventory(scanned.manifest).join("\n")}\n`);
@@ -86,30 +100,106 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
     encodeAcb(scanned.manifest),
     created.metadata,
   );
-  await client.upload({
-    shareId,
-    uploadCapability,
-    ciphertextSha256: encrypted.ciphertextSha256,
-    envelope: encrypted.envelope,
-  });
   const url = buildShareUrl({
     origin: client.origin,
     shareId,
     readCapability,
     fragmentKey: keyToFragment(encrypted.key),
   });
-  await saveShare(
-    {
-      fingerprint,
-      relayOrigin: client.origin,
-      shareId,
-      url,
-      revokeCapability,
-      expiresAt: created.metadata.expiresAt,
+  const pending: LocalShare = {
+    fingerprint,
+    relayOrigin: client.origin,
+    shareId,
+    url,
+    revokeCapability,
+    expiresAt: created.metadata.expiresAt,
+    pendingUpload: {
+      uploadCapability,
+      ciphertextSha256: encrypted.ciphertextSha256,
+      envelopeBase64: Buffer.from(encrypted.envelope).toString("base64"),
     },
-    options.statePath,
-  );
+  };
+  await saveShare(pending, options.statePath);
+  await uploadPending(client, pending);
+  await bestEffortFinalize(pending, options.statePath);
   return url;
+}
+
+async function resumeReusableShare(
+  share: LocalShare,
+  client: RelayClient,
+  statePath?: string,
+): Promise<string | undefined> {
+  try {
+    const response = await client.metadata(
+      share.shareId,
+      parseShareUrl(share.url).readCapability,
+    );
+    if (response.status === "available") {
+      if (share.pendingUpload !== undefined)
+        await bestEffortFinalize(share, statePath);
+      return share.url;
+    }
+    if (
+      response.status === "awaiting-upload" &&
+      share.pendingUpload !== undefined
+    ) {
+      await uploadPending(client, share);
+      await bestEffortFinalize(share, statePath);
+      return share.url;
+    }
+  } catch (error) {
+    if (
+      !(error instanceof RelayClientError) ||
+      ![404, 410].includes(error.status)
+    ) {
+      throw error;
+    }
+  }
+  await removeShareByUrl(share.url, statePath);
+  return undefined;
+}
+
+async function uploadPending(
+  client: RelayClient,
+  share: LocalShare,
+): Promise<void> {
+  const pending = share.pendingUpload;
+  if (pending === undefined) throw new Error("Missing pending upload state");
+  await client.upload({
+    shareId: share.shareId,
+    uploadCapability: pending.uploadCapability,
+    ciphertextSha256: pending.ciphertextSha256,
+    envelope: Buffer.from(pending.envelopeBase64, "base64"),
+  });
+}
+
+async function finalizeShare(
+  share: LocalShare,
+  statePath?: string,
+): Promise<void> {
+  const available: LocalShare = {
+    fingerprint: share.fingerprint,
+    relayOrigin: share.relayOrigin,
+    shareId: share.shareId,
+    url: share.url,
+    revokeCapability: share.revokeCapability,
+    expiresAt: share.expiresAt,
+  };
+  await saveShare(available, statePath);
+}
+
+async function bestEffortFinalize(
+  share: LocalShare,
+  statePath?: string,
+): Promise<void> {
+  try {
+    await finalizeShare(share, statePath);
+  } catch (error) {
+    process.stderr.write(
+      `Warning: upload succeeded but local state cleanup failed: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
 }
 
 async function selectManifest(
@@ -203,4 +293,5 @@ export async function revokeCommand(statePath?: string): Promise<void> {
     throw new Error("No local revocation credential for this link");
   const client = new RelayClient(share.relayOrigin);
   await client.revoke(share.shareId, share.revokeCapability);
+  await removeShareByUrl(share.url, statePath);
 }

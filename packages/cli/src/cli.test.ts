@@ -8,8 +8,9 @@ import {
   startNodeServer,
 } from "@agentshare/relay";
 import { parseShareUrl } from "@agentshare/acb";
-import { shareCommand } from "./commands.js";
-import { codexArgs, claudeArgs } from "./launchers.js";
+import { openShare, shareCommand } from "./commands.js";
+import { codexArgs, claudeArgs, supportsTargetVersion } from "./launchers.js";
+import { loadState } from "./state.js";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -68,6 +69,69 @@ describe("creator and launcher", () => {
     expect(codexArgs("C:/empty").join(" ")).toContain(
       "permissions.agentshare-query.network.enabled=false",
     );
+    expect(codexArgs("C:/empty").join(" ")).toContain(
+      "features.shell_tool=false",
+    );
+    expect(codexArgs("C:/empty").join(" ")).toContain(
+      "features.unified_exec=false",
+    );
+    expect(codexArgs("C:/empty").join(" ")).toContain(
+      "features.apply_patch_freeform=false",
+    );
     expect(claudeArgs()).toContain("--no-session-persistence");
+    expect(supportsTargetVersion("codex", "codex-cli 0.145.0")).toBe(true);
+    expect(supportsTargetVersion("claude", "2.1.210 (Claude Code)")).toBe(true);
+    expect(supportsTargetVersion("codex", "codex-cli 0.146.0")).toBe(false);
+    expect(supportsTargetVersion("claude", "2.1.211 (Claude Code)")).toBe(
+      false,
+    );
+  });
+
+  it("recovers a pending encrypted upload after transport failure", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "agentshare-recovery-"));
+    cleanups.push(() => rm(directory, { recursive: true, force: true }));
+    const input = join(directory, "session.md");
+    const state = join(directory, "state.json");
+    await writeFile(input, "Recover this encrypted handoff.", "utf8");
+    const relay = createRelayHandler(new InMemoryRelayStore());
+    let failUpload = true;
+    const server = startNodeServer(async (request) => {
+      if (request.method === "PUT" && failUpload) {
+        failUpload = false;
+        return Response.json(
+          {
+            error: { code: "INTERNAL", message: "Synthetic transport failure" },
+          },
+          { status: 503 },
+        );
+      }
+      return relay(request);
+    }, 0);
+    await new Promise<void>((resolve) => server.once("listening", resolve));
+    cleanups.push(
+      () => new Promise<void>((resolve) => server.close(() => resolve())),
+    );
+    const address = server.address();
+    if (address === null || typeof address === "string")
+      throw new Error("Missing test address");
+    const origin = `http://127.0.0.1:${address.port}`;
+    const options = {
+      inputPath: input,
+      relayOrigin: origin,
+      ttlSeconds: 60,
+      yes: true,
+      statePath: state,
+    } as const;
+
+    await expect(shareCommand(options)).rejects.toMatchObject({ status: 503 });
+    const [pending] = (await loadState(state)).shares;
+    expect(pending?.pendingUpload).toBeDefined();
+
+    const recovered = await shareCommand(options);
+    expect(recovered).toBe(pending?.url);
+    expect((await loadState(state)).shares[0]?.pendingUpload).toBeUndefined();
+    await expect(openShare(recovered)).resolves.toMatchObject({
+      manifest: { title: "session.md" },
+    });
   });
 });

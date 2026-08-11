@@ -19,6 +19,8 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:edge-runtime": "node scripts/test-edge-runtime.mjs",
+    "test:package": "node scripts/test-package.mjs",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false",

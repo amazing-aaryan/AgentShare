@@ -34,6 +34,13 @@ export class InMemoryRelayStore {
   create(request: CreateShareRequest, now: Date): RelayRecord {
     const existing = this.#shares.get(request.shareId);
     if (existing !== undefined) {
+      const status = effectiveStatus(existing.record, now);
+      if (status === "expired" || status === "revoked") {
+        throw new RelayStoreError(
+          "CONFLICT",
+          "Share ID has already been consumed",
+        );
+      }
       const same =
         existing.record.uploadTokenDigest === request.uploadTokenDigest &&
         existing.record.readTokenDigest === request.readTokenDigest &&

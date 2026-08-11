@@ -12,22 +12,28 @@
 4. Identical upload retries succeed. Different bytes for the same share fail
    with `CONFLICT`.
 5. Read and revoke operations authenticate by digest comparison.
-6. Expired or revoked blobs are unavailable and eligible for deletion.
+6. Expired or revoked blobs are deleted. A permanent status tombstone prevents
+   the share ID and capability URL from being recreated.
 
 ## Capability Link
 
-`https://<host>/s/<share-id>?r=<read-token>#k=<base64url-key>`
+`https://<host>/s/<share-id>#r=<read-token>&k=<base64url-key>`
 
-The relay receives share ID and read token. The encryption key remains in the
-URL fragment and is never included in an HTTP request. Clients must strip the
-fragment before logging, analytics, errors, subprocess arguments, or environment
-variables.
+The browser receives the read token and encryption key from the URL fragment,
+removes the fragment from visible history, then sends the read token only in an
+Authorization header. Neither capability appears in relay request URLs. Clients
+must strip the fragment before logging, analytics, errors, subprocess arguments,
+or environment variables. Readers remain backward compatible with v0.1.1 links.
 
 ## Limits
 
 - Maximum requested TTL: 72 hours.
 - Maximum ciphertext: 50 MiB.
 - Maximum source resource: 5 MiB.
+- Public active shares: 5,000.
+- Public active ciphertext: 4 GB.
+- Public create rate: 10 per source IP per minute.
+- Public upload rate: 20 per source IP per minute.
 
 The server response is authoritative. Clients fail closed on metadata mismatch,
 expiry, hash mismatch, authentication failure, or unknown protocol version.

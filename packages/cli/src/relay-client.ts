@@ -1,5 +1,6 @@
 import {
   createShareRequestSchema,
+  MAX_CIPHERTEXT_BYTES,
   shareMetadataResponseSchema,
   type CreateShareRequest,
   type ShareMetadataResponse,
@@ -19,7 +20,11 @@ export class RelayClient {
   readonly #origin: string;
 
   constructor(origin: string) {
-    this.#origin = new URL(origin).origin;
+    const url = new URL(origin);
+    if (url.protocol !== "https:" && !isLoopback(url.hostname)) {
+      throw new Error("AgentShare relays require HTTPS except on loopback");
+    }
+    this.#origin = url.origin;
   }
 
   get origin(): string {
@@ -27,7 +32,7 @@ export class RelayClient {
   }
 
   async create(request: CreateShareRequest): Promise<ShareMetadataResponse> {
-    const response = await fetch(`${this.#origin}/v1/shares`, {
+    const response = await relayFetch(`${this.#origin}/v1/shares`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(createShareRequestSchema.parse(request)),
@@ -41,7 +46,7 @@ export class RelayClient {
     ciphertextSha256: string;
     envelope: Uint8Array;
   }): Promise<ShareMetadataResponse> {
-    const response = await fetch(
+    const response = await relayFetch(
       `${this.#origin}/v1/shares/${encodeURIComponent(args.shareId)}/blob`,
       {
         method: "PUT",
@@ -60,7 +65,7 @@ export class RelayClient {
     shareId: string,
     readCapability: string,
   ): Promise<ShareMetadataResponse> {
-    const response = await fetch(
+    const response = await relayFetch(
       `${this.#origin}/v1/shares/${encodeURIComponent(shareId)}/meta`,
       { headers: { authorization: `Bearer ${readCapability}` } },
     );
@@ -68,19 +73,38 @@ export class RelayClient {
   }
 
   async download(shareId: string, readCapability: string): Promise<Uint8Array> {
-    const response = await fetch(
+    const response = await relayFetch(
       `${this.#origin}/v1/shares/${encodeURIComponent(shareId)}/blob`,
       { headers: { authorization: `Bearer ${readCapability}` } },
     );
     await ensureOk(response);
-    return new Uint8Array(await response.arrayBuffer());
+    const declared = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > MAX_CIPHERTEXT_BYTES) {
+      throw new RelayClientError(413, "Ciphertext exceeds client limit");
+    }
+    if (response.body === null)
+      throw new RelayClientError(502, "Missing ciphertext body");
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_CIPHERTEXT_BYTES) {
+        await reader.cancel();
+        throw new RelayClientError(413, "Ciphertext exceeds client limit");
+      }
+      chunks.push(value);
+    }
+    return Buffer.concat(chunks, total);
   }
 
   async revoke(
     shareId: string,
     revokeCapability: string,
   ): Promise<ShareMetadataResponse> {
-    const response = await fetch(
+    const response = await relayFetch(
       `${this.#origin}/v1/shares/${encodeURIComponent(shareId)}`,
       {
         method: "DELETE",
@@ -95,6 +119,20 @@ export class RelayClient {
     const body: unknown = await response.json();
     return shareMetadataResponseSchema.parse(body);
   }
+}
+
+function relayFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, {
+    ...init,
+    redirect: "error",
+    signal: AbortSignal.timeout(30_000),
+  });
+}
+
+function isLoopback(hostname: string): boolean {
+  return (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
+  );
 }
 
 async function ensureOk(response: Response): Promise<void> {

@@ -3,13 +3,13 @@
 Encrypted Codex and Claude context handoff.
 
 ```sh
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.1/agentshare-0.1.1.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.2/agentshare-0.1.2.tgz
 agentshare init
 agentshare share --current --source codex
 ```
 
 ```sh
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.1/agentshare-0.1.1.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.2/agentshare-0.1.2.tgz -- agentshare open --target codex
 ```
 
 The connector asks for the capability link using hidden terminal input. Never

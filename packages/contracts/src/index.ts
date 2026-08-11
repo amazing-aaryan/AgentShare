@@ -94,6 +94,8 @@ export const errorEnvelopeSchema = z.object({
       "EXPIRED",
       "REVOKED",
       "PAYLOAD_TOO_LARGE",
+      "RATE_LIMITED",
+      "CAPACITY",
       "INTERNAL",
     ]),
     message: z.string(),

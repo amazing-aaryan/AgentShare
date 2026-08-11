@@ -1,4 +1,14 @@
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import {
+  chmod,
+  mkdir,
+  open,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -9,6 +19,11 @@ export type LocalShare = {
   url: string;
   revokeCapability: string;
   expiresAt: string;
+  pendingUpload?: {
+    uploadCapability: string;
+    ciphertextSha256: string;
+    envelopeBase64: string;
+  };
 };
 
 type LocalState = { version: 1; shares: LocalShare[] };
@@ -27,7 +42,8 @@ export async function loadState(
     ) as UntrustedLocalState;
     if (parsed.version !== 1 || !Array.isArray(parsed.shares))
       throw new Error("Invalid state");
-    return { version: 1, shares: parsed.shares as LocalShare[] };
+    if (!parsed.shares.every(isLocalShare)) throw new Error("Invalid state");
+    return { version: 1, shares: parsed.shares };
   } catch (error) {
     if (isNotFound(error)) return { version: 1, shares: [] };
     throw error;
@@ -38,22 +54,25 @@ export async function saveShare(
   share: LocalShare,
   path = defaultStatePath(),
 ): Promise<void> {
-  const state = await loadState(path);
-  state.shares = state.shares.filter(
-    (item) =>
-      !(
-        item.fingerprint === share.fingerprint &&
-        item.relayOrigin === share.relayOrigin
-      ),
-  );
-  state.shares.push(share);
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, {
-    mode: 0o600,
+  await mutateState(path, (state) => {
+    state.shares = state.shares.filter(
+      (item) =>
+        !(
+          item.fingerprint === share.fingerprint &&
+          item.relayOrigin === share.relayOrigin
+        ),
+    );
+    state.shares.push(share);
   });
-  await chmod(temporary, 0o600).catch(() => undefined);
-  await rename(temporary, path);
+}
+
+export async function removeShareByUrl(
+  url: string,
+  path = defaultStatePath(),
+): Promise<void> {
+  await mutateState(path, (state) => {
+    state.shares = state.shares.filter((share) => share.url !== url);
+  });
 }
 
 export async function findReusableShare(
@@ -79,4 +98,79 @@ export async function findShareByUrl(
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function isLocalShare(value: unknown): value is LocalShare {
+  if (typeof value !== "object" || value === null) return false;
+  const share = value as Record<string, unknown>;
+  const pending = share.pendingUpload;
+  return (
+    [
+      "fingerprint",
+      "relayOrigin",
+      "shareId",
+      "url",
+      "revokeCapability",
+      "expiresAt",
+    ].every((key) => typeof share[key] === "string") &&
+    (pending === undefined ||
+      (typeof pending === "object" &&
+        pending !== null &&
+        typeof (pending as Record<string, unknown>).uploadCapability ===
+          "string" &&
+        typeof (pending as Record<string, unknown>).ciphertextSha256 ===
+          "string" &&
+        typeof (pending as Record<string, unknown>).envelopeBase64 ===
+          "string"))
+  );
+}
+
+async function mutateState(
+  path: string,
+  mutate: (state: LocalState) => void,
+): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const release = await acquireLock(`${path}.lock`);
+  try {
+    const state = await loadState(path);
+    mutate(state);
+    const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+    await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, {
+      mode: 0o600,
+    });
+    await chmod(temporary, 0o600).catch(() => undefined);
+    await rename(temporary, path);
+  } finally {
+    await release();
+  }
+}
+
+async function acquireLock(path: string): Promise<() => Promise<void>> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    try {
+      const handle = await open(path, "wx", 0o600);
+      await handle.writeFile(`${process.pid}\n`, "utf8");
+      await handle.close();
+      return () => rm(path, { force: true });
+    } catch (error) {
+      if (!isAlreadyExists(error)) throw error;
+      let age: number;
+      try {
+        age = Date.now() - (await stat(path)).mtimeMs;
+      } catch (statError) {
+        if (isNotFound(statError)) continue;
+        throw statError;
+      }
+      if (age > 30_000) {
+        await rm(path, { force: true });
+        continue;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+  throw new Error(`Timed out acquiring AgentShare state lock: ${path}`);
+}
+
+function isAlreadyExists(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "EEXIST";
 }

@@ -30,22 +30,47 @@ const PATTERNS: ReadonlyArray<{ kind: string; pattern: RegExp }> = [
     pattern:
       /\b(?:api[_-]?key|secret|token|password)\s*[:=]\s*["']?[A-Za-z0-9_./+=-]{12,}["']?/giu,
   },
+  {
+    kind: "bearer-token",
+    pattern: /\bBearer\s+[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_-]{10,}){0,2}\b/giu,
+  },
 ];
+
+const HTTP_URL = /https?:\/\/[^\s<>"']+/giu;
 
 export function scanAndRedact(input: AcbManifest): ScanResult {
   const manifest = structuredClone(acbManifestSchema.parse(input));
   const findings: SecretFinding[] = [];
 
+  manifest.title = redact(manifest.title, "title", findings);
   manifest.events = manifest.events.map((event) => ({
     ...event,
     text: redact(event.text, `events[${event.sequence}].text`, findings),
+    sourceId: redact(
+      event.sourceId,
+      `events[${event.sequence}].sourceId`,
+      findings,
+    ),
   }));
   manifest.resources = manifest.resources.map((resource, index) => {
+    const scannedMetadata = {
+      ...resource,
+      id: redact(resource.id, `resources[${index}].id`, findings),
+      ...(resource.sourcePath === undefined
+        ? {}
+        : {
+            sourcePath: redact(
+              resource.sourcePath,
+              `resources[${index}].sourcePath`,
+              findings,
+            ),
+          }),
+    };
     if (
       !resource.mediaType.startsWith("text/") &&
       resource.mediaType !== "application/json"
     ) {
-      return resource;
+      return scannedMetadata;
     }
     const original = Buffer.from(resource.contentBase64, "base64").toString(
       "utf8",
@@ -53,7 +78,7 @@ export function scanAndRedact(input: AcbManifest): ScanResult {
     const redacted = redact(original, `resources[${index}].content`, findings);
     const bytes = Buffer.from(redacted, "utf8");
     return {
-      ...resource,
+      ...scannedMetadata,
       byteLength: bytes.byteLength,
       sha256: createHash("sha256").update(bytes).digest("hex"),
       contentBase64: bytes.toString("base64"),
@@ -68,7 +93,15 @@ function redact(
   location: string,
   findings: SecretFinding[],
 ): string {
-  let result = text;
+  let result = text.replace(HTTP_URL, (candidate) => {
+    if (!isAgentShareCapabilityUrl(candidate)) return candidate;
+    findings.push({
+      kind: "agentshare-capability-url",
+      location,
+      redactedPreview: "https://...[REDACTED]",
+    });
+    return "[REDACTED:agentshare-capability-url]";
+  });
   for (const { kind, pattern } of PATTERNS) {
     result = result.replace(pattern, (match) => {
       findings.push({
@@ -80,6 +113,22 @@ function redact(
     });
   }
   return result;
+}
+
+function isAgentShareCapabilityUrl(candidate: string): boolean {
+  try {
+    const url = new URL(candidate);
+    const fragment = new URLSearchParams(url.hash.slice(1));
+    return (
+      /^\/s\/[A-Za-z0-9_-]{20,100}$/u.test(url.pathname) &&
+      /^[A-Za-z0-9_-]{20,}$/u.test(
+        fragment.get("r") ?? url.searchParams.get("r") ?? "",
+      ) &&
+      /^[A-Za-z0-9_-]{40,}$/u.test(fragment.get("k") ?? "")
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function reviewInventory(manifest: AcbManifest): string[] {

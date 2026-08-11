@@ -6,6 +6,13 @@ import { join } from "node:path";
 
 export type TargetAgent = "codex" | "claude";
 
+const SUPPORTED_VERSIONS: Record<TargetAgent, RegExp> = {
+  codex: /^codex-cli 0\.145\./u,
+  claude: /^2\.1\.210(?:\s|$)/u,
+};
+
+const compatibilityChecks = new Map<TargetAgent, Promise<void>>();
+
 export function codexArgs(
   workspace: string,
   disabledSkillPaths: string[] = [],
@@ -22,6 +29,8 @@ export function codexArgs(
     "-c",
     'approval_policy="never"',
     "-c",
+    'sandbox_mode="read-only"',
+    "-c",
     'default_permissions="agentshare-query"',
     "-c",
     'permissions.agentshare-query.filesystem={":minimal"="deny",":workspace_roots"="deny"}',
@@ -29,6 +38,22 @@ export function codexArgs(
     "permissions.agentshare-query.network.enabled=false",
     "-c",
     'web_search="disabled"',
+    "-c",
+    "features.shell_tool=false",
+    "-c",
+    "features.unified_exec=false",
+    "-c",
+    "features.apply_patch_freeform=false",
+    "-c",
+    "features.js_repl=false",
+    "-c",
+    "features.code_mode=false",
+    "-c",
+    "features.code_mode_only=false",
+    "-c",
+    "features.skill_search=false",
+    "-c",
+    "features.plugins=false",
     "-c",
     "features.apps=false",
     "-c",
@@ -67,6 +92,7 @@ export async function runTarget(
   const workspace = await mkdtemp(join(tmpdir(), "agentshare-query-"));
   try {
     const executable = resolveAgentExecutable(target);
+    await assertSupportedTarget(target, executable);
     const args =
       target === "codex"
         ? codexArgs(workspace, await discoverUserSkills())
@@ -89,6 +115,66 @@ export async function runTarget(
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
+}
+
+export function supportsTargetVersion(
+  target: TargetAgent,
+  versionOutput: string,
+): boolean {
+  return SUPPORTED_VERSIONS[target].test(versionOutput.trim());
+}
+
+async function assertSupportedTarget(
+  target: TargetAgent,
+  executable: AgentExecutable,
+): Promise<void> {
+  let check = compatibilityChecks.get(target);
+  if (check === undefined) {
+    check = inspectTargetVersion(target, executable);
+    compatibilityChecks.set(target, check);
+  }
+  await check;
+}
+
+async function inspectTargetVersion(
+  target: TargetAgent,
+  executable: AgentExecutable,
+): Promise<void> {
+  const output = await captureProcess(executable.command, [
+    ...executable.prefixArgs,
+    "--version",
+  ]);
+  if (!supportsTargetVersion(target, output)) {
+    throw new Error(
+      `Unsupported ${target} version: ${output.trim() || "unknown"}. ` +
+        "AgentShare fails closed until this version passes isolation review.",
+    );
+  }
+}
+
+async function captureProcess(
+  command: string,
+  args: string[],
+): Promise<string> {
+  const child = spawn(command, args, {
+    env: safeEnvironment(),
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", (chunk: string) => (stdout += chunk));
+  child.stderr.on("data", (chunk: string) => (stderr += chunk));
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code) => resolve(code ?? 1));
+  });
+  if (exitCode !== 0) {
+    throw new Error(`Unable to inspect target version: ${stderr.trim()}`);
+  }
+  return stdout || stderr;
 }
 
 export async function discoverUserSkills(home = homedir()): Promise<string[]> {

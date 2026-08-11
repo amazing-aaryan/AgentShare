@@ -8,6 +8,7 @@ export default tseslint.config(
       "**/coverage/**",
       "**/.wrangler/**",
       "**/*.d.ts",
+      "scripts/**/*.mjs",
       "eslint.config.js",
       "vitest.config.ts",
     ],

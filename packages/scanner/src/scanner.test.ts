@@ -40,4 +40,33 @@ describe("final payload scanner", () => {
       ).toString(),
     ).toContain("[REDACTED:generic-secret]");
   });
+
+  it("redacts AgentShare capability URLs and bearer tokens from every string field", () => {
+    const capability = `https://relay.example/s/${"s".repeat(24)}?r=${"r".repeat(43)}#k=${"k".repeat(43)}`;
+    const bearer = `Bearer eyJ${"a".repeat(30)}.${"b".repeat(30)}.${"c".repeat(30)}`;
+    const input: AcbManifest = {
+      version: "acb-v1",
+      title: capability,
+      sourceAgent: "generic",
+      exportedAt: "2026-08-08T12:00:00.000Z",
+      events: [
+        {
+          sequence: 0,
+          role: "assistant",
+          kind: "message",
+          text: `Old handoff: ${capability}\nAuthorization: ${bearer}`,
+          sourceId: capability,
+        },
+      ],
+      resources: [],
+    };
+
+    const result = scanAndRedact(input);
+
+    expect(result.findings.map((finding) => finding.kind)).toEqual(
+      expect.arrayContaining(["agentshare-capability-url", "bearer-token"]),
+    );
+    expect(JSON.stringify(result.manifest)).not.toContain(capability);
+    expect(JSON.stringify(result.manifest)).not.toContain(bearer);
+  });
 });

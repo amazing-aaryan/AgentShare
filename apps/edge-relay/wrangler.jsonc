@@ -12,12 +12,32 @@
         "name": "SHARES",
         "class_name": "ShareObject",
       },
+      {
+        "name": "CONTROL",
+        "class_name": "RelayControl",
+      },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
       "new_sqlite_classes": ["ShareObject"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["RelayControl"],
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "CREATE_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 },
+    },
+    {
+      "name": "UPLOAD_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 20, "period": 60 },
     },
   ],
 }
