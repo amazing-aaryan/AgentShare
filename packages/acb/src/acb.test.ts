@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { AcbManifest, AuthoritativeMetadata } from "@agentshare/contracts";
+import {
+  MAX_RESOURCE_BYTES,
+  type AcbManifest,
+  type AuthoritativeMetadata,
+} from "@agentshare/contracts";
 import {
   buildShareUrl,
   canonicalJson,
@@ -41,6 +45,24 @@ const metadata: AuthoritativeMetadata = {
 describe("ACB", () => {
   it("round trips canonical bytes", () => {
     expect(decodeAcb(encodeAcb(manifest))).toEqual(manifest);
+  });
+
+  it("validates a maximum-size resource without exhausting the stack", () => {
+    const content = Buffer.alloc(MAX_RESOURCE_BYTES);
+    const resourceManifest: AcbManifest = {
+      ...manifest,
+      resources: [
+        {
+          id: "maximum-resource",
+          mediaType: "application/octet-stream",
+          byteLength: content.byteLength,
+          sha256: "c036cbb7553a909f9dd00bd99156c2d5986c2cf1d13bcaa4e4b79c9e31e67f91",
+          contentBase64: content.toString("base64"),
+        },
+      ],
+    };
+
+    expect(() => encodeAcb(resourceManifest)).not.toThrow();
   });
 
   it("keeps logical fingerprint stable across export time", () => {
