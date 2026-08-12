@@ -12,8 +12,11 @@ function isUnsafeTerminalCodePoint(codePoint: number | undefined): boolean {
     (codePoint >= 0 && codePoint <= 8) ||
     (codePoint >= 11 && codePoint <= 31) ||
     (codePoint >= 127 && codePoint <= 159) ||
+    codePoint === 0x061c ||
+    codePoint === 0x200e ||
+    codePoint === 0x200f ||
     (codePoint >= 0x202a && codePoint <= 0x202e) ||
-    (codePoint >= 0x2066 && codePoint <= 0x2069)
+    (codePoint >= 0x2066 && codePoint <= 0x206f)
   );
 }
 
