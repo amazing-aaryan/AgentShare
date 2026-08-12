@@ -1,24 +1,13 @@
 import { createInterface } from "node:readline/promises";
 
 export function sanitizeTerminalText(value: string): string {
-  return Array.from(value)
-    .filter((character) => !isUnsafeTerminalCodePoint(character.codePointAt(0)))
-    .join("");
+  return value.replace(UNSAFE_TERMINAL_CONTROL, "");
 }
 
-function isUnsafeTerminalCodePoint(codePoint: number | undefined): boolean {
-  if (codePoint === undefined) return true;
-  return (
-    (codePoint >= 0 && codePoint <= 8) ||
-    (codePoint >= 11 && codePoint <= 31) ||
-    (codePoint >= 127 && codePoint <= 159) ||
-    codePoint === 0x061c ||
-    codePoint === 0x200e ||
-    codePoint === 0x200f ||
-    (codePoint >= 0x202a && codePoint <= 0x202e) ||
-    (codePoint >= 0x2066 && codePoint <= 0x206f)
-  );
-}
+const UNSAFE_TERMINAL_CONTROL =
+  // Terminal safety intentionally requires matching these control ranges.
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u206f]/gu;
 
 export async function confirm(prompt: string): Promise<boolean> {
   const input = createInterface({
