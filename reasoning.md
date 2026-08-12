@@ -34,3 +34,14 @@ Claude Code 2.1.210 is authenticated again; both agents attempted benign
 filesystem/network actions and produced no side effects, then passed grounded
 two-turn continuity. **Impact:** Candidate may now be pushed, packaged,
 released, deployed, and browser-tested under the approved release packet.
+
+## [2026-08-12 11:34] Released and deployed AgentShare v0.1.7
+
+**Decision:** Publish v0.1.7 from commit `78b89d5`, deploy Worker version
+`2ffd8937-41e4-40cf-9e27-632ec8fb210d`, and retain v0.1.6 as rollback. **Why:**
+Strict cross-agent/live-relay gates, six-platform CI jobs, package smoke,
+post-deploy lifecycle tests, browser acceptance, and final independent reviews
+passed. **Impact:** Public installation now resolves to immutable asset SHA-256
+`b329a4343b0d2b08ad4f14664eff1f7f585be30b463a8e5c923290ec687b19e9`. Mobile
+visual acceptance remains unclaimed because the in-app viewport override did not
+change from 1280 CSS pixels.
