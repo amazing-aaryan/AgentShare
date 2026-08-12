@@ -243,4 +243,27 @@ describe("final payload scanner", () => {
       expect(() => scanAndRedact(input)).toThrow(/binary resource.*secret/iu);
     },
   );
+
+  it("rejects a misaligned UTF-16 secret padded to evade encoding detection", () => {
+    const secret = Buffer.from(`password=${"p".repeat(20)}`, "utf16le");
+    const binary = Buffer.concat([Buffer.alloc(101, 0x41), secret]);
+    const input: AcbManifest = {
+      version: "acb-v1",
+      title: "Synthetic",
+      sourceAgent: "generic",
+      exportedAt: "2026-08-08T12:00:00.000Z",
+      events: [],
+      resources: [
+        {
+          id: "padded-encoded-secret",
+          mediaType: "application/octet-stream",
+          byteLength: binary.byteLength,
+          sha256: sha256(binary),
+          contentBase64: binary.toString("base64"),
+        },
+      ],
+    };
+
+    expect(() => scanAndRedact(input)).toThrow(/binary resource.*secret/iu);
+  });
 });
