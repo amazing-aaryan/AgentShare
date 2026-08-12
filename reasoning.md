@@ -45,3 +45,17 @@ passed. **Impact:** Public installation now resolves to immutable asset SHA-256
 `b329a4343b0d2b08ad4f14664eff1f7f585be30b463a8e5c923290ec687b19e9`. Mobile
 visual acceptance remains unclaimed because the in-app viewport override did not
 change from 1280 CSS pixels.
+
+## [2026-08-12 13:02] Security review found two medium risks
+
+**Decision:** Do not describe v0.1.7 as security-clean until terminal control
+characters are neutralized and anonymous global-capacity exhaustion is
+mitigated; publish the verified capability/trust-boundary README independently.
+**Why:** Synthetic review reproduced unsanitized terminal control output and a
+UTF-16 binary secret-scan bypass, while relay code permits unauthenticated
+72-hour reservations against a global 5,000-share pool. Crypto, bearer
+authorization, launcher isolation, dependencies, history secret scan, package,
+edge, and strict six-case live release gates passed. **Impact:** Future source
+release work must address terminal escaping and relay admission/capacity abuse
+first. Binary resource scanning is a low-severity hardening gap because v0.1.7
+user adapters do not attach resources.
