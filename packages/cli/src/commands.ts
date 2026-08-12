@@ -33,7 +33,7 @@ import {
   saveShare,
   type LocalShare,
 } from "./state.js";
-import { confirm, readHiddenLine } from "./terminal.js";
+import { confirm, readHiddenLine, sanitizeTerminalText } from "./terminal.js";
 
 export type ShareOptions = {
   inputPath?: string;
@@ -69,10 +69,14 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
     }
   }
 
-  process.stdout.write(`${reviewInventory(scanned.manifest).join("\n")}\n`);
+  process.stdout.write(
+    sanitizeTerminalText(`${reviewInventory(scanned.manifest).join("\n")}\n`),
+  );
   process.stdout.write(`redactions: ${scanned.findings.length}\n`);
   process.stdout.write(
-    `\nFinal normalized plaintext:\n${reviewPayload(scanned.manifest)}\n`,
+    sanitizeTerminalText(
+      `\nFinal normalized plaintext:\n${reviewPayload(scanned.manifest)}\n`,
+    ),
   );
   process.stdout.write(`fingerprint: ${fingerprint}\n`);
   if (
@@ -201,7 +205,9 @@ async function bestEffortFinalize(
     await finalizeShare(share, statePath);
   } catch (error) {
     process.stderr.write(
-      `Warning: upload succeeded but local state cleanup failed: ${error instanceof Error ? error.message : String(error)}\n`,
+      sanitizeTerminalText(
+        `Warning: upload succeeded but local state cleanup failed: ${error instanceof Error ? error.message : String(error)}\n`,
+      ),
     );
   }
 }
@@ -220,7 +226,9 @@ async function selectManifest(
   process.stdout.write("Available events:\n");
   for (const event of manifest.events) {
     const preview = event.text.replace(/\s+/gu, " ").trim().slice(0, 120);
-    process.stdout.write(`${event.sequence}: ${event.role} ${preview}\n`);
+    process.stdout.write(
+      sanitizeTerminalText(`${event.sequence}: ${event.role} ${preview}\n`),
+    );
   }
   const input = createInterface({
     input: process.stdin,
@@ -268,7 +276,9 @@ export async function openCommand(target: TargetAgent): Promise<void> {
   const link = await readHiddenLine("AgentShare link: ");
   const { manifest, metadata } = await openShare(link);
   process.stdout.write(
-    `Opened ${manifest.title} from ${manifest.sourceAgent}; expires ${metadata.expiresAt}\n`,
+    sanitizeTerminalText(
+      `Opened ${manifest.title} from ${manifest.sourceAgent}; expires ${metadata.expiresAt}\n`,
+    ),
   );
 
   const input = createInterface({

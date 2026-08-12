@@ -4,6 +4,7 @@ import {
   installIntegrations,
   removeIntegrations,
 } from "@agentshare/integrations";
+import { sanitizeTerminalText } from "./terminal.js";
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -31,7 +32,9 @@ try {
     process.stdout.write("Share revoked\n");
   } else if (command === "init" || command === "repair") {
     const files = await installIntegrations();
-    process.stdout.write(`Installed integrations:\n${files.join("\n")}\n`);
+    process.stdout.write(
+      sanitizeTerminalText(`Installed integrations:\n${files.join("\n")}\n`),
+    );
   } else if (command === "remove") {
     await removeIntegrations();
     process.stdout.write("AgentShare integrations removed\n");
@@ -41,7 +44,9 @@ try {
   }
 } catch (error) {
   process.stderr.write(
-    `${error instanceof Error ? error.message : String(error)}\n`,
+    sanitizeTerminalText(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    ),
   );
   process.exitCode = 1;
 }

@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
+import { sanitizeTerminalText } from "./terminal.js";
 
 export type TargetAgent = "codex" | "claude";
 export type TargetResult = { exitCode: number; output: string };
@@ -112,18 +113,27 @@ export async function runTarget(
       {
         cwd: workspace,
         env: safeEnvironment(),
-        stdio: ["pipe", "pipe", "inherit"],
+        stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       },
     );
     let output = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
-      if (!process.stdout.write(chunk)) {
+      const sanitized = sanitizeTerminalText(chunk);
+      if (!process.stdout.write(sanitized)) {
         child.stdout.pause();
         process.stdout.once("drain", () => child.stdout.resume());
       }
-      output = `${output}${chunk}`.slice(-16_000);
+      output = `${output}${sanitized}`.slice(-16_000);
+    });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      const sanitized = sanitizeTerminalText(chunk);
+      if (!process.stderr.write(sanitized)) {
+        child.stderr.pause();
+        process.stderr.once("drain", () => child.stderr.resume());
+      }
     });
     child.stdin.end(prompt);
     const exitCode = await waitForTargetClose(child);
@@ -194,7 +204,9 @@ async function captureProcess(
   child.stderr.on("data", (chunk: string) => (stderr += chunk));
   const exitCode = await waitForTargetClose(child);
   if (exitCode !== 0) {
-    throw new Error(`Unable to inspect target version: ${stderr.trim()}`);
+    throw new Error(
+      `Unable to inspect target version: ${sanitizeTerminalText(stderr.trim())}`,
+    );
   }
   return stdout || stderr;
 }

@@ -1,5 +1,22 @@
 import { createInterface } from "node:readline/promises";
 
+export function sanitizeTerminalText(value: string): string {
+  return Array.from(value)
+    .filter((character) => !isUnsafeTerminalCodePoint(character.codePointAt(0)))
+    .join("");
+}
+
+function isUnsafeTerminalCodePoint(codePoint: number | undefined): boolean {
+  if (codePoint === undefined) return true;
+  return (
+    (codePoint >= 0 && codePoint <= 8) ||
+    (codePoint >= 11 && codePoint <= 31) ||
+    (codePoint >= 127 && codePoint <= 159) ||
+    (codePoint >= 0x202a && codePoint <= 0x202e) ||
+    (codePoint >= 0x2066 && codePoint <= 0x2069)
+  );
+}
+
 export async function confirm(prompt: string): Promise<boolean> {
   const input = createInterface({
     input: process.stdin,

@@ -73,16 +73,15 @@ export function scanAndRedact(input: AcbManifest): ScanResult {
       !resource.mediaType.startsWith("text/") &&
       resource.mediaType !== "application/json"
     ) {
-      const binaryFindings: SecretFinding[] = [];
-      redact(
-        Buffer.from(resource.contentBase64, "base64").toString("latin1"),
-        `resources[${index}].content`,
-        binaryFindings,
-      );
-      if (binaryFindings.length > 0) {
-        throw new Error(
-          `Binary resource ${resource.id} contains a suspected secret and cannot be shared`,
-        );
+      const bytes = Buffer.from(resource.contentBase64, "base64");
+      for (const view of binaryTextViews(bytes)) {
+        const binaryFindings: SecretFinding[] = [];
+        redact(view, `resources[${index}].content`, binaryFindings);
+        if (binaryFindings.length > 0) {
+          throw new Error(
+            `Binary resource ${resource.id} contains a suspected secret and cannot be shared`,
+          );
+        }
       }
       return scannedMetadata;
     }
@@ -100,6 +99,34 @@ export function scanAndRedact(input: AcbManifest): ScanResult {
   });
 
   return { manifest, findings };
+}
+
+function binaryTextViews(bytes: Buffer): string[] {
+  const views = new Set([bytes.toString("latin1"), bytes.toString("utf8")]);
+  if (looksLikeUtf16(bytes, "le")) views.add(bytes.toString("utf16le"));
+  if (looksLikeUtf16(bytes, "be")) {
+    const evenBytes = Buffer.from(bytes.subarray(0, bytes.byteLength & ~1));
+    evenBytes.swap16();
+    views.add(evenBytes.toString("utf16le"));
+  }
+  return [...views];
+}
+
+function looksLikeUtf16(bytes: Buffer, endian: "le" | "be"): boolean {
+  if (bytes.byteLength < 4) return false;
+  if (
+    (endian === "le" && bytes[0] === 0xff && bytes[1] === 0xfe) ||
+    (endian === "be" && bytes[0] === 0xfe && bytes[1] === 0xff)
+  ) {
+    return true;
+  }
+  const pairs = Math.floor(bytes.byteLength / 2);
+  const highByteOffset = endian === "le" ? 1 : 0;
+  let zeroHighBytes = 0;
+  for (let index = highByteOffset; index < pairs * 2; index += 2) {
+    if (bytes[index] === 0) zeroHighBytes += 1;
+  }
+  return zeroHighBytes >= Math.max(2, Math.ceil(pairs / 3));
 }
 
 function redact(

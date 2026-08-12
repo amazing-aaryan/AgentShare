@@ -21,14 +21,20 @@ type Env = {
 
 const CHUNK_BYTES = 1_500_000;
 const MAX_ACTIVE_SHARES = 5_000;
+const MAX_ACTIVE_SHARES_PER_ACTOR = 25;
 const MAX_ACTIVE_CIPHERTEXT_BYTES = 4_000_000_000;
+const PROVISIONAL_TTL_MS = 10 * 60 * 1_000;
+const ACTOR_HEADER = "x-agentshare-actor-digest";
 
 type RateLimiter = {
   limit(input: { key: string }): Promise<{ success: boolean }>;
 };
 
 type QuotaState = {
-  entries: Record<string, { expiresAt: string; bytes: number }>;
+  entries: Record<
+    string,
+    { expiresAt: string; bytes: number; actorDigest?: string }
+  >;
   totalBytes: number;
 };
 
@@ -68,7 +74,9 @@ export default {
       }
     }
     const stub = env.SHARES.get(env.SHARES.idFromName(shareId));
-    return cors(await stub.fetch(request));
+    const headers = new Headers(request.headers);
+    headers.set(ACTOR_HEADER, await requestActorDigest(request));
+    return cors(await stub.fetch(new Request(request, { headers })));
   },
 };
 
@@ -86,7 +94,8 @@ export class ShareObject {
       if (request.method === "POST" && url.pathname === "/v1/shares") {
         const body: unknown = await request.json();
         const parsed = createShareRequestSchema.parse(body);
-        return await this.serialize(() => this.create(parsed));
+        const actorDigest = internalActorDigest(request);
+        return await this.serialize(() => this.create(parsed, actorDigest));
       }
 
       const match = /^\/v1\/shares\/([^/]+)(?:\/(blob|meta))?$/u.exec(
@@ -156,7 +165,11 @@ export class ShareObject {
       if (!(await authorize(record.uploadTokenDigest, request))) {
         return error("UNAUTHORIZED", "Invalid capability", 401);
       }
-      return await this.upload(record, request);
+      return await this.upload(
+        record,
+        request,
+        await this.ownerActorDigest(request),
+      );
     }
     return error("NOT_FOUND", "Route not found", 404);
   }
@@ -208,7 +221,10 @@ export class ShareObject {
     }
   }
 
-  private async create(request: CreateShareRequest): Promise<Response> {
+  private async create(
+    request: CreateShareRequest,
+    actorDigest: string,
+  ): Promise<Response> {
     const existing = await this.state.storage.get<RelayRecord>("record");
     if (existing !== undefined) {
       if (effectiveStatus(existing) === "expired") {
@@ -246,10 +262,11 @@ export class ShareObject {
       revokeTokenDigest: request.revokeTokenDigest,
       status: "awaiting-upload",
     };
-    const reservation = await this.reserveCapacity(metadata);
+    const reservation = await this.reserveCapacity(metadata, actorDigest);
     if (reservation !== undefined) return reservation;
     try {
       await this.state.storage.setAlarm(Date.parse(metadata.expiresAt));
+      await this.state.storage.put("actorDigest", actorDigest);
       await this.state.storage.put("record", record);
     } catch (cause) {
       const failures: unknown[] = [cause];
@@ -261,6 +278,11 @@ export class ShareObject {
         failures.push(error);
       }
       if (recordDeleted) {
+        try {
+          await this.state.storage.delete("actorDigest");
+        } catch (error) {
+          failures.push(error);
+        }
         try {
           await this.state.storage.deleteAlarm();
         } catch (error) {
@@ -287,6 +309,7 @@ export class ShareObject {
   private async upload(
     record: RelayRecord,
     request: Request,
+    actorDigest: string,
   ): Promise<Response> {
     const declaredLength = Number(request.headers.get("content-length"));
     if (!Number.isInteger(declaredLength) || declaredLength <= 0) {
@@ -324,6 +347,7 @@ export class ShareObject {
     const capacity = await this.reserveBytes(
       record,
       descriptor.ciphertextBytes,
+      actorDigest,
     );
     if (capacity !== undefined) {
       await this.deleteChunks(streamed.keys);
@@ -452,6 +476,7 @@ export class ShareObject {
 
   private async reserveCapacity(
     metadata: AuthoritativeMetadata,
+    actorDigest: string,
   ): Promise<Response | undefined> {
     const control = this.control();
     if (control === undefined) return undefined;
@@ -459,7 +484,15 @@ export class ShareObject {
       new Request(`https://control/v1/reservations/${metadata.shareId}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ expiresAt: metadata.expiresAt }),
+        body: JSON.stringify({
+          actorDigest,
+          expiresAt: new Date(
+            Math.min(
+              Date.parse(metadata.expiresAt),
+              Date.parse(metadata.createdAt) + PROVISIONAL_TTL_MS,
+            ),
+          ).toISOString(),
+        }),
       }),
     );
     return response.ok
@@ -470,6 +503,7 @@ export class ShareObject {
   private async reserveBytes(
     record: RelayRecord,
     bytes: number,
+    actorDigest: string,
   ): Promise<Response | undefined> {
     const control = this.control();
     if (control === undefined) return undefined;
@@ -479,7 +513,11 @@ export class ShareObject {
         {
           method: "PATCH",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ bytes }),
+          body: JSON.stringify({
+            actorDigest,
+            bytes,
+            expiresAt: record.metadata.expiresAt,
+          }),
         },
       ),
     );
@@ -501,6 +539,14 @@ export class ShareObject {
 
   private control(): DurableObjectStub | undefined {
     return this.env?.CONTROL.get(this.env.CONTROL.idFromName("global"));
+  }
+
+  private async ownerActorDigest(request: Request): Promise<string> {
+    const stored = await this.state.storage.get<string>("actorDigest");
+    if (stored !== undefined) return stored;
+    const actorDigest = internalActorDigest(request);
+    await this.state.storage.put("actorDigest", actorDigest);
+    return actorDigest;
   }
 }
 
@@ -524,23 +570,33 @@ export class RelayControl {
     if (request.method === "PUT") {
       const body: unknown = await request.json();
       const expiresAt = field(body, "expiresAt");
+      const actorDigest = field(body, "actorDigest");
       if (
         typeof expiresAt !== "string" ||
-        !Number.isFinite(Date.parse(expiresAt))
+        !Number.isFinite(Date.parse(expiresAt)) ||
+        !isActorDigest(actorDigest)
       ) {
-        return error("BAD_REQUEST", "Invalid reservation expiry", 400);
+        return error("BAD_REQUEST", "Invalid reservation", 400);
       }
-      if (quota.entries[shareId] === undefined) {
-        if (Object.keys(quota.entries).length >= MAX_ACTIVE_SHARES) {
-          return error("CAPACITY", "Active share capacity reached", 503);
-        }
-        quota.entries[shareId] = { expiresAt, bytes: 0 };
+      const existing = quota.entries[shareId];
+      if (existing === undefined) {
+        const capacity = reserveShare(quota, actorDigest);
+        if (capacity !== undefined) return capacity;
+        quota.entries[shareId] = { expiresAt, bytes: 0, actorDigest };
       } else {
-        quota.entries[shareId].expiresAt = new Date(
-          Math.max(
-            Date.parse(quota.entries[shareId].expiresAt),
-            Date.parse(expiresAt),
-          ),
+        if (
+          existing.actorDigest !== undefined &&
+          existing.actorDigest !== actorDigest
+        ) {
+          return error("CONFLICT", "Reservation actor mismatch", 409);
+        }
+        if (existing.actorDigest === undefined) {
+          const capacity = reserveActor(quota, actorDigest);
+          if (capacity !== undefined) return capacity;
+          existing.actorDigest = actorDigest;
+        }
+        existing.expiresAt = new Date(
+          Math.max(Date.parse(existing.expiresAt), Date.parse(expiresAt)),
         ).toISOString();
       }
       await this.save(quota);
@@ -549,17 +605,40 @@ export class RelayControl {
     if (request.method === "PATCH") {
       const body: unknown = await request.json();
       const bytes = field(body, "bytes");
-      const entry = quota.entries[shareId];
-      if (entry === undefined)
-        return error("NOT_FOUND", "Reservation not found", 404);
-      if (typeof bytes !== "number" || !Number.isInteger(bytes) || bytes <= 0) {
-        return error("BAD_REQUEST", "Invalid reservation size", 400);
+      const expiresAt = field(body, "expiresAt");
+      const actorDigest = field(body, "actorDigest");
+      if (
+        typeof bytes !== "number" ||
+        !Number.isInteger(bytes) ||
+        bytes <= 0 ||
+        typeof expiresAt !== "string" ||
+        !Number.isFinite(Date.parse(expiresAt)) ||
+        !isActorDigest(actorDigest)
+      ) {
+        return error("BAD_REQUEST", "Invalid reservation update", 400);
+      }
+      let entry = quota.entries[shareId];
+      if (entry === undefined) {
+        const capacity = reserveShare(quota, actorDigest);
+        if (capacity !== undefined) return capacity;
+        entry = { expiresAt, bytes: 0, actorDigest };
+        quota.entries[shareId] = entry;
+      } else if (
+        entry.actorDigest !== undefined &&
+        entry.actorDigest !== actorDigest
+      ) {
+        return error("CONFLICT", "Reservation actor mismatch", 409);
+      } else if (entry.actorDigest === undefined) {
+        const capacity = reserveActor(quota, actorDigest);
+        if (capacity !== undefined) return capacity;
+        entry.actorDigest = actorDigest;
       }
       const nextTotal = quota.totalBytes - entry.bytes + bytes;
       if (nextTotal > MAX_ACTIVE_CIPHERTEXT_BYTES) {
         return error("CAPACITY", "Ciphertext capacity reached", 503);
       }
       entry.bytes = bytes;
+      entry.expiresAt = expiresAt;
       quota.totalBytes = nextTotal;
       await this.save(quota);
       return json({ reserved: true });
@@ -625,6 +704,43 @@ export class RelayControl {
     if (expiries.length === 0) await this.state.storage.deleteAlarm();
     else await this.state.storage.setAlarm(Math.min(...expiries));
   }
+}
+
+function reserveShare(
+  quota: QuotaState,
+  actorDigest: string,
+): Response | undefined {
+  if (Object.keys(quota.entries).length >= MAX_ACTIVE_SHARES) {
+    return error("CAPACITY", "Active share capacity reached", 503);
+  }
+  return reserveActor(quota, actorDigest);
+}
+
+function reserveActor(
+  quota: QuotaState,
+  actorDigest: string,
+): Response | undefined {
+  const actorShares = Object.values(quota.entries).filter(
+    (entry) => entry.actorDigest === actorDigest,
+  ).length;
+  return actorShares >= MAX_ACTIVE_SHARES_PER_ACTOR
+    ? error("CAPACITY", "Actor active-share capacity reached", 503)
+    : undefined;
+}
+
+function isActorDigest(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+}
+
+function internalActorDigest(request: Request): string {
+  const value = request.headers.get(ACTOR_HEADER);
+  if (!isActorDigest(value)) throw new Error("Missing internal actor identity");
+  return value;
+}
+
+async function requestActorDigest(request: Request): Promise<string> {
+  const actor = request.headers.get("cf-connecting-ip") ?? "unknown";
+  return sha256Hex(new TextEncoder().encode(actor));
 }
 
 function effectiveStatus(record: RelayRecord): RelayRecord["status"] {

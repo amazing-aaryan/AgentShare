@@ -503,16 +503,16 @@ describe("production edge relay lifecycle", () => {
     vi.setSystemTime(new Date("2026-08-08T12:00:00.000Z"));
     try {
       const storage = new MemoryStorage();
-      const requests: Request[] = [];
+      const reservationBodies: unknown[] = [];
       const object = new ShareObject(
         { storage } as unknown as DurableObjectState,
         {
           CONTROL: {
             idFromName: () => ({ name: "global" }),
             get: () => ({
-              fetch: (request: Request) => {
-                requests.push(request.clone());
-                return Promise.resolve(new Response(null, { status: 201 }));
+              fetch: async (request: Request) => {
+                reservationBodies.push(await request.json());
+                return new Response(null, { status: 201 });
               },
             }),
           },
@@ -533,7 +533,7 @@ describe("production edge relay lifecycle", () => {
           )
         ).status,
       ).toBe(201);
-      const provisional = (await requests[0]?.json()) as {
+      const provisional = reservationBodies[0] as {
         actorDigest: string;
         expiresAt: string;
       };
@@ -542,7 +542,7 @@ describe("production edge relay lifecycle", () => {
         expiresAt: "2026-08-08T12:10:00.000Z",
       });
 
-      const blob = Buffer.from("encrypted", "utf8");
+      const blob = new TextEncoder().encode("encrypted");
       expect(
         (
           await object.fetch(
@@ -559,7 +559,7 @@ describe("production edge relay lifecycle", () => {
           )
         ).status,
       ).toBe(200);
-      expect(await requests[1]?.json()).toEqual({
+      expect(reservationBodies[1]).toEqual({
         actorDigest: ACTOR_DIGEST,
         bytes: blob.byteLength,
         expiresAt: "2026-08-11T12:00:00.000Z",

@@ -9,9 +9,9 @@ describe("terminal output safety", () => {
     const sanitized = sanitizeTerminalText(hostile);
 
     expect(sanitized).toBe("before]52;c;U0VDUkVUafterforged31mredspoof");
-    expect(sanitized).not.toMatch(
-      /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u,
-    );
+    expect(
+      Array.from(sanitized).map((character) => character.codePointAt(0)),
+    ).not.toEqual(expect.arrayContaining([0x1b, 0x07, 0x0d, 0x9b, 0x202e]));
   });
 
   it("preserves printable text, tabs, and newlines", () => {
