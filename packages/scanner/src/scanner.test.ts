@@ -217,4 +217,30 @@ describe("final payload scanner", () => {
 
     expect(() => scanAndRedact(input)).toThrow(/binary resource.*secret/iu);
   });
+
+  it.each(["utf16le", "utf16be"] as const)(
+    "rejects %s secrets hidden behind a binary media type",
+    (encoding) => {
+      const secret = Buffer.from(`password=${"s".repeat(20)}`, "utf16le");
+      if (encoding === "utf16be") secret.swap16();
+      const input: AcbManifest = {
+        version: "acb-v1",
+        title: "Synthetic",
+        sourceAgent: "generic",
+        exportedAt: "2026-08-08T12:00:00.000Z",
+        events: [],
+        resources: [
+          {
+            id: `encoded-${encoding}`,
+            mediaType: "application/octet-stream",
+            byteLength: secret.byteLength,
+            sha256: sha256(secret),
+            contentBase64: secret.toString("base64"),
+          },
+        ],
+      };
+
+      expect(() => scanAndRedact(input)).toThrow(/binary resource.*secret/iu);
+    },
+  );
 });

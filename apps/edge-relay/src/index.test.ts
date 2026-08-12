@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import worker, { RelayControl, ShareObject } from "./index.js";
 
 const MAX_ACTIVE_SHARES = 5_000;
+const MAX_ACTIVE_SHARES_PER_ACTOR = 25;
+const ACTOR_DIGEST = "a".repeat(64);
 
 class MemoryStorage {
   readonly values = new Map<string, unknown>();
@@ -70,13 +72,17 @@ function createRequest(
   read: string,
   upload: string,
   revoke: string,
+  requestedTtlSeconds = 60,
 ) {
   return new Request("https://relay.test/v1/shares", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-agentshare-actor-digest": ACTOR_DIGEST,
+    },
     body: JSON.stringify({
       shareId,
-      requestedTtlSeconds: 60,
+      requestedTtlSeconds,
       uploadTokenDigest: capabilityDigest(upload),
       readTokenDigest: capabilityDigest(read),
       revokeTokenDigest: capabilityDigest(revoke),
@@ -355,7 +361,11 @@ describe("production edge relay lifecycle", () => {
       entries: Object.fromEntries(
         Array.from({ length: MAX_ACTIVE_SHARES }, (_, index) => [
           `share-${index}`,
-          { expiresAt: "2099-01-01T00:00:00.000Z", bytes: 0 },
+          {
+            expiresAt: "2099-01-01T00:00:00.000Z",
+            bytes: 0,
+            actorDigest: String(index).padStart(64, "0"),
+          },
         ]),
       ),
       totalBytes: 0,
@@ -367,7 +377,10 @@ describe("production edge relay lifecycle", () => {
       new Request(`https://control/v1/reservations/${randomCapability(18)}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ expiresAt: "2099-01-01T00:00:00.000Z" }),
+        body: JSON.stringify({
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          actorDigest: ACTOR_DIGEST,
+        }),
       }),
     );
     expect(response.status).toBe(503);
@@ -379,7 +392,11 @@ describe("production edge relay lifecycle", () => {
       entries: Object.fromEntries(
         Array.from({ length: MAX_ACTIVE_SHARES - 1 }, (_, index) => [
           `share-${index}`,
-          { expiresAt: "2099-01-01T00:00:00.000Z", bytes: 0 },
+          {
+            expiresAt: "2099-01-01T00:00:00.000Z",
+            bytes: 0,
+            actorDigest: String(index).padStart(64, "0"),
+          },
         ]),
       ),
       totalBytes: 0,
@@ -392,7 +409,10 @@ describe("production edge relay lifecycle", () => {
         new Request(`https://control/v1/reservations/${randomCapability(18)}`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ expiresAt: "2099-01-01T00:00:00.000Z" }),
+          body: JSON.stringify({
+            expiresAt: "2099-01-01T00:00:00.000Z",
+            actorDigest: ACTOR_DIGEST,
+          }),
         }),
       );
     const responses = await Promise.all([reserve(), reserve()]);
@@ -410,7 +430,7 @@ describe("production edge relay lifecycle", () => {
         new Request(`https://control/v1/reservations/${shareId}`, {
           method: "PUT",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ expiresAt }),
+          body: JSON.stringify({ expiresAt, actorDigest: ACTOR_DIGEST }),
         }),
       );
     const firstExpiry = "2099-01-01T00:01:00.000Z";
@@ -422,6 +442,168 @@ describe("production edge relay lifecycle", () => {
       entries: Record<string, { expiresAt: string }>;
     };
     expect(quota.entries[shareId]?.expiresAt).toBe(retriedExpiry);
+  });
+
+  it("limits active shares owned by one actor", async () => {
+    const storage = new MemoryStorage();
+    const control = new RelayControl({
+      storage,
+    } as unknown as DurableObjectState);
+    const reserve = () =>
+      control.fetch(
+        new Request(`https://control/v1/reservations/${randomCapability(18)}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            expiresAt: "2099-01-01T00:00:00.000Z",
+            actorDigest: ACTOR_DIGEST,
+          }),
+        }),
+      );
+
+    for (let index = 0; index < MAX_ACTIVE_SHARES_PER_ACTOR; index += 1) {
+      expect((await reserve()).status).toBe(201);
+    }
+    expect((await reserve()).status).toBe(503);
+  });
+
+  it("re-admits an expired provisional reservation during upload", async () => {
+    const storage = new MemoryStorage();
+    const control = new RelayControl({
+      storage,
+    } as unknown as DurableObjectState);
+    const shareId = randomCapability(18);
+    const response = await control.fetch(
+      new Request(`https://control/v1/reservations/${shareId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          bytes: 128,
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          actorDigest: ACTOR_DIGEST,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(storage.values.get("quota")).toMatchObject({
+      entries: {
+        [shareId]: {
+          bytes: 128,
+          expiresAt: "2099-01-01T00:00:00.000Z",
+          actorDigest: ACTOR_DIGEST,
+        },
+      },
+      totalBytes: 128,
+    });
+  });
+
+  it("uses a short provisional reservation then extends it on upload", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-08T12:00:00.000Z"));
+    try {
+      const storage = new MemoryStorage();
+      const requests: Request[] = [];
+      const object = new ShareObject(
+        { storage } as unknown as DurableObjectState,
+        {
+          CONTROL: {
+            idFromName: () => ({ name: "global" }),
+            get: () => ({
+              fetch: (request: Request) => {
+                requests.push(request.clone());
+                return Promise.resolve(new Response(null, { status: 201 }));
+              },
+            }),
+          },
+        } as unknown as ConstructorParameters<typeof ShareObject>[1],
+      );
+      const shareId = randomCapability(18);
+      const upload = randomCapability();
+      expect(
+        (
+          await object.fetch(
+            createRequest(
+              shareId,
+              randomCapability(),
+              upload,
+              randomCapability(),
+              72 * 60 * 60,
+            ),
+          )
+        ).status,
+      ).toBe(201);
+      const provisional = (await requests[0]?.json()) as {
+        actorDigest: string;
+        expiresAt: string;
+      };
+      expect(provisional).toEqual({
+        actorDigest: ACTOR_DIGEST,
+        expiresAt: "2026-08-08T12:10:00.000Z",
+      });
+
+      const blob = Buffer.from("encrypted", "utf8");
+      expect(
+        (
+          await object.fetch(
+            new Request(`https://relay.test/v1/shares/${shareId}/blob`, {
+              method: "PUT",
+              headers: {
+                authorization: `Bearer ${upload}`,
+                "content-length": String(blob.byteLength),
+                "x-agentshare-actor-digest": "b".repeat(64),
+                "x-agentshare-sha256": sha256Hex(blob),
+              },
+              body: blob,
+            }),
+          )
+        ).status,
+      ).toBe(200);
+      expect(await requests[1]?.json()).toEqual({
+        actorDigest: ACTOR_DIGEST,
+        bytes: blob.byteLength,
+        expiresAt: "2026-08-11T12:00:00.000Z",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("overwrites a spoofed internal actor header before Durable Object routing", async () => {
+    let forwarded: Request | undefined;
+    const request = createRequest(
+      randomCapability(18),
+      randomCapability(),
+      randomCapability(),
+      randomCapability(),
+    );
+    request.headers.set("cf-connecting-ip", "203.0.113.10");
+    request.headers.set("x-agentshare-actor-digest", "spoofed");
+    const response = await worker.fetch(request, {
+      CREATE_RATE_LIMITER: {
+        limit: () => Promise.resolve({ success: true }),
+      },
+      UPLOAD_RATE_LIMITER: {
+        limit: () => Promise.resolve({ success: true }),
+      },
+      SHARES: {
+        idFromName: () => ({ name: "share" }),
+        get: () => ({
+          fetch: (incoming: Request) => {
+            forwarded = incoming;
+            return Promise.resolve(new Response(null, { status: 201 }));
+          },
+        }),
+      },
+    } as unknown as Parameters<typeof worker.fetch>[1]);
+
+    expect(response.status).toBe(201);
+    expect(forwarded?.headers.get("x-agentshare-actor-digest")).toMatch(
+      /^[a-f0-9]{64}$/u,
+    );
+    expect(forwarded?.headers.get("x-agentshare-actor-digest")).not.toBe(
+      "spoofed",
+    );
   });
 
   it("rejects rate-limited creates before allocating a Durable Object", async () => {
