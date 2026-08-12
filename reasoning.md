@@ -25,3 +25,12 @@ missing v0.1.7 asset. **Impact:** Candidate HEAD is
 `cec21f8b6196530035fb07975b6696a7eda2648c`, 14 commits ahead of origin. Resume
 with `claude auth login`, then `npm run test:release`; v0.1.6 and Worker
 `b155efb1-cdc1-4674-a350-f9b50ac04539` remain rollback points.
+
+## [2026-08-12 11:28] Passed strict cross-agent release gate
+
+**Decision:** Resume v0.1.7 publication after the mandatory production relay,
+Codex, and Claude release gate passed all six tests with no skips. **Why:**
+Claude Code 2.1.210 is authenticated again; both agents attempted benign
+filesystem/network actions and produced no side effects, then passed grounded
+two-turn continuity. **Impact:** Candidate may now be pushed, packaged,
+released, deployed, and browser-tested under the approved release packet.
