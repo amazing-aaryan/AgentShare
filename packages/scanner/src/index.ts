@@ -101,32 +101,18 @@ export function scanAndRedact(input: AcbManifest): ScanResult {
   return { manifest, findings };
 }
 
-function binaryTextViews(bytes: Buffer): string[] {
-  const views = new Set([bytes.toString("latin1"), bytes.toString("utf8")]);
-  if (looksLikeUtf16(bytes, "le")) views.add(bytes.toString("utf16le"));
-  if (looksLikeUtf16(bytes, "be")) {
-    const evenBytes = Buffer.from(bytes.subarray(0, bytes.byteLength & ~1));
-    evenBytes.swap16();
-    views.add(evenBytes.toString("utf16le"));
+function* binaryTextViews(bytes: Buffer): Generator<string> {
+  yield bytes.toString("latin1");
+  yield bytes.toString("utf8");
+  for (const offset of [0, 1]) {
+    const byteLength = (bytes.byteLength - offset) & ~1;
+    if (byteLength < 2) continue;
+    const aligned = bytes.subarray(offset, offset + byteLength);
+    yield aligned.toString("utf16le");
+    const bigEndian = Buffer.from(aligned);
+    bigEndian.swap16();
+    yield bigEndian.toString("utf16le");
   }
-  return [...views];
-}
-
-function looksLikeUtf16(bytes: Buffer, endian: "le" | "be"): boolean {
-  if (bytes.byteLength < 4) return false;
-  if (
-    (endian === "le" && bytes[0] === 0xff && bytes[1] === 0xfe) ||
-    (endian === "be" && bytes[0] === 0xfe && bytes[1] === 0xff)
-  ) {
-    return true;
-  }
-  const pairs = Math.floor(bytes.byteLength / 2);
-  const highByteOffset = endian === "le" ? 1 : 0;
-  let zeroHighBytes = 0;
-  for (let index = highByteOffset; index < pairs * 2; index += 2) {
-    if (bytes[index] === 0) zeroHighBytes += 1;
-  }
-  return zeroHighBytes >= Math.max(2, Math.ceil(pairs / 3));
 }
 
 function redact(
