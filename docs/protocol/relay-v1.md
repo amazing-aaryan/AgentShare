@@ -31,9 +31,18 @@ or environment variables. Readers remain backward compatible with v0.1.1 links.
 - Maximum ciphertext: 50 MiB.
 - Maximum source resource: 5 MiB.
 - Public active shares: 5,000.
+- Public active shares per source identity: 25.
 - Public active ciphertext: 4 GB.
+- Awaiting-upload reservation lifetime: 10 minutes. A delayed authenticated
+  upload may re-establish an expired provisional reservation under its original
+  source identity and then extends capacity through authoritative share expiry.
 - Public create rate: 10 per source IP per minute.
 - Public upload rate: 20 per source IP per minute.
+
+The edge derives a SHA-256 source identity from Cloudflare's connection address,
+overwrites any client-supplied internal identity header, and stores only the
+digest with quota state. Source identity limits are admission controls, not user
+authentication or an anonymity mechanism.
 
 The server response is authoritative. Clients fail closed on metadata mismatch,
 expiry, hash mismatch, authentication failure, or unknown protocol version.

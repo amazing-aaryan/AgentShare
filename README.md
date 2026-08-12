@@ -198,7 +198,9 @@ shared context. See [SECURITY.md](SECURITY.md) for reporting and support policy.
 | Maximum encrypted bundle    |               50 MiB |
 | Maximum explicit text input |                5 MiB |
 | Active shares               |                5,000 |
+| Active shares per source IP |                   25 |
 | Active ciphertext           |                 4 GB |
+| Unuploaded reservation      |           10 minutes |
 | Create rate                 | 10 per minute per IP |
 | Upload rate                 | 20 per minute per IP |
 

@@ -59,3 +59,40 @@ edge, and strict six-case live release gates passed. **Impact:** Future source
 release work must address terminal escaping and relay admission/capacity abuse
 first. Binary resource scanning is a low-severity hardening gap because v0.1.7
 user adapters do not attach resources.
+
+## [2026-08-12 17:59] Hardened next-release security boundaries
+
+**Decision:** Strip terminal and bidi controls at all CLI external-output sinks,
+scan likely UTF-16LE/BE binary views, and bind relay reservations to a hashed
+creator source with a 25-active-share cap and 10-minute provisional lease.
+**Why:** These changes close the three reproduced review findings while
+preserving safe binary resources, delayed upload recovery, idempotency, and the
+72-hour uploaded-share limit. **Impact:** Changes live only on
+`codex/security-hardening-v0.1.8`; no public release or Worker deployment has
+occurred. Distributed capacity abuse and opaque compressed/encrypted resources
+remain documented residual risks.
+
+## [2026-08-12 18:10] Removed regex stack risk at resource limit
+
+**Decision:** Replace nested Base64 regex validation with an iterative syntax
+validator and test the full 5 MiB resource boundary. **Why:** A valid maximum
+resource exhausted the JavaScript regex stack before secret scanning.
+**Impact:** Maximum resources now validate and complete binary scanning without
+stack failure; Base64 acceptance semantics remain unchanged.
+
+## [2026-08-12 18:18] Completed bidi terminal control filtering
+
+**Decision:** Remove ALM, LRM, RLM, and deprecated directional formatting
+controls in addition to overrides and isolates. **Why:** Final adversarial
+review found those controls survived while the security policy claimed
+bidirectional controls were stripped. **Impact:** CLI display and stored target
+output now remove the complete explicit bidi-control set while preserving
+ordinary Unicode.
+
+## [2026-08-12 18:22] Made terminal sanitization linear-memory
+
+**Decision:** Replace array-based code-point filtering with a tested global
+control-range replacement. **Why:** The array implementation consumed about 199
+MiB of heap for 5 MiB input and could exhaust Node's heap near relay-sized
+payloads. **Impact:** A 50 MiB hostile-input benchmark completed in 54 ms with
+about 50 MiB incremental heap while preserving the same filtering contract.

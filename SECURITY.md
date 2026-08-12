@@ -20,6 +20,10 @@ Security invariants:
 - The relay stores ciphertext and digests, never plaintext or raw capabilities.
 - Recipient plaintext, keys, and indexes remain memory-only.
 - Host launchers fail closed when query-only isolation cannot be established.
+- Untrusted terminal output is stripped of terminal and bidirectional control
+  characters before display.
+- Public relay admission uses a pseudonymous source identity digest, per-source
+  active-share limits, and short provisional reservations.
 
 ## Local Residual Risks
 
@@ -35,3 +39,10 @@ Security invariants:
 - Capability links can leak through clipboard managers or browser history. The
   share page immediately removes query and fragment data from visible history,
   uses `no-referrer`, loads no third-party assets, and sends no analytics.
+- Secret scanning covers known credential formats in text plus ASCII, UTF-8,
+  UTF-16LE, and UTF-16BE views of binary resources. It cannot inspect encrypted,
+  compressed, or unknown encodings; creator review remains mandatory.
+- Per-source capacity controls increase the cost of relay exhaustion but cannot
+  eliminate distributed abuse across many source addresses.
+- Hashing source addresses minimizes stored quota data; it does not anonymize
+  low-entropy IP addresses or hide them from Cloudflare.
