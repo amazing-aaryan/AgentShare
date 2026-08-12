@@ -19,4 +19,12 @@ describe("terminal output safety", () => {
       "alpha\tbeta\ngamma",
     );
   });
+
+  it("removes directional marks and deprecated bidi formatting controls", () => {
+    expect(
+      sanitizeTerminalText(
+        "a\u061cb\u200ec\u200fd\u206ae\u206ff",
+      ),
+    ).toBe("abcdef");
+  });
 });
