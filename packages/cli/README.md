@@ -5,7 +5,7 @@ Encrypted Codex and Claude Code context handoff.
 Requires Node.js 22 or newer.
 
 ```sh
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz
 agentshare init
 ```
 
@@ -15,7 +15,7 @@ Claude Code. Review and approve the payload before sending the resulting link.
 Recipients may run the connector without a global installation:
 
 ```sh
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz -- agentshare open --target codex
 ```
 
 The connector requests the capability link through hidden terminal input. Use

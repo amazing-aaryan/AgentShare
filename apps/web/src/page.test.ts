@@ -10,7 +10,7 @@ describe("share page", () => {
     );
     expect(html).not.toContain("analytics");
     expect(html).toContain(
-      "agentshare-0.1.7.tgz -- agentshare open --target codex",
+      "agentshare-0.1.8.tgz -- agentshare open --target codex",
     );
   });
 

@@ -25,11 +25,11 @@ Requirements: Node.js 22 or newer, plus Codex CLI or Claude Code.
 Ask your agent to install AgentShare by pasting this prompt:
 
 ```text
-Install AgentShare v0.1.7 from its immutable GitHub release.
+Install AgentShare v0.1.8 from its immutable GitHub release.
 
 1. Confirm Node.js 22 or newer is installed.
 2. Run:
-   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz
+   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz
 3. Run: agentshare init
 4. Run: agentshare
 5. Confirm the CLI usage appears, list the installed integration files, and
@@ -39,7 +39,7 @@ Install AgentShare v0.1.7 from its immutable GitHub release.
 Manual install:
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz
 agentshare init
 ```
 
@@ -77,7 +77,7 @@ The recipient does not need a global installation:
 Pinned Codex command:
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz -- agentshare open --target codex
 ```
 
 Replace `codex` with `claude` to use Claude Code. If browser clipboard access is
@@ -222,7 +222,7 @@ Creators can override it with `--relay URL` or `AGENTSHARE_RELAY`.
 
 ```powershell
 # Update this pinned release and repair integrations
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.7/agentshare-0.1.7.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz
 agentshare repair
 
 # Remove integrations and CLI
