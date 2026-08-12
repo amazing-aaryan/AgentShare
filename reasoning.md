@@ -96,3 +96,12 @@ control-range replacement. **Why:** The array implementation consumed about 199
 MiB of heap for 5 MiB input and could exhaust Node's heap near relay-sized
 payloads. **Impact:** A 50 MiB hostile-input benchmark completed in 54 ms with
 about 50 MiB incremental heap while preserving the same filtering contract.
+
+## [2026-08-13 00:48] Released and deployed AgentShare v0.1.8
+
+**Decision:** Publish the verified security-hardening branch as v0.1.8 and
+deploy Worker version `9c3ebe77-a72f-4256-b0ac-14923bd876fc`. **Why:** Local,
+cross-platform CI, strict six-case production Codex/Claude, package integrity,
+fresh public install, and deployed-page checks all passed. **Impact:** v0.1.8 is
+the supported public release; README and share-page commands pin its immutable
+GitHub asset.
