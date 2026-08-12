@@ -56,7 +56,8 @@ describe("ACB", () => {
           id: "maximum-resource",
           mediaType: "application/octet-stream",
           byteLength: content.byteLength,
-          sha256: "c036cbb7553a909f9dd00bd99156c2d5986c2cf1d13bcaa4e4b79c9e31e67f91",
+          sha256:
+            "c036cbb7553a909f8b8877d4461924307f27ecb66cff928eeeafd569c3887e29",
           contentBase64: content.toString("base64"),
         },
       ],

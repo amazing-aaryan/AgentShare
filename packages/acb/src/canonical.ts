@@ -87,12 +87,27 @@ export function sha256Hex(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-const CANONICAL_BASE64 =
-  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
+function isCanonicalBase64(value: string): boolean {
+  if (value.length % 4 !== 0) return false;
+
+  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
+  const contentLength = value.length - padding;
+  for (let index = 0; index < contentLength; index += 1) {
+    const code = value.charCodeAt(index);
+    const isAlphabet =
+      (code >= 0x41 && code <= 0x5a) ||
+      (code >= 0x61 && code <= 0x7a) ||
+      (code >= 0x30 && code <= 0x39) ||
+      code === 0x2b ||
+      code === 0x2f;
+    if (!isAlphabet) return false;
+  }
+  return true;
+}
 
 export function assertResourceIntegrity(manifest: AcbManifest): void {
   for (const resource of manifest.resources) {
-    if (!CANONICAL_BASE64.test(resource.contentBase64)) {
+    if (!isCanonicalBase64(resource.contentBase64)) {
       throw new Error(`Resource ${resource.id} has invalid Base64 content`);
     }
     const content = Buffer.from(resource.contentBase64, "base64");
