@@ -9,6 +9,7 @@ describe("share page", () => {
       /<(?:script|link)[^>]+(?:src|href)=["']https?:\/\//u,
     );
     expect(html).not.toContain("analytics");
+    expect(html).toContain('<meta name="description"');
     expect(html).toContain(
       "agentshare-0.1.9.tgz -- agentshare open --target codex",
     );

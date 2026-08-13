@@ -24,13 +24,14 @@ export function renderSharePage(): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Open encrypted AgentShare context using a restricted Codex or Claude Code session.">
   <title>Open secure agent context · AgentShare</title>
   <style>
     :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #18181b; background: #f7f7f5; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; line-height: 1.55; }
     header { min-height: 56px; display: flex; align-items: center; padding: 10px 24px; color: #fff; background: #18181b; border-bottom: 3px solid #f05a3c; }
-    .mark { width: 26px; height: 26px; margin-right: 10px; display: grid; place-items: center; background: #f05a3c; color: #fff; font: 800 13px/1 ui-monospace, monospace; border-radius: 4px; }
+    .mark { width: 26px; height: 26px; margin-right: 10px; display: grid; place-items: center; background: #b93822; color: #fff; font: 800 13px/1 ui-monospace, monospace; border-radius: 4px; }
     .brand { font-size: 17px; font-weight: 750; }
     main { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 72px; }
     h1 { max-width: 650px; margin: 0; font-size: clamp(30px, 5vw, 42px); line-height: 1.1; letter-spacing: -0.025em; }
@@ -56,7 +57,7 @@ export function renderSharePage(): string {
     .inline-code { display: inline; padding: 2px 5px; border-radius: 3px; background: #ecece8; }
     .command { min-height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px 10px 10px 16px; border: 1px solid #a8a8a1; border-radius: 6px; background: #fff; }
     code { min-width: 0; overflow-wrap: anywhere; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
-    .copy { min-width: 116px; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 5px; color: #fff; background: #d8482c; font: 700 14px/1.2 inherit; cursor: pointer; }
+    .copy { min-width: 116px; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 5px; color: #fff; background: #b93822; font: 700 14px/1.2 inherit; cursor: pointer; }
     .copy-link { margin-top: 12px; color: #18181b; background: #deded8; }
     .copy:disabled { color: #71716b; background: #e8e8e3; cursor: not-allowed; }
     .copy:focus-visible, .target:focus-visible, summary:focus-visible, input:focus-visible { outline: 3px solid #2563b8; outline-offset: 3px; }
