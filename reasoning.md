@@ -154,3 +154,13 @@ what happens next, how to recover from the reported version error, or what
 security exposure remains. **Impact:** Recipients can complete the handoff in
 order without outside documentation, while bearer-link, provider, endpoint,
 untrusted-content, and retention risks remain visible before they proceed.
+
+## [2026-08-13 23:05] Released and deployed AgentShare v0.1.9
+
+**Decision:** Publish the immutable v0.1.9 CLI asset before exposing its URL,
+then advance master and deploy the recipient UI to Worker version
+`1ed0f7d4-a42a-46a3-881c-a92d0b922bca`. **Why:** Package-first ordering avoids a
+live 404 window; strict real-agent gates, anonymous asset verification, and live
+browser QA all passed. **Impact:** Expanded reviewed Codex/Claude support,
+pre-link validation, and the complete risk-aware recipient walkthrough are now
+public. Rollback remains v0.1.8 plus the prior Worker deployment.
