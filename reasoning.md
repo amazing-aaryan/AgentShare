@@ -105,3 +105,52 @@ cross-platform CI, strict six-case production Codex/Claude, package integrity,
 fresh public install, and deployed-page checks all passed. **Impact:** v0.1.8 is
 the supported public release; README and share-page commands pin its immutable
 GitHub asset.
+
+## [2026-08-13 15:26] Reviewed current Claude releases and fixed recipient preflight
+
+**Decision:** Allow only isolation-reviewed Claude Code 2.1.210, 2.1.223, and
+2.1.231, and validate target compatibility before requesting the recipient
+capability link. **Why:** Public AgentShare v0.1.8 accepted only 2.1.210 while
+Anthropic stable/latest had advanced to 2.1.223/2.1.231; validation also
+occurred too late, after link paste and the first question. **Impact:** The next
+release can open current stable/latest Claude while retaining fail-closed
+behavior for unreviewed versions; unsupported users now fail immediately with
+the reviewed-version list. Real filesystem/network isolation and two-turn
+grounding passed on both newly allowed releases.
+
+## [2026-08-13 21:00] Expanded only through verified host releases
+
+**Decision:** Support Codex CLI 0.145.0 through 0.147.0 and every published
+Claude Code release from 2.1.210 through 2.1.231, except nonexistent 2.1.230,
+using exact reviewed profiles plus bounded runtime capability checks before link
+entry and every target spawn. **Why:** Help flags alone cannot prove unchanged
+security semantics, and an LLM-driven self-test cannot establish a security
+boundary for arbitrary future versions. Every added release passed real
+filesystem/network isolation; Codex 0.146.0/0.147.0 also passed grounded
+two-turn continuity. **Impact:** AgentShare now supports the maximum currently
+published and tested host range without weakening fail-closed isolation. Future
+releases require the same automated security review before allowlisting.
+
+## [2026-08-13 21:05] Hardened compatibility preflight and separated release state
+
+**Decision:** Revalidate exact reviewed versions before every target spawn;
+bound version/help probes with hard deadlines, byte caps, stream shutdown, and
+process-tree termination; document per-version evidence while labeling expanded
+support unreleased. **Why:** Help-name presence cannot authorize arbitrary host
+versions, cached checks create replacement races, hostile probes can retain
+pipes after termination, and public v0.1.8 still contains the previous narrow
+gate. **Impact:** Unknown or drifted releases fail before link entry, probe DoS
+paths fail closed, and users are not told the source-only expansion is already
+deployed. A new release and pin update remain required for public availability.
+
+## [2026-08-13 22:27] Made recipient web handoff self-guiding
+
+**Decision:** Replace the compact recipient page with an explicit four-step
+journey covering prerequisites, target/version selection, command execution,
+hidden-link entry, terminal use, risk disclosure, and error recovery. Keep the
+displayed compatibility tied to pinned public v0.1.8 rather than unreleased
+source support. **Why:** The earlier page told users what to copy but not why,
+what happens next, how to recover from the reported version error, or what
+security exposure remains. **Impact:** Recipients can complete the handoff in
+order without outside documentation, while bearer-link, provider, endpoint,
+untrusted-content, and retention risks remain visible before they proceed.

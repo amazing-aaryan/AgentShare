@@ -24,7 +24,7 @@ import {
   type ConversationTurn,
 } from "./retrieval.js";
 import { openShare } from "./handoff.js";
-import { runTarget, type TargetAgent } from "./launchers.js";
+import { runTarget, type TargetAgent, verifyTarget } from "./launchers.js";
 import { RelayClient, RelayClientError } from "./relay-client.js";
 import {
   findReusableShare,
@@ -273,6 +273,7 @@ async function loadManifest(options: ShareOptions): Promise<AcbManifest> {
 }
 
 export async function openCommand(target: TargetAgent): Promise<void> {
+  await verifyTarget(target);
   const link = await readHiddenLine("AgentShare link: ");
   const { manifest, metadata } = await openShare(link);
   process.stdout.write(

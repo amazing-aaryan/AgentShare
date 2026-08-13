@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
@@ -16,12 +16,45 @@ type TargetChildLifecycle = {
   ): TargetChildLifecycle;
 };
 
-const SUPPORTED_VERSIONS: Record<TargetAgent, RegExp> = {
-  codex: /^codex-cli 0\.145\./u,
-  claude: /^2\.1\.210(?:\s|$)/u,
+const TARGET_CONTRACTS: Record<
+  TargetAgent,
+  { helpArgs: string[]; requiredHelpOptions: string[]; versionPattern: RegExp }
+> = {
+  codex: {
+    helpArgs: ["exec", "--help"],
+    requiredHelpOptions: [
+      "--ephemeral",
+      "--ignore-user-config",
+      "--ignore-rules",
+      "--strict-config",
+      "--skip-git-repo-check",
+      "--cd",
+      "--config",
+    ],
+    versionPattern: /^codex-cli\s+\d+\.\d+\.\d+(?:[-+][^\s]+)?\s*$/mu,
+  },
+  claude: {
+    helpArgs: ["--help"],
+    requiredHelpOptions: [
+      "--print",
+      "--no-session-persistence",
+      "--tools",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "--setting-sources",
+      "--disable-slash-commands",
+      "--no-chrome",
+      "--permission-mode",
+    ],
+    versionPattern: /^\d+\.\d+\.\d+(?:[-+][^\s]+)?\s+\(Claude Code\)\s*$/mu,
+  },
 };
 
-const compatibilityChecks = new Map<TargetAgent, Promise<void>>();
+const REVIEWED_VERSIONS: Record<TargetAgent, RegExp> = {
+  codex: /^codex-cli 0\.(?:145|146|147)\.0\s*$/mu,
+  claude:
+    /^2\.1\.(?:210|211|212|213|214|215|216|217|218|219|220|221|222|223|224|225|226|227|228|229|231)\s+\(Claude Code\)\s*$/mu,
+};
 
 export function codexArgs(
   workspace: string,
@@ -34,52 +67,52 @@ export function codexArgs(
     "--ignore-rules",
     "--strict-config",
     "--skip-git-repo-check",
-    "-C",
+    "--cd",
     workspace,
-    "-c",
+    "--config",
     'approval_policy="never"',
-    "-c",
+    "--config",
     'sandbox_mode="read-only"',
-    "-c",
+    "--config",
     'default_permissions="agentshare-query"',
-    "-c",
+    "--config",
     'permissions.agentshare-query.filesystem={":minimal"="deny",":workspace_roots"="deny"}',
-    "-c",
+    "--config",
     "permissions.agentshare-query.network.enabled=false",
-    "-c",
+    "--config",
     'web_search="disabled"',
-    "-c",
+    "--config",
     "features.shell_tool=false",
-    "-c",
+    "--config",
     "features.unified_exec=false",
-    "-c",
+    "--config",
     "features.apply_patch_freeform=false",
-    "-c",
+    "--config",
     "features.js_repl=false",
-    "-c",
+    "--config",
     "features.code_mode=false",
-    "-c",
+    "--config",
     "features.code_mode_only=false",
-    "-c",
+    "--config",
     "features.skill_search=false",
-    "-c",
+    "--config",
     "features.plugins=false",
-    "-c",
+    "--config",
     "features.apps=false",
-    "-c",
+    "--config",
     "features.hooks=false",
-    "-c",
+    "--config",
     "features.memories=false",
     ...(disabledSkillPaths.length === 0
       ? []
-      : ["-c", disabledSkillsConfig(disabledSkillPaths)]),
+      : ["--config", disabledSkillsConfig(disabledSkillPaths)]),
     "-",
   ];
 }
 
 export function claudeArgs(): string[] {
   return [
-    "-p",
+    "--print",
     "--no-session-persistence",
     "--tools",
     "",
@@ -143,6 +176,11 @@ export async function runTarget(
   }
 }
 
+export async function verifyTarget(target: TargetAgent): Promise<void> {
+  const executable = resolveAgentExecutable(target);
+  await assertSupportedTarget(target, executable);
+}
+
 export function waitForTargetClose(
   child: TargetChildLifecycle,
 ): Promise<number> {
@@ -152,63 +190,192 @@ export function waitForTargetClose(
   });
 }
 
-export function supportsTargetVersion(
+export function recognizesTargetVersion(
   target: TargetAgent,
   versionOutput: string,
 ): boolean {
-  return SUPPORTED_VERSIONS[target].test(versionOutput.trim());
+  return TARGET_CONTRACTS[target].versionPattern.test(versionOutput.trim());
+}
+
+export function unsupportedTargetVersionMessage(
+  target: TargetAgent,
+  versionOutput: string,
+): string {
+  return (
+    `Unrecognized ${target} CLI version output: ${displayTargetOutput(versionOutput)}. ` +
+    `AgentShare requires a recognizable ${target} CLI and fails closed for unknown executables.`
+  );
+}
+
+export function missingTargetCapabilities(
+  target: TargetAgent,
+  helpOutput: string,
+): string[] {
+  const advertised = new Set(
+    helpOutput
+      .split(/\r?\n/u)
+      .filter((line) => line.trimStart().startsWith("-"))
+      .flatMap((line) => line.match(/--[a-z][a-z0-9-]*/giu) ?? []),
+  );
+  return TARGET_CONTRACTS[target].requiredHelpOptions.filter(
+    (option) => !advertised.has(option),
+  );
+}
+
+export function unsupportedTargetCapabilitiesMessage(
+  target: TargetAgent,
+  versionOutput: string,
+  missing: string[],
+): string {
+  return (
+    `${target} ${displayTargetOutput(versionOutput)} lacks required isolation controls: ` +
+    `${missing.join(", ")}. Update ${target}; AgentShare will not weaken its sandbox.`
+  );
+}
+
+export function supportsReviewedTargetVersion(
+  target: TargetAgent,
+  versionOutput: string,
+): boolean {
+  return REVIEWED_VERSIONS[target].test(versionOutput.trim());
 }
 
 async function assertSupportedTarget(
   target: TargetAgent,
   executable: AgentExecutable,
 ): Promise<void> {
-  let check = compatibilityChecks.get(target);
-  if (check === undefined) {
-    check = inspectTargetVersion(target, executable);
-    compatibilityChecks.set(target, check);
-  }
-  await check;
+  await inspectTargetVersion(target, executable);
 }
 
 async function inspectTargetVersion(
   target: TargetAgent,
   executable: AgentExecutable,
 ): Promise<void> {
+  const contract = TARGET_CONTRACTS[target];
   const output = await captureProcess(executable.command, [
     ...executable.prefixArgs,
     "--version",
   ]);
-  if (!supportsTargetVersion(target, output)) {
+  if (!recognizesTargetVersion(target, output)) {
+    throw new Error(unsupportedTargetVersionMessage(target, output));
+  }
+  if (!supportsReviewedTargetVersion(target, output)) {
     throw new Error(
-      `Unsupported ${target} version: ${output.trim() || "unknown"}. ` +
-        "AgentShare fails closed until this version passes isolation review.",
+      `${target} ${displayTargetOutput(output)} has not passed AgentShare isolation review. ` +
+        `Update AgentShare or install a reviewed ${target} version; sandbox controls will not be assumed safe.`,
+    );
+  }
+  const help = await captureProcess(executable.command, [
+    ...executable.prefixArgs,
+    ...contract.helpArgs,
+  ]);
+  const missing = missingTargetCapabilities(target, help);
+  if (missing.length > 0) {
+    throw new Error(
+      unsupportedTargetCapabilitiesMessage(target, output, missing),
     );
   }
 }
 
-async function captureProcess(
+export async function captureProcess(
   command: string,
   args: string[],
+  timeoutMs = 15_000,
+  maxOutputBytes = 1_048_576,
 ): Promise<string> {
   const child = spawn(command, args, {
+    detached: process.platform !== "win32",
     env: safeEnvironment(),
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
   let stdout = "";
   let stderr = "";
+  let outputBytes = 0;
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
-  child.stdout.on("data", (chunk: string) => (stdout += chunk));
-  child.stderr.on("data", (chunk: string) => (stderr += chunk));
-  const exitCode = await waitForTargetClose(child);
-  if (exitCode !== 0) {
-    throw new Error(
-      `Unable to inspect target version: ${sanitizeTerminalText(stderr.trim())}`,
+  return await new Promise<string>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error, exitCode = 0) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error !== undefined) reject(error);
+      else if (exitCode !== 0) {
+        reject(
+          new Error(
+            `Unable to inspect target compatibility: ${displayTargetOutput(stderr)}`,
+          ),
+        );
+      } else resolve(`${stdout}\n${stderr}`.trim());
+    };
+    const abort = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.stdout.removeAllListeners("data");
+      child.stderr.removeAllListeners("data");
+      child.stdout.destroy();
+      child.stderr.destroy();
+      terminateProcessTree(child);
+      reject(error);
+    };
+    const append = (stream: "stdout" | "stderr", chunk: string) => {
+      if (settled) return;
+      outputBytes += Buffer.byteLength(chunk, "utf8");
+      if (outputBytes > maxOutputBytes) {
+        abort(
+          new Error(
+            `Target compatibility output exceeded ${maxOutputBytes} bytes`,
+          ),
+        );
+        return;
+      }
+      if (stream === "stdout") stdout += chunk;
+      else stderr += chunk;
+    };
+    const timer = setTimeout(
+      () =>
+        abort(
+          new Error(
+            `Target compatibility check timed out after ${timeoutMs} ms`,
+          ),
+        ),
+      timeoutMs,
     );
+    child.stdout.on("data", (chunk: string) => append("stdout", chunk));
+    child.stderr.on("data", (chunk: string) => append("stderr", chunk));
+    child.once("error", (error) => finish(error));
+    child.once("close", (code) => finish(undefined, code ?? 1));
+  });
+}
+
+function terminateProcessTree(child: Pick<ChildProcess, "kill" | "pid">): void {
+  if (process.platform === "win32" && child.pid !== undefined) {
+    try {
+      spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true,
+      }).unref();
+    } catch {
+      // Direct termination below remains the fallback.
+    }
+  } else if (child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch {
+      // Direct termination below remains the fallback.
+    }
   }
-  return stdout || stderr;
+  try {
+    child.kill("SIGKILL");
+  } catch {
+    // Promise already failed closed; no later close event is required.
+  }
+}
+
+function displayTargetOutput(output: string): string {
+  return sanitizeTerminalText(output).trim().slice(0, 512) || "unknown";
 }
 
 export async function discoverUserSkills(home = homedir()): Promise<string[]> {

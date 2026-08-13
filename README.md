@@ -25,11 +25,11 @@ Requirements: Node.js 22 or newer, plus Codex CLI or Claude Code.
 Ask your agent to install AgentShare by pasting this prompt:
 
 ```text
-Install AgentShare v0.1.8 from its immutable GitHub release.
+Install AgentShare v0.1.9 from its immutable GitHub release.
 
 1. Confirm Node.js 22 or newer is installed.
 2. Run:
-   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz
+   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.9/agentshare-0.1.9.tgz
 3. Run: agentshare init
 4. Run: agentshare
 5. Confirm the CLI usage appears, list the installed integration files, and
@@ -39,7 +39,7 @@ Install AgentShare v0.1.8 from its immutable GitHub release.
 Manual install:
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.9/agentshare-0.1.9.tgz
 agentshare init
 ```
 
@@ -77,7 +77,7 @@ The recipient does not need a global installation:
 Pinned Codex command:
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.9/agentshare-0.1.9.tgz -- agentshare open --target codex
 ```
 
 Replace `codex` with `claude` to use Claude Code. If browser clipboard access is
@@ -175,7 +175,21 @@ storage deployment.
   replaced with different ciphertext.
 - Creator state stores live links and revocation capabilities in
   `~/.agentshare/state-v1.json` with mode `0600` where supported.
-- Target launchers fail closed on unreviewed Codex or Claude versions.
+- Target launchers combine reviewed version profiles with runtime capability
+  checks. Every supported release has passed real filesystem/network isolation
+  tests; each launch also verifies required controls still exist before asking
+  for the capability link. Unknown, missing, renamed, hanging, or oversized host
+  responses fail closed. New releases are added after the same review gate,
+  never by assuming unchanged flag names imply unchanged security.
+
+Reviewed recipient versions:
+
+- Codex CLI: `0.145.0`, `0.146.0`, `0.147.0`.
+- Claude Code: every published release from `2.1.210` through `2.1.231`
+  (`2.1.230` was not published).
+
+See the [per-version compatibility evidence](docs/recipient-compatibility.md)
+and review procedure.
 
 The target CLIs must read their own authentication material to contact their
 model provider. Codex may also enumerate local skill metadata during startup,
@@ -222,7 +236,7 @@ Creators can override it with `--relay URL` or `AGENTSHARE_RELAY`.
 
 ```powershell
 # Update this pinned release and repair integrations
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.8/agentshare-0.1.8.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.9/agentshare-0.1.9.tgz
 agentshare repair
 
 # Remove integrations and CLI

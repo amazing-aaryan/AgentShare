@@ -1,7 +1,25 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runTarget, waitForTargetClose } from "./launchers.js";
+import { captureProcess, runTarget, waitForTargetClose } from "./launchers.js";
+
+const CLAUDE_HELP = [
+  "  -p, --print  Print mode",
+  "  --no-session-persistence  Ephemeral",
+  "  --tools <tools>  Tools",
+  "  --strict-mcp-config  Strict MCP",
+  "  --mcp-config <config>  MCP config",
+  "  --setting-sources <sources>  Settings",
+  "  --disable-slash-commands  No skills",
+  "  --no-chrome  No browser",
+  "  --permission-mode <mode>  Permissions",
+].join("\n");
+
+const CODEX_INCOMPLETE_HELP = [
+  "  -c, --config <key=value>  Config",
+  "  -C, --cd <dir>  Working root",
+  "  --ephemeral  Ephemeral",
+].join("\n");
 
 const { existsSyncMock, spawnMock } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(() => true),
@@ -12,19 +30,27 @@ vi.mock("node:child_process", () => ({ spawn: spawnMock }));
 vi.mock("node:fs", () => ({ existsSync: existsSyncMock }));
 
 function fakeProcess(stdout: string, stderr = "") {
-  const child = new EventEmitter() as EventEmitter & {
-    stdin: { end: (value?: string) => void };
-    stdout: PassThrough;
-    stderr: PassThrough;
-  };
-  child.stdin = { end: vi.fn() };
-  child.stdout = new PassThrough();
-  child.stderr = new PassThrough();
+  const child = fakeHangingProcess();
   queueMicrotask(() => {
     child.stdout.end(stdout);
     child.stderr.end(stderr);
     child.emit("close", 0);
   });
+  return child;
+}
+
+function fakeHangingProcess() {
+  const child = new EventEmitter() as EventEmitter & {
+    stdin: { end: (value?: string) => void };
+    stdout: PassThrough;
+    stderr: PassThrough;
+    kill: ReturnType<typeof vi.fn>;
+    pid: number;
+  };
+  child.stdin = { end: vi.fn() };
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  Object.assign(child, { kill: vi.fn(), pid: 12345 });
   return child;
 }
 
@@ -34,6 +60,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -54,7 +81,8 @@ describe("target process lifecycle", () => {
 
   it("sanitizes child output before display and conversation storage", async () => {
     spawnMock
-      .mockImplementationOnce(() => fakeProcess("2.1.210\n"))
+      .mockImplementationOnce(() => fakeProcess("2.1.231 (Claude Code)\n"))
+      .mockImplementationOnce(() => fakeProcess(CLAUDE_HELP))
       .mockImplementationOnce(() =>
         fakeProcess(
           "answer\u001b[31m\u202Espoof\n",
@@ -73,5 +101,49 @@ describe("target process lifecycle", () => {
     expect(result).toEqual({ exitCode: 0, output: "answer[31mspoof" });
     expect(stdout).toHaveBeenCalledWith("answer[31mspoof\n");
     expect(stderr).toHaveBeenCalledWith("warning31mspoof\n");
+  });
+
+  it("fails closed before launch when a required isolation control is absent", async () => {
+    spawnMock
+      .mockImplementationOnce(() => fakeProcess("codex-cli 0.147.0\n"))
+      .mockImplementationOnce(() => fakeProcess(CODEX_INCOMPLETE_HELP));
+
+    await expect(runTarget("codex", "question")).rejects.toThrow(
+      "lacks required isolation controls",
+    );
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects an unreviewed version without running its help command", async () => {
+    spawnMock.mockImplementationOnce(() =>
+      fakeProcess("codex-cli 99.4.7-beta.1\n"),
+    );
+
+    await expect(runTarget("codex", "question")).rejects.toThrow(
+      "has not passed AgentShare isolation review",
+    );
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects oversized probe output without waiting for close", async () => {
+    const child = fakeHangingProcess();
+    spawnMock.mockReturnValueOnce(child);
+    queueMicrotask(() => child.stdout.write("12345"));
+
+    await expect(
+      captureProcess("claude", ["--version"], 1_000, 4),
+    ).rejects.toThrow("exceeded 4 bytes");
+    expect(child.stdout.destroyed).toBe(true);
+  });
+
+  it("rejects a probe deadline even when target never closes", async () => {
+    vi.useFakeTimers();
+    const child = fakeHangingProcess();
+    spawnMock.mockReturnValueOnce(child);
+    const result = captureProcess("claude", ["--version"], 10, 1_000);
+    const rejection = expect(result).rejects.toThrow("timed out after 10 ms");
+
+    await vi.advanceTimersByTimeAsync(11);
+    await rejection;
   });
 });

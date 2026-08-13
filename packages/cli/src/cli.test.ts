@@ -9,7 +9,15 @@ import {
 } from "@agentshare/relay";
 import { parseShareUrl } from "@agentshare/acb";
 import { openShare, shareCommand } from "./commands.js";
-import { codexArgs, claudeArgs, supportsTargetVersion } from "./launchers.js";
+import {
+  codexArgs,
+  claudeArgs,
+  missingTargetCapabilities,
+  supportsReviewedTargetVersion,
+  recognizesTargetVersion,
+  unsupportedTargetCapabilitiesMessage,
+  unsupportedTargetVersionMessage,
+} from "./launchers.js";
 import { loadState } from "./state.js";
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -79,11 +87,64 @@ describe("creator and launcher", () => {
       "features.apply_patch_freeform=false",
     );
     expect(claudeArgs()).toContain("--no-session-persistence");
-    expect(supportsTargetVersion("codex", "codex-cli 0.145.0")).toBe(true);
-    expect(supportsTargetVersion("claude", "2.1.210 (Claude Code)")).toBe(true);
-    expect(supportsTargetVersion("codex", "codex-cli 0.146.0")).toBe(false);
-    expect(supportsTargetVersion("claude", "2.1.211 (Claude Code)")).toBe(
+    expect(recognizesTargetVersion("codex", "codex-cli 0.145.0")).toBe(true);
+    expect(recognizesTargetVersion("claude", "2.1.210 (Claude Code)")).toBe(
+      true,
+    );
+    expect(recognizesTargetVersion("claude", "2.1.223 (Claude Code)")).toBe(
+      true,
+    );
+    expect(recognizesTargetVersion("claude", "2.1.231 (Claude Code)")).toBe(
+      true,
+    );
+    expect(recognizesTargetVersion("codex", "codex-cli 0.146.0")).toBe(true);
+    expect(recognizesTargetVersion("codex", "codex-cli 99.4.7-beta.1")).toBe(
+      true,
+    );
+    expect(recognizesTargetVersion("claude", "2.1.211 (Claude Code)")).toBe(
+      true,
+    );
+    expect(
+      recognizesTargetVersion("claude", "99.4.7-beta.1 (Claude Code)"),
+    ).toBe(true);
+    expect(recognizesTargetVersion("claude", "not-claude 2.1.231")).toBe(false);
+    expect(
+      recognizesTargetVersion("claude", "2.1.231 (Claude Code) forged"),
+    ).toBe(false);
+    expect(
+      supportsReviewedTargetVersion("claude", "2.1.231 (Claude Code)"),
+    ).toBe(true);
+    expect(
+      supportsReviewedTargetVersion("claude", "2.1.232 (Claude Code)"),
+    ).toBe(false);
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.999.0")).toBe(
       false,
+    );
+    expect(
+      unsupportedTargetVersionMessage("claude", "not-claude 2.1.232"),
+    ).toBe(
+      "Unrecognized claude CLI version output: not-claude 2.1.232. " +
+        "AgentShare requires a recognizable claude CLI and fails closed for unknown executables.",
+    );
+    expect(
+      missingTargetCapabilities(
+        "claude",
+        "Options:\n  -p, --print  Print mode\n  --tools <tools>  Tools\nA description mentioning --no-chrome",
+      ),
+    ).toEqual([
+      "--no-session-persistence",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "--setting-sources",
+      "--disable-slash-commands",
+      "--no-chrome",
+      "--permission-mode",
+    ]);
+    expect(
+      unsupportedTargetCapabilitiesMessage("claude", "1.0.0", ["--tools"]),
+    ).toBe(
+      "claude 1.0.0 lacks required isolation controls: --tools. " +
+        "Update claude; AgentShare will not weaken its sandbox.",
     );
   });
 
