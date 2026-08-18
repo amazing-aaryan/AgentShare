@@ -58,7 +58,10 @@ try {
   process.exitCode = 1;
 }
 
-function assertKnownOptions(args: string[], allowed: ReadonlySet<string>): void {
+function assertKnownOptions(
+  args: string[],
+  allowed: ReadonlySet<string>,
+): void {
   for (const value of args) {
     if (value.startsWith("--") && !allowed.has(value)) {
       throw new Error(`Unknown option: ${value}`);
