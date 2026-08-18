@@ -7,14 +7,15 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![License](https://img.shields.io/github/license/amazing-aaryan/AgentShare)](LICENSE)
 
-AgentShare packages selected agent conversation context, shows the creator the
-exact normalized plaintext, encrypts it locally, and produces a link that a
-coworker can open with an isolated Codex or Claude Code session. The public
-relay stores ciphertext, never conversation plaintext or decryption keys.
+AgentShare packages selected agent conversation context, shows the creator all
+normalized/redacted text exactly plus an integrity inventory for any binary
+resources, encrypts the bundle locally, and produces a link that a coworker can
+open with an isolated Codex or Claude Code session. The public relay stores
+ciphertext, never conversation plaintext or decryption keys.
 
 > [!IMPORTANT] AgentShare is a public beta. Do not share production credentials,
-> regulated data, or other high-risk material. Review the complete payload
-> before upload.
+> regulated data, or other high-risk material. Review all displayed text and the
+> binary resource inventory before upload.
 
 ## Quick Start
 
@@ -25,11 +26,11 @@ Requirements: Node.js 22 or newer, plus Codex CLI or Claude Code.
 Ask your agent to install AgentShare by pasting this prompt:
 
 ```text
-Install AgentShare v0.1.9 from its immutable GitHub release.
+Install AgentShare v0.1.10 from its immutable GitHub release.
 
 1. Confirm Node.js 22 or newer is installed.
 2. Run:
-   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.9/agentshare-0.1.9.tgz
+   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
 3. Run: agentshare init
 4. Run: agentshare
 5. Confirm the CLI usage appears, list the installed integration files, and
@@ -39,7 +40,7 @@ Install AgentShare v0.1.9 from its immutable GitHub release.
 Manual install:
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.9/agentshare-0.1.9.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
 agentshare init
 ```
 
@@ -52,9 +53,13 @@ Start a new agent session so the host discovers the integration.
 | Codex        | `$agentshare` |
 | Claude Code  | `/share`      |
 
-AgentShare shows the selected events, redactions, final normalized plaintext,
-fingerprint, relay expiry, and size limit. Nothing uploads until you approve
-both prompts. Send the resulting capability link to your coworker.
+AgentShare shows selected events, redactions, all normalized text content,
+fingerprint, relay expiry, size limits, and binary resource metadata when
+binary resources are present. Text content is shown exactly after normalization
+and redaction. Binary bytes are not printed byte-for-byte; binary resources are
+identified by media type, byte length, and SHA-256 and scanned for suspected
+secrets in supported text views. Nothing uploads until you approve both prompts.
+Send the resulting capability link to your coworker.
 
 Direct CLI equivalents:
 
@@ -77,7 +82,7 @@ The recipient does not need a global installation:
 Pinned Codex command:
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.9/agentshare-0.1.9.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz -- agentshare open --target codex
 ```
 
 Replace `codex` with `claude` to use Claude Code. If browser clipboard access is
@@ -94,10 +99,11 @@ flowchart LR
         K["Random key and read capability"] --> D
     end
 
-    D -->|"Ciphertext and capability digests"| R["Cloudflare relay"]
+    D -->|"Ciphertext and capability digests"| R["Cloudflare ciphertext relay"]
     K -->|"URL fragment only"| L["Capability link"]
+    L --> W["Independent AgentShare handoff page"]
     R -->|"Ciphertext"| E["Recipient CLI"]
-    L --> E
+    W -->|"Pinned CLI command + copied link"| E
 
     subgraph Recipient["Recipient device"]
         E --> F["Local decryption"]
@@ -107,16 +113,25 @@ flowchart LR
     end
 ```
 
-The link format is:
+New v0.1.10 links use an AgentShare-controlled handoff origin that is separate
+from the ciphertext relay. The relay origin is non-secret query metadata; the
+read capability and encryption key remain in the URL fragment:
 
 ```text
-https://relay.example/s/<share-id>#r=<read-capability>&k=<encryption-key>
+https://agentshare-handoff.carnation-vermicelli.workers.dev/s/<share-id>?relay=https%3A%2F%2Frelay.example#r=<read-capability>&k=<encryption-key>
 ```
 
-URL fragments are not sent in HTTP requests. The share page removes the secret
-fragment from visible browser history immediately, loads no third-party assets,
-and sends no analytics. The recipient CLI uses the fragment locally to
-authenticate, download, verify, and decrypt the bundle.
+Browsers do not send URL fragments in HTTP requests. The trusted handoff page
+reads the fragment locally in browser JavaScript, removes query and fragment data
+from visible browser history, loads no third-party assets, sends no analytics,
+and sends only the read capability to the selected relay for metadata checks.
+The encryption key is not sent to the relay. Because new links are opened on the
+independent handoff origin, a custom ciphertext relay does not control the page
+JavaScript that can read the fragment.
+
+Legacy links without `relay=` remain readable by v0.1.10. They treat the link
+origin as the relay origin and retain the older v0.1.9 browser trust assumption;
+do not use an untrusted custom relay with legacy-format links.
 
 ## Capabilities
 
@@ -149,32 +164,42 @@ The recipient CLI decrypts the complete bundle locally. For each question, it
 sends the question, recent AgentShare conversation, and selected evidence
 excerpts to the chosen model provider through the recipient's authenticated
 Codex or Claude CLI. OpenAI or Anthropic therefore receives those excerpts under
-the recipient's account and terms; the Cloudflare relay does not.
+the recipient's account and terms; the Cloudflare ciphertext relay does not.
 
 ### Multiple Readers and Deployments
 
 A share is not consumed when opened. Multiple people, machines, Codex sessions,
 and Claude sessions can use the same link simultaneously. Any holder can also
 forward it, so treat the entire URL as a secret. Revocation invalidates all
-readers at once; expiration is currently capped at 72 hours.
+readers of that link at once; expiration is currently capped at 72 hours.
 
 Normal Worker code deployments preserve links when they keep the same Cloudflare
 Durable Object bindings and storage. A link is tied to its relay origin and data
 namespace; it does not move automatically to another relay, account, or reset
-storage deployment.
+storage deployment. The independent handoff service does not store share
+ciphertext.
 
 ## Security Model
 
 - AES-256-GCM encryption and decryption happen on client devices.
+- New v0.1.10 links use the independent trusted AgentShare handoff origin; the
+  selected ciphertext relay is carried as non-secret link metadata.
 - The relay receives ciphertext, SHA-256 digests, timestamps, sizes, and status.
 - Raw upload, read, and revoke capabilities are not stored by the relay.
-- Encryption keys remain in URL fragments and never reach the relay.
+- The encryption key remains in the URL fragment. The browser does not transmit
+  that fragment in its HTTP request; trusted handoff JavaScript reads it locally
+  and does not send it to the relay.
+- A custom relay cannot replace the trusted handoff JavaScript for new-format
+  links. Compromise of the trusted handoff origin remains a residual risk.
 - Ciphertext integrity, authenticated metadata, resource length, and SHA-256 are
   checked before recipient use.
 - Upload retries and repeated creates are idempotent; an existing blob cannot be
   replaced with different ciphertext.
-- Creator state stores live links and revocation capabilities in
-  `~/.agentshare/state-v1.json` with mode `0600` where supported.
+- Creator state stores every live link and its revocation capability in
+  `~/.agentshare/state-v1.json` with mode `0600` where supported. `--new` keeps
+  older live revocation records rather than overwriting them.
+- Reusing unchanged live context requires explicit creator confirmation. Decline
+  the reuse prompt or add `--new` to create a separate link.
 - Target launchers combine reviewed version profiles with runtime capability
   checks. Every supported release has passed real filesystem/network isolation
   tests; each launch also verifies required controls still exist before asking
@@ -198,10 +223,11 @@ app, plugin, and other tool surfaces before supplying shared evidence. Creator
 agents retain whatever project permissions the user independently granted them;
 invoking AgentShare does not add broader file access.
 
-Primary residual risks are link forwarding, clipboard/history leakage, creator
-device compromise, plaintext in recipient process memory or OS swap, incomplete
-secret detection, and incorrect or malicious content already present in the
-shared context. See [SECURITY.md](SECURITY.md) for reporting and support policy.
+Primary residual risks are link forwarding, clipboard/history leakage, trusted
+handoff-origin compromise, creator or recipient device compromise, plaintext in
+recipient process memory or OS swap, incomplete secret detection, and incorrect
+or malicious content already present in the shared context. See
+[SECURITY.md](SECURITY.md) for reporting and support policy.
 
 ## Limits
 
@@ -221,22 +247,29 @@ shared context. See [SECURITY.md](SECURITY.md) for reporting and support policy.
 Public relay:
 [`https://agentshare-relay.carnation-vermicelli.workers.dev`](https://agentshare-relay.carnation-vermicelli.workers.dev)
 
-Creators can override it with `--relay URL` or `AGENTSHARE_RELAY`.
+Trusted handoff origin:
+[`https://agentshare-handoff.carnation-vermicelli.workers.dev`](https://agentshare-handoff.carnation-vermicelli.workers.dev)
+
+Creators can override the ciphertext relay with `--relay URL` or
+`AGENTSHARE_RELAY`. Newly created public-CLI links still open on the trusted
+AgentShare handoff origin; the chosen relay is encoded as non-secret link
+metadata.
 
 ## Link Lifecycle
 
-- **Reuse:** Sharing unchanged context reuses the creator's unexpired link by
-  default. Add `--new` to create a separate link.
+- **Reuse:** Sharing unchanged context finds the newest unexpired matching link
+  and asks whether to reuse it. Declining the prompt creates a fresh link. Add
+  `--new` to skip reuse lookup and create a separate link immediately.
 - **Retry:** Interrupted uploads resume from encrypted local pending state.
-- **Revoke:** Run `agentshare revoke`, then paste the original link at the
-  hidden prompt. Revocation requires the creator's local state.
+- **Revoke:** Run `agentshare revoke`, then paste the exact link at the hidden
+  prompt. Every locally retained live link has its own revocation credential.
 - **Expire:** Relay-enforced expiry deletes ciphertext and releases capacity.
 
 ## Update or Remove
 
 ```powershell
 # Update this pinned release and repair integrations
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.9/agentshare-0.1.9.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
 agentshare repair
 
 # Remove integrations and CLI
@@ -254,6 +287,8 @@ npm run build
 npm run test:coverage
 npm run test:package
 npm run test:edge-runtime
+npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
+npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
 npm audit --audit-level=high
 ```
 
