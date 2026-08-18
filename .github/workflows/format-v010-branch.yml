@@ -18,16 +18,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx prettier --write .github/workflows/ci.yml README.md SECURITY.md
+      - run: npx prettier --write README.md SECURITY.md
       - name: Commit formatting if changed
         shell: bash
         run: |
-          if git diff --quiet -- .github/workflows/ci.yml README.md SECURITY.md; then
+          if git diff --quiet -- README.md SECURITY.md; then
             echo "Files already formatted"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/workflows/ci.yml README.md SECURITY.md
+          git add README.md SECURITY.md
           git commit -m "style: format v0.1.10 release alignment"
           git push origin "HEAD:${GITHUB_REF_NAME}"
