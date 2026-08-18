@@ -41,7 +41,7 @@ export type ShareOptions = {
   relayOrigin: string;
   ttlSeconds: number;
   sourceAgent?: "codex" | "claude" | "generic";
-  yes?: boolean;
+  assumeApproved?: boolean;
   forceNew?: boolean;
   statePath?: string;
 };
@@ -65,7 +65,13 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
         client,
         options.statePath,
       );
-      if (resumed !== undefined) return resumed;
+      if (resumed !== undefined) {
+        if (options.assumeApproved) return resumed;
+        process.stdout.write(
+          `existing live share: fingerprint=${fingerprint} expires=${reusable.expiresAt}\n`,
+        );
+        if (await confirm("Reuse this existing live share?")) return resumed;
+      }
     }
   }
 
@@ -80,7 +86,7 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
   );
   process.stdout.write(`fingerprint: ${fingerprint}\n`);
   if (
-    !options.yes &&
+    !options.assumeApproved &&
     !(await confirm("Share this exact normalized payload?"))
   ) {
     throw new Error("Share cancelled before upload");
@@ -100,7 +106,10 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
   process.stdout.write(
     `authoritative expiry: ${created.metadata.expiresAt}\nmax bytes: ${created.metadata.limits.maxCiphertextBytes}\n`,
   );
-  if (!options.yes && !(await confirm("Accept relay expiry and limits?"))) {
+  if (
+    !options.assumeApproved &&
+    !(await confirm("Accept relay expiry and limits?"))
+  ) {
     throw new Error("Share cancelled before encryption");
   }
 
@@ -218,7 +227,7 @@ async function selectManifest(
 ): Promise<AcbManifest> {
   if (
     options.current !== true ||
-    options.yes === true ||
+    options.assumeApproved === true ||
     manifest.events.length <= 1
   ) {
     return manifest;
