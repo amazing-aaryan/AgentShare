@@ -124,3 +124,7 @@ export type RelayRecord = {
   status: ShareStatus;
   upload?: UploadDescriptor;
 };
+
+export * from "./environment.js";
+export * from "./proposals.js";
+export * from "./relay-v2.js";
