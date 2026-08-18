@@ -84,8 +84,7 @@ export async function findReusableShare(
   for (let index = state.shares.length - 1; index >= 0; index -= 1) {
     const share = state.shares[index];
     if (
-      share !== undefined &&
-      share.fingerprint === fingerprint &&
+      share?.fingerprint === fingerprint &&
       share.relayOrigin === relayOrigin &&
       Date.parse(share.expiresAt) > Date.now()
     ) {
