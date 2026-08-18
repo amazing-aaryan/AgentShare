@@ -16,9 +16,13 @@ describe("trusted handoff worker", () => {
     expect(response.headers.get("content-security-policy")).toContain(
       "default-src 'none'",
     );
-    await expect(response.text()).resolves.toContain("Open shared agent context");
+    await expect(response.text()).resolves.toContain(
+      "Open shared agent context",
+    );
 
-    const missing = await handleRequest(new Request("https://handoff.example/"));
+    const missing = await handleRequest(
+      new Request("https://handoff.example/"),
+    );
     expect(missing.status).toBe(404);
   });
 
