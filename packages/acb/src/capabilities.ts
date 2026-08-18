@@ -26,7 +26,9 @@ type SplitShareUrlArgs = CapabilityFields & {
   origin?: never;
 };
 
-export function buildShareUrl(args: LegacyShareUrlArgs | SplitShareUrlArgs): string {
+export function buildShareUrl(
+  args: LegacyShareUrlArgs | SplitShareUrlArgs,
+): string {
   const handoffOrigin = normalizeSecureOrigin(
     "origin" in args ? args.origin : args.handoffOrigin,
   );
@@ -89,7 +91,9 @@ export function normalizeSecureOrigin(value: string): string {
     url.search !== "" ||
     url.hash !== ""
   ) {
-    throw new Error("AgentShare origin must not include credentials, path, query, or fragment");
+    throw new Error(
+      "AgentShare origin must not include credentials, path, query, or fragment",
+    );
   }
   return url.origin;
 }
