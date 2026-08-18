@@ -14,14 +14,13 @@ export async function listGitShareableFiles(root: string): Promise<string[] | un
       "git",
       ["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
       {
-        encoding: "buffer",
+        encoding: "utf8",
         timeout: 30_000,
         windowsHide: true,
         maxBuffer: 64 * 1024 * 1024,
       },
     );
-    return Buffer.from(stdout)
-      .toString("utf8")
+    return stdout
       .split("\0")
       .filter((value) => value.length > 0)
       .sort((a, b) => a.localeCompare(b, "en"));
