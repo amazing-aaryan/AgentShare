@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/contracts" },
     { "path": "packages/acb" },
+    { "path": "packages/workspace" },
     { "path": "packages/scanner" },
     { "path": "packages/adapter-codex" },
     { "path": "packages/adapter-claude" },
