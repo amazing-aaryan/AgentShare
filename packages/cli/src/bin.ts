@@ -10,6 +10,10 @@ const [command, ...args] = process.argv.slice(2);
 
 try {
   if (command === "share") {
+    assertKnownOptions(
+      args,
+      new Set(["--current", "--relay", "--ttl", "--source", "--new"]),
+    );
     const current = args.includes("--current");
     const inputPath = current ? undefined : positional(args, 0);
     const url = await shareCommand({
@@ -21,21 +25,24 @@ try {
         "https://agentshare-relay.carnation-vermicelli.workers.dev",
       ttlSeconds: Number(option(args, "--ttl") ?? "3600"),
       sourceAgent: sourceAgent(option(args, "--source") ?? "generic"),
-      yes: args.includes("--yes"),
       forceNew: args.includes("--new"),
     });
     process.stdout.write(`${url}\n`);
   } else if (command === "open") {
+    assertKnownOptions(args, new Set(["--target"]));
     await openCommand(targetAgent(option(args, "--target") ?? "codex"));
   } else if (command === "revoke") {
+    assertKnownOptions(args, new Set());
     await revokeCommand();
     process.stdout.write("Share revoked\n");
   } else if (command === "init" || command === "repair") {
+    assertKnownOptions(args, new Set());
     const files = await installIntegrations();
     process.stdout.write(
       sanitizeTerminalText(`Installed integrations:\n${files.join("\n")}\n`),
     );
   } else if (command === "remove") {
+    assertKnownOptions(args, new Set());
     await removeIntegrations();
     process.stdout.write("AgentShare integrations removed\n");
   } else {
@@ -49,6 +56,14 @@ try {
     ),
   );
   process.exitCode = 1;
+}
+
+function assertKnownOptions(args: string[], allowed: ReadonlySet<string>): void {
+  for (const value of args) {
+    if (value.startsWith("--") && !allowed.has(value)) {
+      throw new Error(`Unknown option: ${value}`);
+    }
+  }
 }
 
 function option(args: string[], name: string): string | undefined {
