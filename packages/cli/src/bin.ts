@@ -6,6 +6,11 @@ import {
 } from "@agentshare/integrations";
 import { sanitizeTerminalText } from "./terminal.js";
 
+const DEFAULT_RELAY_ORIGIN =
+  "https://agentshare-relay.carnation-vermicelli.workers.dev";
+const TRUSTED_HANDOFF_ORIGIN =
+  "https://agentshare-handoff.carnation-vermicelli.workers.dev";
+
 const [command, ...args] = process.argv.slice(2);
 
 try {
@@ -22,7 +27,8 @@ try {
       relayOrigin:
         option(args, "--relay") ??
         process.env.AGENTSHARE_RELAY ??
-        "https://agentshare-relay.carnation-vermicelli.workers.dev",
+        DEFAULT_RELAY_ORIGIN,
+      handoffOrigin: TRUSTED_HANDOFF_ORIGIN,
       ttlSeconds: Number(option(args, "--ttl") ?? "3600"),
       sourceAgent: sourceAgent(option(args, "--source") ?? "generic"),
       forceNew: args.includes("--new"),
