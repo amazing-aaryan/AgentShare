@@ -11,6 +11,7 @@ import {
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import type { CiphertextDescriptor, ReserveRevisionRequest } from "@agentshare/contracts";
 
 export type EnvironmentSharePolicy = {
   includeConversation: boolean;
@@ -28,19 +29,18 @@ export type OwnedEnvironment = {
   proposalCapability?: string;
   inboxCapability: string;
   revokeCapability: string;
+  proposalPublicKey?: string;
   proposalPrivateKey: string;
   currentRevisionId: string | null;
   expiresAt: string;
   sharePolicy: EnvironmentSharePolicy;
+  knownBlobs?: Record<string, CiphertextDescriptor>;
   pendingRevision?: {
-    revisionId: string;
-    parentRevisionId?: string;
+    reservation: ReserveRevisionRequest;
     manifestBase64: string;
-    manifestSha256: string;
     blobs: Array<{
       blobId: string;
       ciphertextBase64: string;
-      ciphertextSha256: string;
     }>;
   };
 };
