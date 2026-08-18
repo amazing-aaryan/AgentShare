@@ -29,6 +29,5 @@ jobs:
       - run: npm run test:edge-runtime
       - run:
           npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
-      - run:
-          npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
+      - run: npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
       - run: npm audit --audit-level=high
