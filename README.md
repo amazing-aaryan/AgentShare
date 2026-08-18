@@ -54,9 +54,9 @@ Start a new agent session so the host discovers the integration.
 | Claude Code  | `/share`      |
 
 AgentShare shows selected events, redactions, all normalized text content,
-fingerprint, relay expiry, size limits, and binary resource metadata when
-binary resources are present. Text content is shown exactly after normalization
-and redaction. Binary bytes are not printed byte-for-byte; binary resources are
+fingerprint, relay expiry, size limits, and binary resource metadata when binary
+resources are present. Text content is shown exactly after normalization and
+redaction. Binary bytes are not printed byte-for-byte; binary resources are
 identified by media type, byte length, and SHA-256 and scanned for suspected
 secrets in supported text views. Nothing uploads until you approve both prompts.
 Send the resulting capability link to your coworker.
@@ -122,12 +122,12 @@ https://agentshare-handoff.carnation-vermicelli.workers.dev/s/<share-id>?relay=h
 ```
 
 Browsers do not send URL fragments in HTTP requests. The trusted handoff page
-reads the fragment locally in browser JavaScript, removes query and fragment data
-from visible browser history, loads no third-party assets, sends no analytics,
-and sends only the read capability to the selected relay for metadata checks.
-The encryption key is not sent to the relay. Because new links are opened on the
-independent handoff origin, a custom ciphertext relay does not control the page
-JavaScript that can read the fragment.
+reads the fragment locally in browser JavaScript, removes query and fragment
+data from visible browser history, loads no third-party assets, sends no
+analytics, and sends only the read capability to the selected relay for metadata
+checks. The encryption key is not sent to the relay. Because new links are
+opened on the independent handoff origin, a custom ciphertext relay does not
+control the page JavaScript that can read the fragment.
 
 Legacy links without `relay=` remain readable by v0.1.10. They treat the link
 origin as the relay origin and retain the older v0.1.9 browser trust assumption;

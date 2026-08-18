@@ -36,8 +36,8 @@ Security invariants for v0.1.10 new-format links:
 Legacy links without an explicit `relay=` parameter are parsed for compatibility
 by treating the link origin as the relay origin. Those relay-origin links retain
 the older v0.1.9 browser trust assumption: JavaScript served by that relay can
-read the URL fragment in the browser. Do not use an untrusted custom relay with a
-legacy-format link.
+read the URL fragment in the browser. Do not use an untrusted custom relay with
+a legacy-format link.
 
 ## Local Residual Risks
 
@@ -47,8 +47,8 @@ legacy-format link.
 - Decrypted recipient context exists in process memory and may appear in OS swap
   or crash dumps. AgentShare does not claim secure memory erasure.
 - Codex may enumerate skill metadata during startup, but AgentShare disables its
-  shell, unified exec, patch, JavaScript, code-mode, search, app, and plugin tool
-  surfaces before handing it untrusted context. Launchers fail closed on
+  shell, unified exec, patch, JavaScript, code-mode, search, app, and plugin
+  tool surfaces before handing it untrusted context. Launchers fail closed on
   unreviewed Codex or Claude versions.
 - Capability links can leak through clipboard managers, screenshots, browser
   extensions, screen recording, or compromised endpoints. The handoff page
@@ -62,11 +62,11 @@ legacy-format link.
 - Secret scanning covers known credential formats in text plus ASCII, UTF-8,
   UTF-16LE, and UTF-16BE views of binary resources. It cannot inspect encrypted,
   compressed, or unknown encodings.
-- Creator review is exact for normalized/redacted text. Binary resource bytes are
-  not rendered byte-for-byte in the terminal; binary resources are inventoried
-  by media type, byte length, and SHA-256, and a suspected secret found in the
-  supported binary text views blocks sharing. Omit binary resources you cannot
-  independently trust.
+- Creator review is exact for normalized/redacted text. Binary resource bytes
+  are not rendered byte-for-byte in the terminal; binary resources are
+  inventoried by media type, byte length, and SHA-256, and a suspected secret
+  found in the supported binary text views blocks sharing. Omit binary resources
+  you cannot independently trust.
 - Per-source capacity controls increase the cost of relay exhaustion but cannot
   eliminate distributed abuse across many source addresses.
 - Hashing source addresses minimizes stored quota data; it does not anonymize
