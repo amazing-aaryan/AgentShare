@@ -21,7 +21,7 @@ import { scanAndRedact } from "@agentshare/scanner";
 import {
   buildWorkspaceSnapshot,
   type WorkspaceSnapshot,
-} from "@agentshare/workspace";
+} from "../workspace/index.js";
 import { EnvironmentRelayClient } from "./relay-client.js";
 import {
   saveOwnedEnvironment,
@@ -73,7 +73,9 @@ export async function createEnvironmentFromCapture(
   options: CreateEnvironmentOptions,
 ): Promise<CreateEnvironmentResult> {
   if (!options.includeConversation && !options.includeWorkspace) {
-    throw new Error("AgentShare environment must include conversation, workspace, or both");
+    throw new Error(
+      "AgentShare environment must include conversation, workspace, or both",
+    );
   }
   const now = options.now ?? (() => new Date());
   const environmentId = `env_${randomCapability(18)}`;
@@ -254,7 +256,9 @@ async function prepareRevision(
   const files = snapshot.files.map((file, index) => {
     const resource = redacted.manifest.resources[index];
     if (resource === undefined) {
-      throw new Error(`Missing scanned workspace resource for ${file.path}`);
+      throw new Error(
+        `Missing scanned workspace resource for ${file.path}`,
+      );
     }
     const plaintext = Buffer.from(resource.contentBase64, "base64");
     const resourceId = stableOpaqueId(
@@ -409,7 +413,11 @@ function workspaceToAcb(
 }
 
 function emptySnapshot(root: string): WorkspaceSnapshot {
-  const rootName = root.replace(/\\/gu, "/").split("/").filter(Boolean).at(-1);
+  const rootName = root
+    .replace(/\\/gu, "/")
+    .split("/")
+    .filter(Boolean)
+    .at(-1);
   return {
     root,
     rootName: rootName ?? "workspace",
