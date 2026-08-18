@@ -128,3 +128,4 @@ export type RelayRecord = {
 export * from "./environment.js";
 export * from "./proposals.js";
 export * from "./relay-v2.js";
+export * from "./environment-machine.js";
