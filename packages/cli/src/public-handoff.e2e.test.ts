@@ -54,7 +54,7 @@ describe("complete AgentShare handoff", () => {
         relayOrigin: origin,
         ttlSeconds: 60,
         sourceAgent: "generic",
-        yes: true,
+        assumeApproved: true,
         forceNew: true,
         statePath,
       });
@@ -86,7 +86,7 @@ describe("complete AgentShare handoff", () => {
         relayOrigin: origin,
         ttlSeconds: 60,
         sourceAgent: "generic",
-        yes: true,
+        assumeApproved: true,
         statePath,
       });
       expect(replacement).not.toBe(url);
