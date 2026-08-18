@@ -65,6 +65,9 @@ describe("live share reuse confirmation", () => {
     });
 
     expect(second).not.toBe(first);
-    expect(confirm).toHaveBeenNthCalledWith(1, "Reuse this existing live share?");
+    expect(confirm).toHaveBeenNthCalledWith(
+      1,
+      "Reuse this existing live share?",
+    );
   });
 });
