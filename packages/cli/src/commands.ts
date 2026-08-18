@@ -35,10 +35,14 @@ import {
 } from "./state.js";
 import { confirm, readHiddenLine, sanitizeTerminalText } from "./terminal.js";
 
+export const DEFAULT_HANDOFF_ORIGIN =
+  "https://agentshare-handoff.carnation-vermicelli.workers.dev";
+
 export type ShareOptions = {
   inputPath?: string;
   current?: boolean;
   relayOrigin: string;
+  handoffOrigin?: string;
   ttlSeconds: number;
   sourceAgent?: "codex" | "claude" | "generic";
   assumeApproved?: boolean;
@@ -118,7 +122,8 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
     created.metadata,
   );
   const url = buildShareUrl({
-    origin: client.origin,
+    handoffOrigin: options.handoffOrigin ?? DEFAULT_HANDOFF_ORIGIN,
+    relayOrigin: client.origin,
     shareId,
     readCapability,
     fragmentKey: keyToFragment(encrypted.key),
