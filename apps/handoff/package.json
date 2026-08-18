@@ -1,0 +1,10 @@
+{
+  "name": "@agentshare/handoff",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy:temporary": "wrangler deploy --temporary"
+  }
+}
