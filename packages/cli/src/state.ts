@@ -58,7 +58,7 @@ export async function saveShare(
     state.shares = state.shares.filter(
       (item) =>
         !(
-          item.fingerprint === share.fingerprint &&
+          item.shareId === share.shareId &&
           item.relayOrigin === share.relayOrigin
         ),
     );
@@ -81,12 +81,18 @@ export async function findReusableShare(
   path = defaultStatePath(),
 ): Promise<LocalShare | undefined> {
   const state = await loadState(path);
-  return state.shares.find(
-    (share) =>
+  for (let index = state.shares.length - 1; index >= 0; index -= 1) {
+    const share = state.shares[index];
+    if (
+      share !== undefined &&
       share.fingerprint === fingerprint &&
       share.relayOrigin === relayOrigin &&
-      Date.parse(share.expiresAt) > Date.now(),
-  );
+      Date.parse(share.expiresAt) > Date.now()
+    ) {
+      return share;
+    }
+  }
+  return undefined;
 }
 
 export async function findShareByUrl(
