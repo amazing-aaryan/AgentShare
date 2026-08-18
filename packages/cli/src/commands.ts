@@ -85,13 +85,13 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
   process.stdout.write(`redactions: ${scanned.findings.length}\n`);
   process.stdout.write(
     sanitizeTerminalText(
-      `\nFinal normalized plaintext:\n${reviewPayload(scanned.manifest)}\n`,
+      `\nNormalized review payload (text exact; binary bytes summarized):\n${reviewPayload(scanned.manifest)}\n`,
     ),
   );
   process.stdout.write(`fingerprint: ${fingerprint}\n`);
   if (
     !options.assumeApproved &&
-    !(await confirm("Share this exact normalized payload?"))
+    !(await confirm("Share this reviewed normalized payload?"))
   ) {
     throw new Error("Share cancelled before upload");
   }
