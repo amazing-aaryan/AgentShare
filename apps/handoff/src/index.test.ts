@@ -3,7 +3,7 @@ import { handleRequest, renderTrustedHandoffPage } from "./index.js";
 
 describe("trusted handoff worker", () => {
   it("serves only the static handoff page with restrictive headers", async () => {
-    const response = await handleRequest(
+    const response = handleRequest(
       new Request(
         "https://handoff.example/s/abcdefghijklmnopqrstuvwx?relay=https%3A%2F%2Frelay.example",
       ),
@@ -20,9 +20,7 @@ describe("trusted handoff worker", () => {
       "Open shared agent context",
     );
 
-    const missing = await handleRequest(
-      new Request("https://handoff.example/"),
-    );
+    const missing = handleRequest(new Request("https://handoff.example/"));
     expect(missing.status).toBe(404);
   });
 
