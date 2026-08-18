@@ -17,7 +17,7 @@ Run this command using the shell tool:
 agentshare share --current --source codex
 \`\`\`
 
-Let creator inspect normalized payload, redactions, fingerprint, expiry, and limits. Never add \`--yes\`. Return resulting capability link exactly once. Never inspect or log local AgentShare state.
+Let creator inspect normalized payload, redactions, fingerprint, expiry, and limits. AgentShare requires creator confirmation; never try to bypass or automate it. Return resulting capability link exactly once. Never inspect or log local AgentShare state.
 `;
 
 const CODEX_INTERFACE = `interface:
@@ -36,7 +36,7 @@ disable-model-invocation: true
 
 ${MARKER}
 
-Run \`agentshare share --current --source claude\`. Let creator inspect normalized payload, redactions, fingerprint, expiry, and limits. Never add \`--yes\`. Return resulting capability link exactly once. Never inspect or log local AgentShare state.
+Run \`agentshare share --current --source claude\`. Let creator inspect normalized payload, redactions, fingerprint, expiry, and limits. AgentShare requires creator confirmation; never try to bypass or automate it. Return resulting capability link exactly once. Never inspect or log local AgentShare state.
 `;
 
 export type IntegrationRoots = {
