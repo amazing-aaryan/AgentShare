@@ -1,4 +1,4 @@
-const PUBLIC_RELEASE = "0.1.9";
+const PUBLIC_RELEASE = "0.1.10";
 const PUBLIC_PACKAGE =
   `https://github.com/amazing-aaryan/AgentShare/releases/download/v${PUBLIC_RELEASE}/` +
   `agentshare-${PUBLIC_RELEASE}.tgz`;
@@ -165,8 +165,7 @@ export function renderSharePage(): string {
   </main>
   <script>
     (() => {
-      "use strict";
-      const original = new URL(window.location.href);
+      const original = new URL(location.href);
       const capabilityLink = original.toString();
       const fragment = new URLSearchParams(original.hash.slice(1));
       const read = fragment.get("r") || original.searchParams.get("r");
