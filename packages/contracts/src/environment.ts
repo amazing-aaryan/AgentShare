@@ -29,7 +29,7 @@ export const sharedWorkspacePathSchema = z
 export const environmentBlobReferenceSchema = z.object({
   blobId: objectIdSchema,
   byteOffset: z.number().int().nonnegative(),
-  byteLength: z.number().int().positive(),
+  byteLength: z.number().int().nonnegative(),
 });
 
 export const sharedFileSchema = z.object({
