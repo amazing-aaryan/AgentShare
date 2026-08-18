@@ -52,6 +52,7 @@ describe("complete AgentShare handoff", () => {
       const url = await shareCommand({
         inputPath,
         relayOrigin: origin,
+        handoffOrigin: origin,
         ttlSeconds: 60,
         sourceAgent: "generic",
         assumeApproved: true,
@@ -84,6 +85,7 @@ describe("complete AgentShare handoff", () => {
       const replacement = await shareCommand({
         inputPath,
         relayOrigin: origin,
+        handoffOrigin: origin,
         ttlSeconds: 60,
         sourceAgent: "generic",
         assumeApproved: true,
