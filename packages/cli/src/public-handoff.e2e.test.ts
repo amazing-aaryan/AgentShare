@@ -83,9 +83,15 @@ describe("complete AgentShare handoff", () => {
       expect(page.headers.get("cache-control")).toBe("no-store");
       expect(page.headers.get("referrer-policy")).toBe("no-referrer");
       expect(page.headers.get("x-frame-options")).toBe("DENY");
-      expect(page.headers.get("content-security-policy")).toContain(
-        `connect-src ${new URL(origin).origin}`,
-      );
+      if (configuredOrigin === undefined) {
+        expect(page.headers.get("content-security-policy")).toContain(
+          "connect-src 'self'",
+        );
+      } else {
+        expect(page.headers.get("content-security-policy")).toContain(
+          `connect-src ${new URL(origin).origin}`,
+        );
+      }
       expect(await page.text()).toContain("agentshare open --target codex");
 
       const opened = await openShare(url);
