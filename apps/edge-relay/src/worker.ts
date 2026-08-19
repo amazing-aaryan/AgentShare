@@ -1,3 +1,4 @@
+import { bootstrapDocument, renderEnvironmentPage } from "@agentshare/web/v2";
 import legacyWorker, { RelayControl, ShareObject } from "./index.js";
 import { EnvironmentObject } from "./environment-object.js";
 
@@ -17,14 +18,40 @@ type Env = {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (!new URL(request.url).pathname.startsWith("/v2/environments")) {
+    const url = new URL(request.url);
+    const page = /^\/e\/([^/]+)(?:\/(bootstrap\.json))?$/u.exec(url.pathname);
+    if (request.method === "GET" && page?.[1] !== undefined) {
+      const environmentId = decodeURIComponent(page[1]);
+      if (page[2] === "bootstrap.json") {
+        return Response.json(bootstrapDocument(), {
+          headers: {
+            "cache-control": "public, max-age=300",
+            "content-security-policy": "default-src 'none'",
+            "referrer-policy": "no-referrer",
+            "x-content-type-options": "nosniff",
+          },
+        });
+      }
+      return new Response(renderEnvironmentPage(environmentId), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store",
+          "content-security-policy":
+            "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+          "referrer-policy": "no-referrer",
+          "x-content-type-options": "nosniff",
+          "x-frame-options": "DENY",
+        },
+      });
+    }
+
+    if (!url.pathname.startsWith("/v2/environments")) {
       return legacyWorker.fetch(request, env);
     }
     if (request.method === "OPTIONS") {
       return cors(new Response(null, { status: 204 }));
     }
 
-    const url = new URL(request.url);
     let environmentId: string | undefined;
     if (request.method === "POST" && url.pathname === "/v2/environments") {
       if (!(await allow(env.CREATE_RATE_LIMITER, request, "environment-create"))) {
