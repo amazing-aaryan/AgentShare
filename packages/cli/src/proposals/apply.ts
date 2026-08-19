@@ -81,7 +81,9 @@ export async function approveOwnedProposal(
     options.client ?? new EnvironmentRelayClient(owned.relayOrigin);
   const inbox = await listOwnedProposals(environmentId, {
     client,
-    statePath: options.statePath,
+    ...(options.statePath === undefined
+      ? {}
+      : { statePath: options.statePath }),
   });
   const item = inbox.find(
     (candidate) => candidate.proposal.proposalId === proposalId,
@@ -146,9 +148,13 @@ export async function approveOwnedProposal(
   );
 
   const published = await publishEnvironmentRevision(capture, owned, client, {
-    statePath: options.statePath,
+    ...(options.statePath === undefined
+      ? {}
+      : { statePath: options.statePath }),
     now: (options.now ?? (() => new Date()))(),
-    workspaceOptions: options.workspaceOptions,
+    ...(options.workspaceOptions === undefined
+      ? {}
+      : { workspaceOptions: options.workspaceOptions }),
   });
   owned = published.environment;
   await client.setProposalStatus(
