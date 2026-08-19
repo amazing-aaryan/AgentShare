@@ -17,15 +17,25 @@ describe("v2 share command", () => {
     const root = await fixture();
     const statePath = join(root, "state-v2.json");
     const handler = createRelayHandler(new InMemoryRelayStore());
-    const fetchImpl: typeof fetch = (input, init) => handler(new Request(input, init));
-    const client = new EnvironmentRelayClient("http://127.0.0.1:8787", fetchImpl);
+    const fetchImpl: typeof fetch = (input, init) =>
+      handler(new Request(input, init));
+    const client = new EnvironmentRelayClient(
+      "http://127.0.0.1:8787",
+      fetchImpl,
+    );
     const result = await shareCaptureV2(
       {
         sourceAgent: "codex",
         title: "Codex: demo",
         workspaceRoot: root,
         conversation: [
-          { sequence: 0, role: "user", kind: "message", text: "Question", sourceId: "thread" },
+          {
+            sequence: 0,
+            role: "user",
+            kind: "message",
+            text: "Question",
+            sourceId: "thread",
+          },
         ],
       },
       {
@@ -49,20 +59,35 @@ describe("v2 share command", () => {
     const root = await fixture();
     const statePath = join(root, "state-v2.json");
     const handler = createRelayHandler(new InMemoryRelayStore());
-    const fetchImpl: typeof fetch = (input, init) => handler(new Request(input, init));
-    const client = new EnvironmentRelayClient("http://127.0.0.1:8787", fetchImpl);
+    const fetchImpl: typeof fetch = (input, init) =>
+      handler(new Request(input, init));
+    const client = new EnvironmentRelayClient(
+      "http://127.0.0.1:8787",
+      fetchImpl,
+    );
     const capture = {
       sourceAgent: "codex" as const,
       title: "Codex: demo",
       workspaceRoot: root,
       conversation: [
-        { sequence: 0, role: "user" as const, kind: "message" as const, text: "Question", sourceId: "thread" },
+        {
+          sequence: 0,
+          role: "user" as const,
+          kind: "message" as const,
+          text: "Question",
+          sourceId: "thread",
+        },
       ],
     };
     const first = await shareCaptureV2(capture, {
       client,
       statePath,
-      selection: { includeConversation: true, includeWorkspace: true, proposalsEnabled: true, ttlSeconds: 86400 },
+      selection: {
+        includeConversation: true,
+        includeWorkspace: true,
+        proposalsEnabled: true,
+        ttlSeconds: 86400,
+      },
       workspaceOptions: { preferGit: false },
     });
     await writeFile(join(root, "README.md"), "second revision\n", "utf8");
@@ -73,6 +98,8 @@ describe("v2 share command", () => {
       workspaceOptions: { preferGit: false },
     });
     expect(second.url).toBe(first.url);
-    expect(second.environment.currentRevisionId).not.toBe(first.environment.currentRevisionId);
+    expect(second.environment.currentRevisionId).not.toBe(
+      first.environment.currentRevisionId,
+    );
   });
 });

@@ -18,7 +18,11 @@ export type McpRuntime = {
   readFile: (path: string) => Promise<unknown>;
   readConversation: (query?: string) => Promise<unknown>;
   stageReplace: (path: string, content: string) => Promise<unknown>;
-  stageCreate: (path: string, content: string, mediaType?: string) => Promise<unknown>;
+  stageCreate: (
+    path: string,
+    content: string,
+    mediaType?: string,
+  ) => Promise<unknown>;
   stageDelete: (path: string) => Promise<unknown>;
   proposalDiff: () => Promise<unknown>;
   proposalSubmit: (summary: string) => Promise<unknown>;
@@ -41,34 +45,68 @@ type JsonRpcResponse = {
 const READ_TOOLS = [
   tool("environment_info", "Describe the attached AgentShare environment.", {}),
   tool("list_files", "List paths in the shared read-only workspace.", {}),
-  tool("search", "Search shared files and conversation evidence.", {
-    query: { type: "string" },
-  }, ["query"]),
-  tool("read_file", "Read one shared text file by relative path.", {
-    path: { type: "string" },
-  }, ["path"]),
-  tool("read_conversation", "Read shared conversation events, optionally filtered by text.", {
-    query: { type: "string" },
-  }),
+  tool(
+    "search",
+    "Search shared files and conversation evidence.",
+    {
+      query: { type: "string" },
+    },
+    ["query"],
+  ),
+  tool(
+    "read_file",
+    "Read one shared text file by relative path.",
+    {
+      path: { type: "string" },
+    },
+    ["path"],
+  ),
+  tool(
+    "read_conversation",
+    "Read shared conversation events, optionally filtered by text.",
+    {
+      query: { type: "string" },
+    },
+  ),
 ] as const;
 
 const PROPOSAL_TOOLS = [
-  tool("proposal_stage_replace", "Stage a full-file replacement proposal; this never writes UserA's workspace.", {
-    path: { type: "string" },
-    content: { type: "string" },
-  }, ["path", "content"]),
-  tool("proposal_stage_create", "Stage creation of a new text file in the proposal overlay.", {
-    path: { type: "string" },
-    content: { type: "string" },
-    mediaType: { type: "string" },
-  }, ["path", "content"]),
-  tool("proposal_stage_delete", "Stage deletion of a shared file in the proposal overlay.", {
-    path: { type: "string" },
-  }, ["path"]),
+  tool(
+    "proposal_stage_replace",
+    "Stage a full-file replacement proposal; this never writes UserA's workspace.",
+    {
+      path: { type: "string" },
+      content: { type: "string" },
+    },
+    ["path", "content"],
+  ),
+  tool(
+    "proposal_stage_create",
+    "Stage creation of a new text file in the proposal overlay.",
+    {
+      path: { type: "string" },
+      content: { type: "string" },
+      mediaType: { type: "string" },
+    },
+    ["path", "content"],
+  ),
+  tool(
+    "proposal_stage_delete",
+    "Stage deletion of a shared file in the proposal overlay.",
+    {
+      path: { type: "string" },
+    },
+    ["path"],
+  ),
   tool("proposal_diff", "Review the currently staged proposal operations.", {}),
-  tool("proposal_submit", "Encrypt and submit the staged proposal to UserA for approval.", {
-    summary: { type: "string" },
-  }, ["summary"]),
+  tool(
+    "proposal_submit",
+    "Encrypt and submit the staged proposal to UserA for approval.",
+    {
+      summary: { type: "string" },
+    },
+    ["summary"],
+  ),
 ] as const;
 
 export async function handleMcpRequest(
@@ -150,7 +188,11 @@ export async function handleMcpRequest(
         value = await runtime.proposalSubmit(requiredString(args, "summary"));
         break;
       default:
-        return responseError(request.id, -32602, `Unknown AgentShare tool: ${name}`);
+        return responseError(
+          request.id,
+          -32602,
+          `Unknown AgentShare tool: ${name}`,
+        );
     }
     return responseResult(request.id, {
       content: [{ type: "text", text: stringify(value) }],
@@ -173,14 +215,21 @@ export async function createEnvironmentMcpRuntime(
   environmentId: string,
   options: { statePath?: string; cacheRoot?: string } = {},
 ): Promise<McpRuntime> {
-  const attached = await findAttachedEnvironment(environmentId, options.statePath);
+  const attached = await findAttachedEnvironment(
+    environmentId,
+    options.statePath,
+  );
   if (attached === undefined) {
     throw new Error(`AgentShare environment is not attached: ${environmentId}`);
   }
   const staged = new Map<string, ProposalOperation>();
   const readOptions = {
-    ...(options.statePath === undefined ? {} : { statePath: options.statePath }),
-    ...(options.cacheRoot === undefined ? {} : { cacheRoot: options.cacheRoot }),
+    ...(options.statePath === undefined
+      ? {}
+      : { statePath: options.statePath }),
+    ...(options.cacheRoot === undefined
+      ? {}
+      : { cacheRoot: options.cacheRoot }),
   };
   const sync = () => refreshAttachedEnvironment(environmentId, readOptions);
   return {
@@ -199,9 +248,9 @@ export async function createEnvironmentMcpRuntime(
     },
     async listFiles() {
       await sync();
-      return (await readAttachedManifest(environmentId, readOptions)).workspace.files.map(
-        (file) => file.path,
-      );
+      return (
+        await readAttachedManifest(environmentId, readOptions)
+      ).workspace.files.map((file) => file.path);
     },
     async search(query: string) {
       await sync();
@@ -213,7 +262,8 @@ export async function createEnvironmentMcpRuntime(
     },
     async readConversation(query?: string) {
       await sync();
-      const events = (await readAttachedManifest(environmentId, readOptions)).conversation.events;
+      const events = (await readAttachedManifest(environmentId, readOptions))
+        .conversation.events;
       if (query === undefined || query.trim().length === 0) return events;
       const needle = query.toLocaleLowerCase("en-US");
       return events.filter((event) =>
@@ -223,7 +273,9 @@ export async function createEnvironmentMcpRuntime(
     async stageReplace(path: string, content: string) {
       await sync();
       const manifest = await readAttachedManifest(environmentId, readOptions);
-      const file = manifest.workspace.files.find((candidate) => candidate.path === path);
+      const file = manifest.workspace.files.find(
+        (candidate) => candidate.path === path,
+      );
       if (file === undefined) throw new Error(`Shared file not found: ${path}`);
       staged.set(path, {
         type: "replace",
@@ -238,7 +290,9 @@ export async function createEnvironmentMcpRuntime(
     async stageCreate(path: string, content: string, mediaType?: string) {
       await sync();
       const manifest = await readAttachedManifest(environmentId, readOptions);
-      if (manifest.workspace.files.some((candidate) => candidate.path === path)) {
+      if (
+        manifest.workspace.files.some((candidate) => candidate.path === path)
+      ) {
         throw new Error(`Shared file already exists: ${path}`);
       }
       staged.set(path, {
@@ -253,7 +307,9 @@ export async function createEnvironmentMcpRuntime(
     async stageDelete(path: string) {
       await sync();
       const manifest = await readAttachedManifest(environmentId, readOptions);
-      const file = manifest.workspace.files.find((candidate) => candidate.path === path);
+      const file = manifest.workspace.files.find(
+        (candidate) => candidate.path === path,
+      );
       if (file === undefined) throw new Error(`Shared file not found: ${path}`);
       staged.set(path, { type: "delete", path, baseSha256: file.sha256 });
       return { staged: "delete", path };
@@ -264,7 +320,10 @@ export async function createEnvironmentMcpRuntime(
         path: operation.path,
         ...(operation.type === "delete"
           ? {}
-          : { newBytes: Buffer.from(operation.contentBase64, "base64").byteLength }),
+          : {
+              newBytes: Buffer.from(operation.contentBase64, "base64")
+                .byteLength,
+            }),
       }));
     },
     async proposalSubmit(summary: string) {
@@ -300,7 +359,8 @@ export async function runInternalMcpServer(
       continue;
     }
     const response = await handleMcpRequest(request, runtime);
-    if (response !== undefined) process.stdout.write(`${JSON.stringify(response)}\n`);
+    if (response !== undefined)
+      process.stdout.write(`${JSON.stringify(response)}\n`);
   }
 }
 
@@ -326,7 +386,11 @@ function responseResult(id: unknown, result: unknown): JsonRpcResponse {
   return { jsonrpc: "2.0", id: id ?? null, result };
 }
 
-function responseError(id: unknown, code: number, message: string): JsonRpcResponse {
+function responseError(
+  id: unknown,
+  code: number,
+  message: string,
+): JsonRpcResponse {
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message } };
 }
 
@@ -353,7 +417,8 @@ function optionalString(
 }
 
 function assertProposals(runtime: McpRuntime): void {
-  if (!runtime.canPropose) throw new Error("This AgentShare environment is read-only");
+  if (!runtime.canPropose)
+    throw new Error("This AgentShare environment is read-only");
 }
 
 function stringify(value: unknown): string {

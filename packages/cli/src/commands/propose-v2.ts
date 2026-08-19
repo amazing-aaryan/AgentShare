@@ -20,7 +20,10 @@ export async function proposeAttachedEnvironmentChange(
   instruction: string,
   options: ProposeEnvironmentOptions,
 ): Promise<string> {
-  const attached = await findAttachedEnvironment(environmentId, options.statePath);
+  const attached = await findAttachedEnvironment(
+    environmentId,
+    options.statePath,
+  );
   if (attached === undefined) {
     throw new Error(`AgentShare environment is not attached: ${environmentId}`);
   }
@@ -28,8 +31,12 @@ export async function proposeAttachedEnvironmentChange(
     throw new Error("This AgentShare environment is read-only");
   }
   const runtimeOptions = {
-    ...(options.statePath === undefined ? {} : { statePath: options.statePath }),
-    ...(options.cacheRoot === undefined ? {} : { cacheRoot: options.cacheRoot }),
+    ...(options.statePath === undefined
+      ? {}
+      : { statePath: options.statePath }),
+    ...(options.cacheRoot === undefined
+      ? {}
+      : { cacheRoot: options.cacheRoot }),
   };
   await refreshAttachedEnvironment(environmentId, runtimeOptions);
   const runner = options.runner ?? runEnvironmentTarget;

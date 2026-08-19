@@ -77,8 +77,10 @@ export class EnvironmentObject {
       }
 
       const status = effectiveEnvironmentStatus(record, new Date());
-      if (status === "expired") return error("EXPIRED", "Environment expired", 410);
-      if (status === "revoked") return error("REVOKED", "Environment revoked", 410);
+      if (status === "expired")
+        return error("EXPIRED", "Environment expired", 410);
+      if (status === "revoked")
+        return error("REVOKED", "Environment revoked", 410);
 
       if (request.method === "GET" && rest === "meta") {
         if (!(await authorize(record.readTokenDigest, request))) {
@@ -93,7 +95,9 @@ export class EnvironmentObject {
         }
         const next = reserveEnvironmentRevision(
           record,
-          reserveRevisionRequestSchema.parse(await readJson(request, 8 * 1024 * 1024)),
+          reserveRevisionRequestSchema.parse(
+            await readJson(request, 8 * 1024 * 1024),
+          ),
           new Date(),
         );
         await this.state.storage.put("record", next);
@@ -155,7 +159,12 @@ export class EnvironmentObject {
           }
           const bytes = await readBoundedBytes(request, MAX_CIPHERTEXT_BYTES);
           const descriptor = await descriptorFor(bytes);
-          const next = recordEnvironmentBlob(record, blobId, descriptor, new Date());
+          const next = recordEnvironmentBlob(
+            record,
+            blobId,
+            descriptor,
+            new Date(),
+          );
           await this.storeBytes(blobPrefix(blobId), bytes);
           await this.state.storage.put("record", next);
           return json(toMetadata(next));
@@ -197,7 +206,11 @@ export class EnvironmentObject {
             actual.ciphertextBytes !== descriptor.ciphertextBytes ||
             actual.ciphertextSha256 !== descriptor.ciphertextSha256
           ) {
-            return error("CONFLICT", "Proposal ciphertext descriptor mismatch", 409);
+            return error(
+              "CONFLICT",
+              "Proposal ciphertext descriptor mismatch",
+              409,
+            );
           }
           const next = addEnvironmentProposal(record, descriptor, new Date());
           await this.storeBytes(proposalPrefix(descriptor.proposalId), bytes);
@@ -233,10 +246,7 @@ export class EnvironmentObject {
       }
 
       const proposalStatusMatch = /^proposals\/([^/]+)\/status$/u.exec(rest);
-      if (
-        request.method === "POST" &&
-        proposalStatusMatch?.[1] !== undefined
-      ) {
+      if (request.method === "POST" && proposalStatusMatch?.[1] !== undefined) {
         if (!(await authorize(record.inboxTokenDigest, request))) {
           return unauthorized();
         }
@@ -262,7 +272,8 @@ export class EnvironmentObject {
   private async create(request: CreateEnvironmentRequest): Promise<Response> {
     const existing = await this.state.storage.get<EnvironmentRecord>("record");
     if (existing !== undefined) {
-      const active = effectiveEnvironmentStatus(existing, new Date()) === "active";
+      const active =
+        effectiveEnvironmentStatus(existing, new Date()) === "active";
       const same =
         existing.readTokenDigest === request.readTokenDigest &&
         existing.updateTokenDigest === request.updateTokenDigest &&
@@ -279,7 +290,9 @@ export class EnvironmentObject {
     return json(toMetadata(record), 201);
   }
 
-  private async requiredRecord(environmentId: string): Promise<EnvironmentRecord> {
+  private async requiredRecord(
+    environmentId: string,
+  ): Promise<EnvironmentRecord> {
     const record = await this.state.storage.get<EnvironmentRecord>("record");
     if (record?.environmentId !== environmentId) {
       throw new EnvironmentStateError("NOT_FOUND", "Environment not found");
@@ -289,7 +302,8 @@ export class EnvironmentObject {
 
   private async storeBytes(prefix: string, bytes: Uint8Array): Promise<void> {
     const existing = await this.state.storage.list({ prefix });
-    if (existing.size > 0) await this.state.storage.delete([...existing.keys()]);
+    if (existing.size > 0)
+      await this.state.storage.delete([...existing.keys()]);
     const values: Record<string, Uint8Array> = {};
     let index = 0;
     for (let offset = 0; offset < bytes.byteLength; offset += CHUNK_BYTES) {
@@ -371,7 +385,10 @@ function toMetadata(record: EnvironmentRecord): unknown {
   });
 }
 
-async function authorize(expectedDigest: string, request: Request): Promise<boolean> {
+async function authorize(
+  expectedDigest: string,
+  request: Request,
+): Promise<boolean> {
   const match = /^Bearer ([A-Za-z0-9_-]+)$/u.exec(
     request.headers.get("authorization") ?? "",
   );
@@ -390,7 +407,10 @@ async function descriptorFor(bytes: Uint8Array): Promise<CiphertextDescriptor> {
 }
 
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer);
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    Uint8Array.from(bytes).buffer,
+  );
   return [...new Uint8Array(digest)]
     .map((value) => value.toString(16).padStart(2, "0"))
     .join("");

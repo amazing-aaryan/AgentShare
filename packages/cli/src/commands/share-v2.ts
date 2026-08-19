@@ -81,12 +81,15 @@ export async function shareCaptureV2(
       ],
       0,
     );
-    if (action === 0) return updateEnvironment(capture, existing, client, options);
+    if (action === 0)
+      return updateEnvironment(capture, existing, client, options);
     if (action === 1) {
       await reviewProposalInbox(capture.sourceAgent, options.statePath);
       const refreshed =
-        (await findOwnedEnvironment(existing.environmentId, options.statePath)) ??
-        existing;
+        (await findOwnedEnvironment(
+          existing.environmentId,
+          options.statePath,
+        )) ?? existing;
       return existingResult(refreshed);
     }
     if (action === 2) return existingResult(existing);
@@ -104,7 +107,9 @@ export async function shareCaptureV2(
     proposalsEnabled: selection.proposalsEnabled,
     includeConversation: selection.includeConversation,
     includeWorkspace: selection.includeWorkspace,
-    ...(options.statePath === undefined ? {} : { statePath: options.statePath }),
+    ...(options.statePath === undefined
+      ? {}
+      : { statePath: options.statePath }),
     ...(options.workspaceOptions === undefined
       ? {}
       : { workspaceOptions: options.workspaceOptions }),

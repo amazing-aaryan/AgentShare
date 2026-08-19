@@ -36,7 +36,9 @@ try {
       process.stdout.write(`${result.url}\n`);
     } else {
       const inputPath = current ? undefined : positional(args, 0);
-      process.stdout.write(`${await legacyShare(args, current, inputPath, selectedSource)}\n`);
+      process.stdout.write(
+        `${await legacyShare(args, current, inputPath, selectedSource)}\n`,
+      );
     }
   } else if (command === "share-v1") {
     const current = args.includes("--current");
@@ -60,10 +62,12 @@ try {
     });
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } else if (command === "ask") {
-    const attached = option(args, "--environment") === undefined
-      ? await latestAttachedEnvironment(option(args, "--state-path"))
-      : undefined;
-    const environmentId = option(args, "--environment") ?? attached?.environmentId;
+    const attached =
+      option(args, "--environment") === undefined
+        ? await latestAttachedEnvironment(option(args, "--state-path"))
+        : undefined;
+    const environmentId =
+      option(args, "--environment") ?? attached?.environmentId;
     if (environmentId === undefined) throw new Error("Missing environment");
     const question = option(args, "--question");
     if (question === undefined) throw new Error("Missing --question");
@@ -78,10 +82,12 @@ try {
     });
     process.stdout.write(`${answer}\n`);
   } else if (command === "propose") {
-    const attached = option(args, "--environment") === undefined
-      ? await latestAttachedEnvironment(option(args, "--state-path"))
-      : undefined;
-    const environmentId = option(args, "--environment") ?? attached?.environmentId;
+    const attached =
+      option(args, "--environment") === undefined
+        ? await latestAttachedEnvironment(option(args, "--state-path"))
+        : undefined;
+    const environmentId =
+      option(args, "--environment") ?? attached?.environmentId;
     if (environmentId === undefined) throw new Error("Missing environment");
     const instruction = option(args, "--instruction");
     if (instruction === undefined) throw new Error("Missing --instruction");
@@ -127,9 +133,10 @@ try {
     process.stdout.write("Share revoked\n");
   } else if (command === "init" || command === "repair") {
     const files = await installIntegrations();
-    const repaired = command === "repair"
-      ? await repairOwnedEnvironmentPublications(option(args, "--state-path"))
-      : 0;
+    const repaired =
+      command === "repair"
+        ? await repairOwnedEnvironmentPublications(option(args, "--state-path"))
+        : 0;
     process.stdout.write(
       sanitizeTerminalText(
         `Installed integrations:\n${files.join("\n")}\n${repaired > 0 ? `Resumed ${repaired} pending environment publication(s).\n` : ""}`,
@@ -201,8 +208,12 @@ function usage(): void {
   process.stdout.write(`AgentShare\n\n`);
   process.stdout.write(`  agentshare share --current --source codex|claude\n`);
   process.stdout.write(`  agentshare bootstrap < link-on-stdin\n`);
-  process.stdout.write(`  agentshare ask [--environment ID] --target codex|claude --question TEXT\n`);
-  process.stdout.write(`  agentshare propose [--environment ID] --target codex|claude --instruction TEXT\n`);
+  process.stdout.write(
+    `  agentshare ask [--environment ID] --target codex|claude --question TEXT\n`,
+  );
+  process.stdout.write(
+    `  agentshare propose [--environment ID] --target codex|claude --instruction TEXT\n`,
+  );
   process.stdout.write(`  agentshare inbox --source codex|claude\n`);
   process.stdout.write(`  agentshare revoke-environment --environment ID\n`);
   process.stdout.write(`  agentshare share-v1 <file>|--current ...\n`);

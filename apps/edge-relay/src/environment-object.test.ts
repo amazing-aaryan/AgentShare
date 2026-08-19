@@ -12,7 +12,8 @@ class MemoryStorage {
   put(key: string | Record<string, unknown>, value?: unknown): Promise<void> {
     if (typeof key === "string") this.values.set(key, value);
     else {
-      for (const [name, item] of Object.entries(key)) this.values.set(name, item);
+      for (const [name, item] of Object.entries(key))
+        this.values.set(name, item);
     }
     return Promise.resolve();
   }

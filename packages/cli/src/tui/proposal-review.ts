@@ -12,19 +12,33 @@ export function renderProposalDiff(
   for (const operation of proposal.operations) {
     if (operation.type === "create") {
       lines.push(`A ${operation.path}`);
-      lines.push(...prefixed(Buffer.from(operation.contentBase64, "base64").toString("utf8"), "+ "));
+      lines.push(
+        ...prefixed(
+          Buffer.from(operation.contentBase64, "base64").toString("utf8"),
+          "+ ",
+        ),
+      );
       lines.push("");
       continue;
     }
     if (operation.type === "delete") {
       lines.push(`D ${operation.path}`);
-      lines.push(...prefixed(currentFiles.get(operation.path) ?? "<unavailable>", "- "));
+      lines.push(
+        ...prefixed(currentFiles.get(operation.path) ?? "<unavailable>", "- "),
+      );
       lines.push("");
       continue;
     }
     lines.push(`M ${operation.path}`);
-    lines.push(...prefixed(currentFiles.get(operation.path) ?? "<unavailable>", "- "));
-    lines.push(...prefixed(Buffer.from(operation.contentBase64, "base64").toString("utf8"), "+ "));
+    lines.push(
+      ...prefixed(currentFiles.get(operation.path) ?? "<unavailable>", "- "),
+    );
+    lines.push(
+      ...prefixed(
+        Buffer.from(operation.contentBase64, "base64").toString("utf8"),
+        "+ ",
+      ),
+    );
     lines.push("");
   }
   return lines.join("\n");

@@ -13,7 +13,9 @@ describe("v2 environment handoff", () => {
 
   it("tells recipients to paste the full link into their agent without reflecting secrets", () => {
     const html = renderEnvironmentPage("env_public_identifier");
-    expect(html).toContain("Paste the full AgentShare link into Codex or Claude Code");
+    expect(html).toContain(
+      "Paste the full AgentShare link into Codex or Claude Code",
+    );
     expect(html).toContain("bootstrap.json");
     expect(html).toContain("Maximum privacy");
     expect(html).not.toContain("#r=");

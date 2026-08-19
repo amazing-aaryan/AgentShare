@@ -54,7 +54,9 @@ export default {
 
     let environmentId: string | undefined;
     if (request.method === "POST" && url.pathname === "/v2/environments") {
-      if (!(await allow(env.CREATE_RATE_LIMITER, request, "environment-create"))) {
+      if (
+        !(await allow(env.CREATE_RATE_LIMITER, request, "environment-create"))
+      ) {
         return cors(error("RATE_LIMITED", "Create rate limit exceeded", 429));
       }
       try {
@@ -69,7 +71,8 @@ export default {
       }
     } else {
       const match = /^\/v2\/environments\/([^/]+)/u.exec(url.pathname);
-      if (match?.[1] !== undefined) environmentId = decodeURIComponent(match[1]);
+      if (match?.[1] !== undefined)
+        environmentId = decodeURIComponent(match[1]);
     }
     if (environmentId === undefined) {
       return cors(error("NOT_FOUND", "Route not found", 404));
@@ -85,7 +88,9 @@ export default {
       return cors(error("RATE_LIMITED", "Upload rate limit exceeded", 429));
     }
 
-    const stub = env.ENVIRONMENTS.get(env.ENVIRONMENTS.idFromName(environmentId));
+    const stub = env.ENVIRONMENTS.get(
+      env.ENVIRONMENTS.idFromName(environmentId),
+    );
     return cors(await stub.fetch(request));
   },
 };

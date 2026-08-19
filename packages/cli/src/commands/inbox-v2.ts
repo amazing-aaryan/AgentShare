@@ -83,7 +83,10 @@ export async function reviewProposalInbox(
       current.set(
         operation.path,
         await readFile(
-          resolve(chosen.environment.workspaceRoot, ...operation.path.split("/")),
+          resolve(
+            chosen.environment.workspaceRoot,
+            ...operation.path.split("/"),
+          ),
           "utf8",
         ),
       );
@@ -91,7 +94,9 @@ export async function reviewProposalInbox(
       current.set(operation.path, "<current file unavailable>");
     }
   }
-  process.stdout.write(`\x1b[2J\x1b[H${renderProposalDiff(chosen.item.proposal, current)}\n`);
+  process.stdout.write(
+    `\x1b[2J\x1b[H${renderProposalDiff(chosen.item.proposal, current)}\n`,
+  );
   const action = await chooseOption(
     "AgentShare - Proposal decision",
     ["Approve & apply", "Reject", "Cancel"],

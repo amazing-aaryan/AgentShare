@@ -96,10 +96,7 @@ export async function installIntegrations(
   roots = defaultIntegrationRoots(),
 ): Promise<string[]> {
   const files = [
-    [
-      join(roots.codexSkills, "agentshare", "SKILL.md"),
-      CODEX_CREATOR_SKILL,
-    ],
+    [join(roots.codexSkills, "agentshare", "SKILL.md"), CODEX_CREATOR_SKILL],
     [
       join(roots.codexSkills, "agentshare", "agents", "openai.yaml"),
       CODEX_CREATOR_INTERFACE,
@@ -109,19 +106,11 @@ export async function installIntegrations(
       CODEX_RECEIVER_SKILL,
     ],
     [
-      join(
-        roots.codexSkills,
-        "agentshare-receive",
-        "agents",
-        "openai.yaml",
-      ),
+      join(roots.codexSkills, "agentshare-receive", "agents", "openai.yaml"),
       CODEX_RECEIVER_INTERFACE,
     ],
     [join(roots.claudeSkills, "share", "SKILL.md"), CLAUDE_CREATOR_SKILL],
-    [
-      join(roots.claudeSkills, "agentshare", "SKILL.md"),
-      CLAUDE_RECEIVER_SKILL,
-    ],
+    [join(roots.claudeSkills, "agentshare", "SKILL.md"), CLAUDE_RECEIVER_SKILL],
   ] as const;
   for (const [path, content] of files) await writeManaged(path, content);
   return files.map(([path]) => path);

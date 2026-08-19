@@ -9,13 +9,18 @@ export async function bootstrapEnvironment(
   await installIntegrations();
   const link = options.link ?? (await readCapabilityInput());
   return acceptEnvironmentLink(link, {
-    ...(options.statePath === undefined ? {} : { statePath: options.statePath }),
-    ...(options.cacheRoot === undefined ? {} : { cacheRoot: options.cacheRoot }),
+    ...(options.statePath === undefined
+      ? {}
+      : { statePath: options.statePath }),
+    ...(options.cacheRoot === undefined
+      ? {}
+      : { cacheRoot: options.cacheRoot }),
   });
 }
 
 export async function readCapabilityInput(): Promise<string> {
-  if (process.stdin.isTTY) return readHiddenLine("AgentShare environment link: ");
+  if (process.stdin.isTTY)
+    return readHiddenLine("AgentShare environment link: ");
   return capabilityLine(await readFile(0, "utf8"));
 }
 

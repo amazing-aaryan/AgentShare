@@ -32,8 +32,10 @@ export async function chooseOption(
         reject(new Error("AgentShare cancelled"));
         return;
       }
-      if (key.name === "up") selected = moveSelection(selected, -1, options.length);
-      else if (key.name === "down") selected = moveSelection(selected, 1, options.length);
+      if (key.name === "up")
+        selected = moveSelection(selected, -1, options.length);
+      else if (key.name === "down")
+        selected = moveSelection(selected, 1, options.length);
       else if (key.name === "return" || key.name === "enter") {
         cleanup();
         resolve(selected);
@@ -45,11 +47,17 @@ export async function chooseOption(
   });
 }
 
-function render(title: string, options: readonly string[], selected: number): void {
+function render(
+  title: string,
+  options: readonly string[],
+  selected: number,
+): void {
   process.stdout.write("\x1b[2J\x1b[H");
   process.stdout.write(`${sanitizeTerminalText(title)}\n\n`);
   options.forEach((option, index) => {
-    process.stdout.write(`${index === selected ? ">" : " "} ${sanitizeTerminalText(option)}\n`);
+    process.stdout.write(
+      `${index === selected ? ">" : " "} ${sanitizeTerminalText(option)}\n`,
+    );
   });
   process.stdout.write("\nUp/Down choose - Enter continue - Esc cancel\n");
 }

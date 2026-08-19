@@ -24,21 +24,21 @@ describe("creator share TUI state", () => {
   });
 
   it("maps alternate choices to explicit share options", () => {
-    expect(
-      selectionToShareOptions({ scope: 1, access: 1, expiry: 0 }),
-    ).toEqual({
-      includeConversation: true,
-      includeWorkspace: false,
-      proposalsEnabled: false,
-      ttlSeconds: 3600,
-    });
-    expect(
-      selectionToShareOptions({ scope: 2, access: 0, expiry: 2 }),
-    ).toEqual({
-      includeConversation: false,
-      includeWorkspace: true,
-      proposalsEnabled: true,
-      ttlSeconds: 259200,
-    });
+    expect(selectionToShareOptions({ scope: 1, access: 1, expiry: 0 })).toEqual(
+      {
+        includeConversation: true,
+        includeWorkspace: false,
+        proposalsEnabled: false,
+        ttlSeconds: 3600,
+      },
+    );
+    expect(selectionToShareOptions({ scope: 2, access: 0, expiry: 2 })).toEqual(
+      {
+        includeConversation: false,
+        includeWorkspace: true,
+        proposalsEnabled: true,
+        ttlSeconds: 259200,
+      },
+    );
   });
 });

@@ -1,5 +1,8 @@
 import { buildEnvironmentUrl, keyFromFragment } from "@agentshare/acb";
-import { acceptEnvironmentLink, type EnvironmentReadOptions } from "./accept.js";
+import {
+  acceptEnvironmentLink,
+  type EnvironmentReadOptions,
+} from "./accept.js";
 import { EnvironmentRelayClient } from "./relay-client.js";
 import { findAttachedEnvironment } from "./state.js";
 
@@ -7,12 +10,19 @@ export async function refreshAttachedEnvironment(
   environmentId: string,
   options: EnvironmentReadOptions & { client?: EnvironmentRelayClient } = {},
 ): Promise<boolean> {
-  const attached = await findAttachedEnvironment(environmentId, options.statePath);
+  const attached = await findAttachedEnvironment(
+    environmentId,
+    options.statePath,
+  );
   if (attached === undefined) {
     throw new Error(`AgentShare environment is not attached: ${environmentId}`);
   }
-  const client = options.client ?? new EnvironmentRelayClient(attached.relayOrigin);
-  const metadata = await client.metadata(environmentId, attached.readCapability);
+  const client =
+    options.client ?? new EnvironmentRelayClient(attached.relayOrigin);
+  const metadata = await client.metadata(
+    environmentId,
+    attached.readCapability,
+  );
   if (metadata.currentRevisionId === attached.currentRevisionId) return false;
   if (metadata.currentRevisionId === null) {
     throw new Error("AgentShare environment has no committed revision");
@@ -28,8 +38,12 @@ export async function refreshAttachedEnvironment(
   });
   await acceptEnvironmentLink(link, {
     client,
-    ...(options.statePath === undefined ? {} : { statePath: options.statePath }),
-    ...(options.cacheRoot === undefined ? {} : { cacheRoot: options.cacheRoot }),
+    ...(options.statePath === undefined
+      ? {}
+      : { statePath: options.statePath }),
+    ...(options.cacheRoot === undefined
+      ? {}
+      : { cacheRoot: options.cacheRoot }),
   });
   return true;
 }

@@ -58,12 +58,16 @@ export async function runEnvironmentTarget(
             cliPath,
             options,
           );
-    const child = spawn(executable.command, [...executable.prefixArgs, ...args], {
-      cwd: workspace,
-      env: safeEnvironment(),
-      stdio: ["pipe", "pipe", "pipe"],
-      windowsHide: true,
-    });
+    const child = spawn(
+      executable.command,
+      [...executable.prefixArgs, ...args],
+      {
+        cwd: workspace,
+        env: safeEnvironment(),
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+      },
+    );
     let output = "";
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");

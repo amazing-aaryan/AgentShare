@@ -22,8 +22,12 @@ export async function askAttachedEnvironment(
   options: AskEnvironmentOptions,
 ): Promise<string> {
   const runtimeOptions = {
-    ...(options.statePath === undefined ? {} : { statePath: options.statePath }),
-    ...(options.cacheRoot === undefined ? {} : { cacheRoot: options.cacheRoot }),
+    ...(options.statePath === undefined
+      ? {}
+      : { statePath: options.statePath }),
+    ...(options.cacheRoot === undefined
+      ? {}
+      : { cacheRoot: options.cacheRoot }),
   };
   await refreshAttachedEnvironment(environmentId, runtimeOptions);
   const evidence = await searchAttachedEnvironment(
@@ -65,6 +69,8 @@ export function buildEnvironmentEvidencePrompt(
     `Question: ${question}`,
     "",
     "Initial AgentShare evidence:",
-    blocks.length === 0 ? "<no matching evidence; use AgentShare search>" : blocks.join("\n\n"),
+    blocks.length === 0
+      ? "<no matching evidence; use AgentShare search>"
+      : blocks.join("\n\n"),
   ].join("\n");
 }

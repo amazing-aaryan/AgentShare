@@ -46,7 +46,9 @@ export async function revokeOwnedEnvironment(
     (environment) => environment.environmentId === environmentId,
   );
   if (owned === undefined) {
-    throw new Error(`AgentShare environment is not owned locally: ${environmentId}`);
+    throw new Error(
+      `AgentShare environment is not owned locally: ${environmentId}`,
+    );
   }
   const client = new EnvironmentRelayClient(owned.relayOrigin);
   await client.revoke(environmentId, owned.revokeCapability);
