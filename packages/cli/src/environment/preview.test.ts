@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { previewEnvironmentCapture } from "./publication.js";
+import { previewEnvironmentCapture } from "./preview.js";
 
 describe("environment publication preview", () => {
   it("reports included files, exclusions, and redactions without contacting a relay", async () => {
