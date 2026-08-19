@@ -7,7 +7,10 @@ import {
   reserveRevisionRequestSchema,
   type EnvironmentRecord,
 } from "@agentshare/contracts";
-import { InMemoryEnvironmentStore, RelayStoreError } from "./environment-store.js";
+import {
+  InMemoryEnvironmentStore,
+  RelayStoreError,
+} from "./environment-store.js";
 
 const MAX_JSON_BODY = 70 * 1024 * 1024;
 
@@ -21,12 +24,16 @@ export async function handleEnvironmentRequest(
   try {
     if (request.method === "POST" && url.pathname === "/v2/environments") {
       const body = await readJson(request, 1024 * 1024);
-      const record = store.create(createEnvironmentRequestSchema.parse(body), now);
+      const record = store.create(
+        createEnvironmentRequestSchema.parse(body),
+        now,
+      );
       return json(toMetadata(record), 201);
     }
 
     const root = /^\/v2\/environments\/([^/]+)(?:\/(.*))?$/u.exec(url.pathname);
-    if (root?.[1] === undefined) return error("NOT_FOUND", "Route not found", 404);
+    if (root?.[1] === undefined)
+      return error("NOT_FOUND", "Route not found", 404);
     const environmentId = decodeURIComponent(root[1]);
     const rest = root[2] ?? "";
     const capability = bearer(request);
@@ -54,10 +61,22 @@ export async function handleEnvironmentRequest(
       const revisionId = decodeURIComponent(manifestMatch[1]);
       if (request.method === "PUT") {
         const bytes = await readBoundedBytes(request, 50 * 1024 * 1024);
-        return json(toMetadata(store.uploadManifest(environmentId, revisionId, capability, bytes, now)));
+        return json(
+          toMetadata(
+            store.uploadManifest(
+              environmentId,
+              revisionId,
+              capability,
+              bytes,
+              now,
+            ),
+          ),
+        );
       }
       if (request.method === "GET") {
-        return binary(store.downloadManifest(environmentId, revisionId, capability, now));
+        return binary(
+          store.downloadManifest(environmentId, revisionId, capability, now),
+        );
       }
     }
 
@@ -80,10 +99,16 @@ export async function handleEnvironmentRequest(
       const blobId = decodeURIComponent(blobMatch[1]);
       if (request.method === "PUT") {
         const bytes = await readBoundedBytes(request, 50 * 1024 * 1024);
-        return json(toMetadata(store.uploadBlob(environmentId, blobId, capability, bytes, now)));
+        return json(
+          toMetadata(
+            store.uploadBlob(environmentId, blobId, capability, bytes, now),
+          ),
+        );
       }
       if (request.method === "GET") {
-        return binary(store.downloadBlob(environmentId, blobId, capability, now));
+        return binary(
+          store.downloadBlob(environmentId, blobId, capability, now),
+        );
       }
     }
 
@@ -132,7 +157,9 @@ export async function handleEnvironmentRequest(
 
     const proposalStatusMatch = /^proposals\/([^/]+)\/status$/u.exec(rest);
     if (request.method === "POST" && proposalStatusMatch?.[1] !== undefined) {
-      const body = proposalStatusRequestSchema.parse(await readJson(request, 64 * 1024));
+      const body = proposalStatusRequestSchema.parse(
+        await readJson(request, 64 * 1024),
+      );
       return json(
         toMetadata(
           store.setProposalStatus(
@@ -156,7 +183,7 @@ function toMetadata(record: EnvironmentRecord): unknown {
   const current =
     record.currentRevisionId === null
       ? null
-      : record.revisions[record.currentRevisionId]?.request ?? null;
+      : (record.revisions[record.currentRevisionId]?.request ?? null);
   return environmentMetadataResponseSchema.parse({
     protocolVersion: record.protocolVersion,
     environmentId: record.environmentId,
@@ -187,7 +214,10 @@ async function readJson(request: Request, maxBytes: number): Promise<unknown> {
   }
 }
 
-async function readBoundedBytes(request: Request, maxBytes: number): Promise<Uint8Array> {
+async function readBoundedBytes(
+  request: Request,
+  maxBytes: number,
+): Promise<Uint8Array> {
   const declaredHeader = request.headers.get("content-length");
   const declared = declaredHeader === null ? undefined : Number(declaredHeader);
   if (declared !== undefined && (!Number.isInteger(declared) || declared < 0)) {
@@ -240,7 +270,11 @@ function mapError(caught: unknown): Response {
   if (caught instanceof PayloadTooLargeError) {
     return error("PAYLOAD_TOO_LARGE", caught.message, 413);
   }
-  if (caught instanceof BadRequestError || caught instanceof SyntaxError || isZodError(caught)) {
+  if (
+    caught instanceof BadRequestError ||
+    caught instanceof SyntaxError ||
+    isZodError(caught)
+  ) {
     return error("BAD_REQUEST", "Invalid request", 400);
   }
   if (caught instanceof RelayStoreError) {
@@ -265,7 +299,12 @@ function asObject(value: unknown): Record<string, unknown> {
 }
 
 function isZodError(value: unknown): value is { name: "ZodError" } {
-  return typeof value === "object" && value !== null && "name" in value && value.name === "ZodError";
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "name" in value &&
+    value.name === "ZodError"
+  );
 }
 
 class BadRequestError extends Error {}

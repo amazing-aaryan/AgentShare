@@ -9,16 +9,27 @@ export const sharedWorkspacePathSchema = z
   .max(4096)
   .superRefine((value, context) => {
     if (value.includes("\\")) {
-      context.addIssue({ code: "custom", message: "Workspace paths must use forward slashes" });
+      context.addIssue({
+        code: "custom",
+        message: "Workspace paths must use forward slashes",
+      });
       return;
     }
     if (value.startsWith("/") || /^[A-Za-z]:\//u.test(value)) {
-      context.addIssue({ code: "custom", message: "Workspace paths must be relative" });
+      context.addIssue({
+        code: "custom",
+        message: "Workspace paths must be relative",
+      });
       return;
     }
     const parts = value.split("/");
-    if (parts.some((part) => part.length === 0 || part === "." || part === "..")) {
-      context.addIssue({ code: "custom", message: "Workspace path is not normalized" });
+    if (
+      parts.some((part) => part.length === 0 || part === "." || part === "..")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Workspace path is not normalized",
+      });
       return;
     }
     if (parts[0] === ".git" || parts[0] === ".agentshare") {

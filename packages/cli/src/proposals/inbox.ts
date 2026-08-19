@@ -22,9 +22,12 @@ export async function listOwnedProposals(
 ): Promise<OwnedProposal[]> {
   const owned = await findOwnedEnvironment(environmentId, options.statePath);
   if (owned === undefined) {
-    throw new Error(`AgentShare environment is not owned locally: ${environmentId}`);
+    throw new Error(
+      `AgentShare environment is not owned locally: ${environmentId}`,
+    );
   }
-  const client = options.client ?? new EnvironmentRelayClient(owned.relayOrigin);
+  const client =
+    options.client ?? new EnvironmentRelayClient(owned.relayOrigin);
   const descriptors = await client.listProposals(
     environmentId,
     owned.inboxCapability,
@@ -63,7 +66,9 @@ export async function listOwnedProposals(
       proposal.proposalId !== item.descriptor.proposalId ||
       proposal.baseRevisionId !== item.descriptor.baseRevisionId
     ) {
-      throw new Error(`Proposal identity mismatch: ${item.descriptor.proposalId}`);
+      throw new Error(
+        `Proposal identity mismatch: ${item.descriptor.proposalId}`,
+      );
     }
     proposals.push({ proposal, status: item.status });
   }

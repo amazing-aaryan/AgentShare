@@ -41,9 +41,7 @@ export async function buildWorkspaceSnapshot(
     if (!metadata.isFile() || metadata.isSymbolicLink()) {
       excluded.push({
         path,
-        reason: metadata.isSymbolicLink()
-          ? "symlink"
-          : "unsupported-file-type",
+        reason: metadata.isSymbolicLink() ? "symlink" : "unsupported-file-type",
       });
       continue;
     }

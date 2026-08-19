@@ -37,7 +37,10 @@ describe("Codex adapter", () => {
   it("captures the session workspace root for v2 without changing v1 output", () => {
     const capture = parseCodexCapture(input, "synthetic-id");
     expect(capture.workspaceRoot).toBe("C:/synthetic/repo");
-    expect(capture.conversation.map((event) => event.text)).toEqual(["Question", "Answer"]);
+    expect(capture.conversation.map((event) => event.text)).toEqual([
+      "Question",
+      "Answer",
+    ]);
     expect(parseCodexSession(input, "synthetic-id").resources).toEqual([]);
   });
 });

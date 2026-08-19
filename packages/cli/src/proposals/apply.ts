@@ -15,7 +15,10 @@ import {
   encryptEnvironmentObject,
   keyFromFragment,
 } from "@agentshare/acb";
-import { type AgentShareProposal, type ProposalOperation } from "@agentshare/contracts";
+import {
+  type AgentShareProposal,
+  type ProposalOperation,
+} from "@agentshare/contracts";
 import { scanAndRedact } from "@agentshare/scanner";
 import {
   publishEnvironmentRevision,
@@ -70,9 +73,12 @@ export async function approveOwnedProposal(
 ): Promise<ApproveProposalResult> {
   let owned = await findOwnedEnvironment(environmentId, options.statePath);
   if (owned === undefined) {
-    throw new Error(`AgentShare environment is not owned locally: ${environmentId}`);
+    throw new Error(
+      `AgentShare environment is not owned locally: ${environmentId}`,
+    );
   }
-  const client = options.client ?? new EnvironmentRelayClient(owned.relayOrigin);
+  const client =
+    options.client ?? new EnvironmentRelayClient(owned.relayOrigin);
   const inbox = await listOwnedProposals(environmentId, {
     client,
     statePath: options.statePath,
@@ -139,16 +145,11 @@ export async function approveOwnedProposal(
     options.statePath,
   );
 
-  const published = await publishEnvironmentRevision(
-    capture,
-    owned,
-    client,
-    {
-      statePath: options.statePath,
-      now: (options.now ?? (() => new Date()))(),
-      workspaceOptions: options.workspaceOptions,
-    },
-  );
+  const published = await publishEnvironmentRevision(capture, owned, client, {
+    statePath: options.statePath,
+    now: (options.now ?? (() => new Date()))(),
+    workspaceOptions: options.workspaceOptions,
+  });
   owned = published.environment;
   await client.setProposalStatus(
     environmentId,
@@ -168,9 +169,12 @@ export async function rejectOwnedProposal(
 ): Promise<void> {
   const owned = await findOwnedEnvironment(environmentId, options.statePath);
   if (owned === undefined) {
-    throw new Error(`AgentShare environment is not owned locally: ${environmentId}`);
+    throw new Error(
+      `AgentShare environment is not owned locally: ${environmentId}`,
+    );
   }
-  const client = options.client ?? new EnvironmentRelayClient(owned.relayOrigin);
+  const client =
+    options.client ?? new EnvironmentRelayClient(owned.relayOrigin);
   await client.setProposalStatus(
     environmentId,
     proposalId,
@@ -199,7 +203,9 @@ async function preflightProposal(
     await assertParentsSafe(root, path);
     if (operation.type === "create") {
       if (await exists(target)) {
-        throw new Error(`Proposal conflict: create target already exists: ${path}`);
+        throw new Error(
+          `Proposal conflict: create target already exists: ${path}`,
+        );
       }
       const content = verifiedNewContent(operation);
       rejectSecrets(path, operation.mediaType, content);
@@ -248,9 +254,7 @@ async function applyOperations(
     await mkdir(dirname(target), { recursive: true });
     const temporary = `${target}.agentshare-${randomUUID()}.tmp`;
     const mode =
-      operation.type === "replace"
-        ? ((await lstat(target)).mode & 0o777)
-        : 0o644;
+      operation.type === "replace" ? (await lstat(target)).mode & 0o777 : 0o644;
     await writeFile(temporary, content, { mode });
     await chmod(temporary, mode).catch(() => undefined);
     await rename(temporary, target);

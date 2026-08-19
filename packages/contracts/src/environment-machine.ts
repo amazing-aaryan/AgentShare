@@ -16,11 +16,7 @@ import {
 export class EnvironmentStateError extends Error {
   constructor(
     readonly code:
-      | "NOT_FOUND"
-      | "CONFLICT"
-      | "EXPIRED"
-      | "REVOKED"
-      | "PAYLOAD_TOO_LARGE",
+      "NOT_FOUND" | "CONFLICT" | "EXPIRED" | "REVOKED" | "PAYLOAD_TOO_LARGE",
     message: string,
   ) {
     super(message);
@@ -95,7 +91,10 @@ export function effectiveEnvironmentStatus(
   now: Date,
 ): EnvironmentStatus {
   if (record.status === "revoked") return "revoked";
-  if (record.status === "expired" || now.getTime() >= Date.parse(record.expiresAt)) {
+  if (
+    record.status === "expired" ||
+    now.getTime() >= Date.parse(record.expiresAt)
+  ) {
     return "expired";
   }
   return "active";
@@ -117,8 +116,12 @@ export function reserveEnvironmentRevision(
   }
   const existing = record.revisions[request.revisionId];
   if (existing !== undefined) {
-    if (JSON.stringify(existing.request) === JSON.stringify(request)) return record;
-    throw new EnvironmentStateError("CONFLICT", "Revision id already exists with different descriptors");
+    if (JSON.stringify(existing.request) === JSON.stringify(request))
+      return record;
+    throw new EnvironmentStateError(
+      "CONFLICT",
+      "Revision id already exists with different descriptors",
+    );
   }
   return {
     ...record,
@@ -141,7 +144,11 @@ export function recordEnvironmentManifest(
 ): EnvironmentRecord {
   assertActive(record, now);
   const revision = requiredRevision(record, revisionId);
-  assertDescriptorMatches(revision.request.manifest, descriptor, "Revision manifest");
+  assertDescriptorMatches(
+    revision.request.manifest,
+    descriptor,
+    "Revision manifest",
+  );
   if (revision.manifestUploaded) return record;
   return {
     ...record,
@@ -168,7 +175,10 @@ export function recordEnvironmentBlob(
     .flatMap((revision) => revision.request.blobs)
     .find((blob) => blob.blobId === blobId);
   if (declared === undefined) {
-    throw new EnvironmentStateError("NOT_FOUND", "Blob is not declared by an environment revision");
+    throw new EnvironmentStateError(
+      "NOT_FOUND",
+      "Blob is not declared by an environment revision",
+    );
   }
   assertDescriptorMatches(declared, descriptor, "Environment blob");
   return {
@@ -187,15 +197,24 @@ export function commitEnvironmentRevision(
   if (revision.status === "committed") return record;
   const expectedParent = record.currentRevisionId ?? undefined;
   if (revision.request.parentRevisionId !== expectedParent) {
-    throw new EnvironmentStateError("CONFLICT", "Environment moved since revision reservation");
+    throw new EnvironmentStateError(
+      "CONFLICT",
+      "Environment moved since revision reservation",
+    );
   }
   if (!revision.manifestUploaded) {
-    throw new EnvironmentStateError("CONFLICT", "Revision manifest has not been uploaded");
+    throw new EnvironmentStateError(
+      "CONFLICT",
+      "Revision manifest has not been uploaded",
+    );
   }
   for (const blob of revision.request.blobs) {
     const stored = record.blobs[blob.blobId];
     if (stored === undefined) {
-      throw new EnvironmentStateError("CONFLICT", `Revision blob ${blob.blobId} has not been uploaded`);
+      throw new EnvironmentStateError(
+        "CONFLICT",
+        `Revision blob ${blob.blobId} has not been uploaded`,
+      );
     }
     assertDescriptorMatches(blob, stored, `Revision blob ${blob.blobId}`);
   }
@@ -216,16 +235,26 @@ export function addEnvironmentProposal(
 ): EnvironmentRecord {
   assertActive(record, now);
   if (record.proposalTokenDigest === undefined) {
-    throw new EnvironmentStateError("NOT_FOUND", "Environment does not accept proposals");
+    throw new EnvironmentStateError(
+      "NOT_FOUND",
+      "Environment does not accept proposals",
+    );
   }
   const descriptor = proposalDescriptorSchema.parse(input);
   if (record.revisions[descriptor.baseRevisionId]?.status !== "committed") {
-    throw new EnvironmentStateError("CONFLICT", "Proposal base revision is not committed");
+    throw new EnvironmentStateError(
+      "CONFLICT",
+      "Proposal base revision is not committed",
+    );
   }
   const existing = record.proposals[descriptor.proposalId];
   if (existing !== undefined) {
-    if (JSON.stringify(existing.descriptor) === JSON.stringify(descriptor)) return record;
-    throw new EnvironmentStateError("CONFLICT", "Proposal id already exists with different ciphertext");
+    if (JSON.stringify(existing.descriptor) === JSON.stringify(descriptor))
+      return record;
+    throw new EnvironmentStateError(
+      "CONFLICT",
+      "Proposal id already exists with different ciphertext",
+    );
   }
   return {
     ...record,
@@ -244,9 +273,13 @@ export function setEnvironmentProposalStatus(
 ): EnvironmentRecord {
   assertActive(record, now);
   const proposal = record.proposals[proposalId];
-  if (proposal === undefined) throw new EnvironmentStateError("NOT_FOUND", "Proposal not found");
+  if (proposal === undefined)
+    throw new EnvironmentStateError("NOT_FOUND", "Proposal not found");
   if (proposal.status !== "pending" && proposal.status !== status) {
-    throw new EnvironmentStateError("CONFLICT", "Proposal already has a different terminal status");
+    throw new EnvironmentStateError(
+      "CONFLICT",
+      "Proposal already has a different terminal status",
+    );
   }
   if (proposal.status === status) return record;
   return {
@@ -258,14 +291,20 @@ export function setEnvironmentProposalStatus(
   };
 }
 
-export function revokeEnvironment(record: EnvironmentRecord): EnvironmentRecord {
+export function revokeEnvironment(
+  record: EnvironmentRecord,
+): EnvironmentRecord {
   if (record.status === "revoked") return record;
   return { ...record, status: "revoked" };
 }
 
-function requiredRevision(record: EnvironmentRecord, revisionId: string): EnvironmentRevisionRecord {
+function requiredRevision(
+  record: EnvironmentRecord,
+  revisionId: string,
+): EnvironmentRevisionRecord {
   const revision = record.revisions[revisionId];
-  if (revision === undefined) throw new EnvironmentStateError("NOT_FOUND", "Revision not found");
+  if (revision === undefined)
+    throw new EnvironmentStateError("NOT_FOUND", "Revision not found");
   return revision;
 }
 
@@ -284,6 +323,8 @@ function assertDescriptorMatches(
 
 function assertActive(record: EnvironmentRecord, now: Date): void {
   const status = effectiveEnvironmentStatus(record, now);
-  if (status === "expired") throw new EnvironmentStateError("EXPIRED", "Environment expired");
-  if (status === "revoked") throw new EnvironmentStateError("REVOKED", "Environment revoked");
+  if (status === "expired")
+    throw new EnvironmentStateError("EXPIRED", "Environment expired");
+  if (status === "revoked")
+    throw new EnvironmentStateError("REVOKED", "Environment revoked");
 }

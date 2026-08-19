@@ -11,7 +11,10 @@ import {
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { CiphertextDescriptor, ReserveRevisionRequest } from "@agentshare/contracts";
+import type {
+  CiphertextDescriptor,
+  ReserveRevisionRequest,
+} from "@agentshare/contracts";
 
 export type EnvironmentSharePolicy = {
   includeConversation: boolean;
@@ -80,7 +83,9 @@ export async function loadEnvironmentState(
   path = defaultEnvironmentStatePath(),
 ): Promise<EnvironmentState> {
   try {
-    const parsed = JSON.parse(await readFile(path, "utf8")) as Partial<EnvironmentState>;
+    const parsed = JSON.parse(
+      await readFile(path, "utf8"),
+    ) as Partial<EnvironmentState>;
     if (
       parsed.version !== 2 ||
       !Array.isArray(parsed.ownedEnvironments) ||
@@ -141,7 +146,9 @@ export async function findOwnedEnvironmentForWorkspace(
   path = defaultEnvironmentStatePath(),
 ): Promise<OwnedEnvironment | undefined> {
   return (await loadEnvironmentState(path)).ownedEnvironments.find(
-    (item) => item.workspaceRoot === workspaceRoot && Date.parse(item.expiresAt) > Date.now(),
+    (item) =>
+      item.workspaceRoot === workspaceRoot &&
+      Date.parse(item.expiresAt) > Date.now(),
   );
 }
 
@@ -198,7 +205,9 @@ async function mutate(
     const state = await loadEnvironmentState(path);
     operation(state);
     const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
-    await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+    await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, {
+      mode: 0o600,
+    });
     await chmod(temporary, 0o600).catch(() => undefined);
     await rename(temporary, path);
     await chmod(path, 0o600).catch(() => undefined);

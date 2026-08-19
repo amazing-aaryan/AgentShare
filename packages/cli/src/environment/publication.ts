@@ -23,10 +23,7 @@ import {
   type WorkspaceSnapshot,
 } from "../workspace/index.js";
 import { EnvironmentRelayClient } from "./relay-client.js";
-import {
-  saveOwnedEnvironment,
-  type OwnedEnvironment,
-} from "./state.js";
+import { saveOwnedEnvironment, type OwnedEnvironment } from "./state.js";
 
 export type HostCapture = {
   sourceAgent: "codex" | "claude";
@@ -256,9 +253,7 @@ async function prepareRevision(
   const files = snapshot.files.map((file, index) => {
     const resource = redacted.manifest.resources[index];
     if (resource === undefined) {
-      throw new Error(
-        `Missing scanned workspace resource for ${file.path}`,
-      );
+      throw new Error(`Missing scanned workspace resource for ${file.path}`);
     }
     const plaintext = Buffer.from(resource.contentBase64, "base64");
     const resourceId = stableOpaqueId(
@@ -413,11 +408,7 @@ function workspaceToAcb(
 }
 
 function emptySnapshot(root: string): WorkspaceSnapshot {
-  const rootName = root
-    .replace(/\\/gu, "/")
-    .split("/")
-    .filter(Boolean)
-    .at(-1);
+  const rootName = root.replace(/\\/gu, "/").split("/").filter(Boolean).at(-1);
   return {
     root,
     rootName: rootName ?? "workspace",

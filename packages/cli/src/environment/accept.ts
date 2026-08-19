@@ -1,10 +1,4 @@
-import {
-  chmod,
-  mkdir,
-  readFile,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import {
@@ -114,7 +108,9 @@ export async function acceptEnvironmentLink(
     for (const reference of file.blobs) {
       const descriptor = declared.get(reference.blobId);
       if (descriptor === undefined) {
-        throw new Error(`Manifest references undeclared blob ${reference.blobId}`);
+        throw new Error(
+          `Manifest references undeclared blob ${reference.blobId}`,
+        );
       }
       const path = join(root, "blobs", `${reference.blobId}.enc`);
       const existing = await readValidCiphertext(path, descriptor);
@@ -124,7 +120,11 @@ export async function acceptEnvironmentLink(
         reference.blobId,
         parsed.readCapability,
       );
-      assertDescriptor(descriptor, bytes, `environment blob ${reference.blobId}`);
+      assertDescriptor(
+        descriptor,
+        bytes,
+        `environment blob ${reference.blobId}`,
+      );
       await writeSecure(path, bytes);
     }
   }
@@ -213,10 +213,15 @@ export async function readAttachedFile(
   const attached = await requiredAttached(environmentId, options.statePath);
   const root = environmentCacheDirectory(environmentId, options.cacheRoot);
   const manifest = await loadCachedManifest(attached, root);
-  const file = manifest.workspace.files.find((candidate) => candidate.path === path);
+  const file = manifest.workspace.files.find(
+    (candidate) => candidate.path === path,
+  );
   if (file === undefined) throw new Error(`Shared file not found: ${path}`);
   const bytes = await readSharedFileBytes(attached, root, file);
-  if (!file.mediaType.startsWith("text/") && file.mediaType !== "application/json") {
+  if (
+    !file.mediaType.startsWith("text/") &&
+    file.mediaType !== "application/json"
+  ) {
     throw new Error(`Shared file is not text-readable: ${path}`);
   }
   return Buffer.from(bytes).toString("utf8");
@@ -258,7 +263,10 @@ async function buildIndexFromManifest(
     title: manifest.title,
   };
   for (const file of manifest.workspace.files) {
-    if (!file.mediaType.startsWith("text/") && file.mediaType !== "application/json") {
+    if (
+      !file.mediaType.startsWith("text/") &&
+      file.mediaType !== "application/json"
+    ) {
       continue;
     }
     const bytes = await readSharedFileBytes(attached, root, file);
@@ -368,9 +376,7 @@ async function readValidCiphertext(
     const metadata = await stat(path);
     if (metadata.size !== descriptor.ciphertextBytes) return undefined;
     const bytes = await readFile(path);
-    return sha256Hex(bytes) === descriptor.ciphertextSha256
-      ? bytes
-      : undefined;
+    return sha256Hex(bytes) === descriptor.ciphertextSha256 ? bytes : undefined;
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       return undefined;

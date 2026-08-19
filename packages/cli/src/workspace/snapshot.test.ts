@@ -9,16 +9,10 @@ async function fixture(): Promise<string> {
   await mkdir(join(root, "src"), { recursive: true });
   await mkdir(join(root, "node_modules", "pkg"), { recursive: true });
   await mkdir(join(root, ".git"), { recursive: true });
-  await writeFile(
-    join(root, "src", "index.ts"),
-    "export const answer = 42;\n",
-  );
+  await writeFile(join(root, "src", "index.ts"), "export const answer = 42;\n");
   await writeFile(join(root, "README.md"), "# Demo\n");
   await writeFile(join(root, ".env"), "SECRET=should-not-share\n");
-  await writeFile(
-    join(root, "node_modules", "pkg", "index.js"),
-    "ignored\n",
-  );
+  await writeFile(join(root, "node_modules", "pkg", "index.js"), "ignored\n");
   await writeFile(join(root, ".git", "config"), "ignored\n");
   try {
     await symlink(join(root, ".env"), join(root, "src", "secret-link"));

@@ -1,8 +1,5 @@
 import { createHash } from "node:crypto";
-import {
-  encryptProposalForOwner,
-  randomCapability,
-} from "@agentshare/acb";
+import { encryptProposalForOwner, randomCapability } from "@agentshare/acb";
 import {
   proposalSchema,
   type AgentShareProposal,
@@ -29,7 +26,9 @@ export async function submitFileReplacement(
   options: SubmitProposalOptions = {},
 ): Promise<AgentShareProposal> {
   const manifest = await readAttachedManifest(environmentId, options);
-  const file = manifest.workspace.files.find((candidate) => candidate.path === path);
+  const file = manifest.workspace.files.find(
+    (candidate) => candidate.path === path,
+  );
   if (file === undefined) throw new Error(`Shared file not found: ${path}`);
   await readAttachedFile(environmentId, path, options);
   return submitProposalOperations(
@@ -55,7 +54,10 @@ export async function submitProposalOperations(
   operations: ProposalOperation[],
   options: SubmitProposalOptions = {},
 ): Promise<AgentShareProposal> {
-  const attached = await findAttachedEnvironment(environmentId, options.statePath);
+  const attached = await findAttachedEnvironment(
+    environmentId,
+    options.statePath,
+  );
   if (attached === undefined) {
     throw new Error(`AgentShare environment is not attached: ${environmentId}`);
   }

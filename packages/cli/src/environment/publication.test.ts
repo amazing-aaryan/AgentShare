@@ -18,10 +18,18 @@ async function fixture() {
 describe("creator environment publication", () => {
   it("publishes conversation plus workspace as an encrypted committed revision", async () => {
     const now = new Date("2026-08-19T00:00:00.000Z");
-    const handler = createRelayHandler(new InMemoryRelayStore(), { now: () => now });
-    const fetchImpl: typeof fetch = (input, init) => handler(new Request(input, init));
-    const client = new EnvironmentRelayClient("http://127.0.0.1:8787", fetchImpl);
-    const stateDir = await mkdtemp(join(tmpdir(), "agentshare-publication-state-"));
+    const handler = createRelayHandler(new InMemoryRelayStore(), {
+      now: () => now,
+    });
+    const fetchImpl: typeof fetch = (input, init) =>
+      handler(new Request(input, init));
+    const client = new EnvironmentRelayClient(
+      "http://127.0.0.1:8787",
+      fetchImpl,
+    );
+    const stateDir = await mkdtemp(
+      join(tmpdir(), "agentshare-publication-state-"),
+    );
     const statePath = join(stateDir, "state-v2.json");
     const root = await fixture();
 
@@ -31,8 +39,20 @@ describe("creator environment publication", () => {
         title: "Codex: demo",
         workspaceRoot: root,
         conversation: [
-          { sequence: 0, role: "user", kind: "message", text: "Why?", sourceId: "thread" },
-          { sequence: 1, role: "assistant", kind: "message", text: "Because.", sourceId: "thread" },
+          {
+            sequence: 0,
+            role: "user",
+            kind: "message",
+            text: "Why?",
+            sourceId: "thread",
+          },
+          {
+            sequence: 1,
+            role: "assistant",
+            kind: "message",
+            text: "Because.",
+            sourceId: "thread",
+          },
         ],
       },
       {
@@ -48,12 +68,20 @@ describe("creator environment publication", () => {
     );
 
     const parsed = parseEnvironmentUrl(result.url);
-    const metadata = await client.metadata(parsed.environmentId, parsed.readCapability);
-    expect(metadata.currentRevisionId).toBe(result.environment.currentRevisionId);
+    const metadata = await client.metadata(
+      parsed.environmentId,
+      parsed.readCapability,
+    );
+    expect(metadata.currentRevisionId).toBe(
+      result.environment.currentRevisionId,
+    );
     expect(metadata.currentRevision?.blobs).toHaveLength(1);
     expect(result.summary.files).toBe(1);
     expect(result.summary.conversationEvents).toBe(2);
     expect(result.summary.proposalsEnabled).toBe(true);
-    expect((await findOwnedEnvironment(result.environment.environmentId, statePath))?.pendingRevision).toBeUndefined();
+    expect(
+      (await findOwnedEnvironment(result.environment.environmentId, statePath))
+        ?.pendingRevision,
+    ).toBeUndefined();
   });
 });

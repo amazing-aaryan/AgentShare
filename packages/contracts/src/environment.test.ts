@@ -46,15 +46,24 @@ describe("sharedWorkspacePathSchema", () => {
     );
   });
 
-  it.each(["../secret", "/etc/passwd", "C:/Users/a/.ssh/id_rsa", ".git/config", ".agentshare/state-v2.json", "a//b", "a/./b"])(
-    "rejects unsafe path %s",
-    (path) => expect(() => sharedWorkspacePathSchema.parse(path)).toThrow(),
+  it.each([
+    "../secret",
+    "/etc/passwd",
+    "C:/Users/a/.ssh/id_rsa",
+    ".git/config",
+    ".agentshare/state-v2.json",
+    "a//b",
+    "a/./b",
+  ])("rejects unsafe path %s", (path) =>
+    expect(() => sharedWorkspacePathSchema.parse(path)).toThrow(),
   );
 });
 
 describe("environmentManifestSchema", () => {
   it("accepts a valid workspace revision manifest", () => {
-    expect(environmentManifestSchema.parse(validManifest()).workspace.files).toHaveLength(1);
+    expect(
+      environmentManifestSchema.parse(validManifest()).workspace.files,
+    ).toHaveLength(1);
   });
 
   it("requires a proposal public key when proposals are enabled", () => {

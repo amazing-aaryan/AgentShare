@@ -18,7 +18,9 @@ function baseProposal() {
         baseSha256: hex,
         newSha256: hex,
         mediaType: "text/typescript",
-        contentBase64: Buffer.from("export const retry = true;\n").toString("base64"),
+        contentBase64: Buffer.from("export const retry = true;\n").toString(
+          "base64",
+        ),
       },
     ],
   };
@@ -26,7 +28,9 @@ function baseProposal() {
 
 describe("proposalSchema", () => {
   it("accepts deterministic whole-file operations", () => {
-    expect(proposalSchema.parse(baseProposal()).operations[0]?.type).toBe("replace");
+    expect(proposalSchema.parse(baseProposal()).operations[0]?.type).toBe(
+      "replace",
+    );
   });
 
   it("rejects traversal paths", () => {

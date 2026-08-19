@@ -19,11 +19,23 @@ async function fixture(): Promise<string> {
 describe("creator proposal approval", () => {
   it("changes the real workspace only after approval and publishes a new revision", async () => {
     const now = new Date("2026-08-19T00:00:00.000Z");
-    const handler = createRelayHandler(new InMemoryRelayStore(), { now: () => now });
-    const fetchImpl: typeof fetch = (input, init) => handler(new Request(input, init));
-    const client = new EnvironmentRelayClient("http://127.0.0.1:8787", fetchImpl);
-    const ownerState = join(await mkdtemp(join(tmpdir(), "agentshare-owner-")), "state-v2.json");
-    const readerState = join(await mkdtemp(join(tmpdir(), "agentshare-reader-")), "state-v2.json");
+    const handler = createRelayHandler(new InMemoryRelayStore(), {
+      now: () => now,
+    });
+    const fetchImpl: typeof fetch = (input, init) =>
+      handler(new Request(input, init));
+    const client = new EnvironmentRelayClient(
+      "http://127.0.0.1:8787",
+      fetchImpl,
+    );
+    const ownerState = join(
+      await mkdtemp(join(tmpdir(), "agentshare-owner-")),
+      "state-v2.json",
+    );
+    const readerState = join(
+      await mkdtemp(join(tmpdir(), "agentshare-reader-")),
+      "state-v2.json",
+    );
     const cacheRoot = await mkdtemp(join(tmpdir(), "agentshare-reader-cache-"));
     const root = await fixture();
     const capture = {
@@ -56,7 +68,9 @@ describe("creator proposal approval", () => {
       { client, statePath: readerState, cacheRoot, now: () => now },
     );
 
-    expect(await readFile(join(root, "src", "value.ts"), "utf8")).toContain("1");
+    expect(await readFile(join(root, "src", "value.ts"), "utf8")).toContain(
+      "1",
+    );
     const approved = await approveOwnedProposal(
       shared.environment.environmentId,
       proposal.proposalId,
@@ -68,29 +82,67 @@ describe("creator proposal approval", () => {
         workspaceOptions: { preferGit: false },
       },
     );
-    expect(await readFile(join(root, "src", "value.ts"), "utf8")).toContain("2");
-    expect(approved.environment.currentRevisionId).not.toBe(shared.environment.currentRevisionId);
+    expect(await readFile(join(root, "src", "value.ts"), "utf8")).toContain(
+      "2",
+    );
+    expect(approved.environment.currentRevisionId).not.toBe(
+      shared.environment.currentRevisionId,
+    );
     expect(
-      (await client.metadata(shared.environment.environmentId, shared.environment.readCapability)).currentRevisionId,
+      (
+        await client.metadata(
+          shared.environment.environmentId,
+          shared.environment.readCapability,
+        )
+      ).currentRevisionId,
     ).toBe(approved.environment.currentRevisionId);
   });
 
   it("fails closed when the creator changed the base file after sharing", async () => {
     const now = new Date("2026-08-19T00:00:00.000Z");
-    const handler = createRelayHandler(new InMemoryRelayStore(), { now: () => now });
-    const fetchImpl: typeof fetch = (input, init) => handler(new Request(input, init));
-    const client = new EnvironmentRelayClient("http://127.0.0.1:8787", fetchImpl);
-    const ownerState = join(await mkdtemp(join(tmpdir(), "agentshare-owner-conflict-")), "state-v2.json");
-    const readerState = join(await mkdtemp(join(tmpdir(), "agentshare-reader-conflict-")), "state-v2.json");
-    const cacheRoot = await mkdtemp(join(tmpdir(), "agentshare-reader-cache-conflict-"));
+    const handler = createRelayHandler(new InMemoryRelayStore(), {
+      now: () => now,
+    });
+    const fetchImpl: typeof fetch = (input, init) =>
+      handler(new Request(input, init));
+    const client = new EnvironmentRelayClient(
+      "http://127.0.0.1:8787",
+      fetchImpl,
+    );
+    const ownerState = join(
+      await mkdtemp(join(tmpdir(), "agentshare-owner-conflict-")),
+      "state-v2.json",
+    );
+    const readerState = join(
+      await mkdtemp(join(tmpdir(), "agentshare-reader-conflict-")),
+      "state-v2.json",
+    );
+    const cacheRoot = await mkdtemp(
+      join(tmpdir(), "agentshare-reader-cache-conflict-"),
+    );
     const root = await fixture();
-    const capture = { sourceAgent: "codex" as const, title: "Conflict demo", workspaceRoot: root, conversation: [] };
+    const capture = {
+      sourceAgent: "codex" as const,
+      title: "Conflict demo",
+      workspaceRoot: root,
+      conversation: [],
+    };
     const shared = await createEnvironmentFromCapture(capture, {
-      client, statePath: ownerState, ttlSeconds: 86400, proposalsEnabled: true,
-      includeConversation: false, includeWorkspace: true, now: () => now,
+      client,
+      statePath: ownerState,
+      ttlSeconds: 86400,
+      proposalsEnabled: true,
+      includeConversation: false,
+      includeWorkspace: true,
+      now: () => now,
       workspaceOptions: { preferGit: false },
     });
-    await acceptEnvironmentLink(shared.url, { client, statePath: readerState, cacheRoot, now: () => now });
+    await acceptEnvironmentLink(shared.url, {
+      client,
+      statePath: readerState,
+      cacheRoot,
+      now: () => now,
+    });
     const proposal = await submitFileReplacement(
       shared.environment.environmentId,
       "src/value.ts",
@@ -98,12 +150,25 @@ describe("creator proposal approval", () => {
       "Update value",
       { client, statePath: readerState, cacheRoot, now: () => now },
     );
-    await writeFile(join(root, "src", "value.ts"), "export const value = 99;\n");
+    await writeFile(
+      join(root, "src", "value.ts"),
+      "export const value = 99;\n",
+    );
     await expect(
-      approveOwnedProposal(shared.environment.environmentId, proposal.proposalId, capture, {
-        client, statePath: ownerState, now: () => now, workspaceOptions: { preferGit: false },
-      }),
+      approveOwnedProposal(
+        shared.environment.environmentId,
+        proposal.proposalId,
+        capture,
+        {
+          client,
+          statePath: ownerState,
+          now: () => now,
+          workspaceOptions: { preferGit: false },
+        },
+      ),
     ).rejects.toThrow(/conflict|hash/iu);
-    expect(await readFile(join(root, "src", "value.ts"), "utf8")).toContain("99");
+    expect(await readFile(join(root, "src", "value.ts"), "utf8")).toContain(
+      "99",
+    );
   });
 });

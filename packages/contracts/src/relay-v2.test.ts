@@ -33,11 +33,16 @@ describe("v2 relay schemas", () => {
     ).toThrow();
   });
 
-  it.each(["accepted", "rejected"])("accepts terminal proposal status %s", (status) => {
-    expect(proposalStatusRequestSchema.parse({ status }).status).toBe(status);
-  });
+  it.each(["accepted", "rejected"])(
+    "accepts terminal proposal status %s",
+    (status) => {
+      expect(proposalStatusRequestSchema.parse({ status }).status).toBe(status);
+    },
+  );
 
   it("rejects pending as a client-set proposal status", () => {
-    expect(() => proposalStatusRequestSchema.parse({ status: "pending" })).toThrow();
+    expect(() =>
+      proposalStatusRequestSchema.parse({ status: "pending" }),
+    ).toThrow();
   });
 });

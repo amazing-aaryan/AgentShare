@@ -28,7 +28,10 @@ function create() {
 
 function revision(parentRevisionId?: string) {
   return {
-    revisionId: parentRevisionId === undefined ? "rev_11111111111111111111" : "rev_22222222222222222222",
+    revisionId:
+      parentRevisionId === undefined
+        ? "rev_11111111111111111111"
+        : "rev_22222222222222222222",
     ...(parentRevisionId === undefined ? {} : { parentRevisionId }),
     manifest: { ciphertextSha256: digest, ciphertextBytes: 80 },
     blobs: [
@@ -44,26 +47,75 @@ function revision(parentRevisionId?: string) {
 describe("environment relay state machine", () => {
   it("commits a revision only after every declared object exists", () => {
     let record = reserveEnvironmentRevision(create(), revision(), now);
-    expect(() => commitEnvironmentRevision(record, "rev_11111111111111111111", now)).toThrow(EnvironmentStateError);
-    record = recordEnvironmentManifest(record, "rev_11111111111111111111", { ciphertextSha256: digest, ciphertextBytes: 80 }, now);
-    record = recordEnvironmentBlob(record, "blob_1111111111111111111", { ciphertextSha256: digest, ciphertextBytes: 120 }, now);
+    expect(() =>
+      commitEnvironmentRevision(record, "rev_11111111111111111111", now),
+    ).toThrow(EnvironmentStateError);
+    record = recordEnvironmentManifest(
+      record,
+      "rev_11111111111111111111",
+      { ciphertextSha256: digest, ciphertextBytes: 80 },
+      now,
+    );
+    record = recordEnvironmentBlob(
+      record,
+      "blob_1111111111111111111",
+      { ciphertextSha256: digest, ciphertextBytes: 120 },
+      now,
+    );
     record = commitEnvironmentRevision(record, "rev_11111111111111111111", now);
     expect(record.currentRevisionId).toBe("rev_11111111111111111111");
-    expect(record.revisions["rev_11111111111111111111"]?.status).toBe("committed");
+    expect(record.revisions["rev_11111111111111111111"]?.status).toBe(
+      "committed",
+    );
   });
 
   it("rejects a stale parent revision", () => {
     let record = reserveEnvironmentRevision(create(), revision(), now);
-    record = recordEnvironmentManifest(record, "rev_11111111111111111111", { ciphertextSha256: digest, ciphertextBytes: 80 }, now);
-    record = recordEnvironmentBlob(record, "blob_1111111111111111111", { ciphertextSha256: digest, ciphertextBytes: 120 }, now);
+    record = recordEnvironmentManifest(
+      record,
+      "rev_11111111111111111111",
+      { ciphertextSha256: digest, ciphertextBytes: 80 },
+      now,
+    );
+    record = recordEnvironmentBlob(
+      record,
+      "blob_1111111111111111111",
+      { ciphertextSha256: digest, ciphertextBytes: 120 },
+      now,
+    );
     record = commitEnvironmentRevision(record, "rev_11111111111111111111", now);
-    expect(() => reserveEnvironmentRevision(record, revision("rev_stale_123456789012345"), now)).toThrow(EnvironmentStateError);
+    expect(() =>
+      reserveEnvironmentRevision(
+        record,
+        revision("rev_stale_123456789012345"),
+        now,
+      ),
+    ).toThrow(EnvironmentStateError);
   });
 
   it("allows idempotent identical blob descriptors and rejects replacement", () => {
     let record = reserveEnvironmentRevision(create(), revision(), now);
-    record = recordEnvironmentBlob(record, "blob_1111111111111111111", { ciphertextSha256: digest, ciphertextBytes: 120 }, now);
-    expect(recordEnvironmentBlob(record, "blob_1111111111111111111", { ciphertextSha256: digest, ciphertextBytes: 120 }, now)).toEqual(record);
-    expect(() => recordEnvironmentBlob(record, "blob_1111111111111111111", { ciphertextSha256: "e".repeat(64), ciphertextBytes: 120 }, now)).toThrow(EnvironmentStateError);
+    record = recordEnvironmentBlob(
+      record,
+      "blob_1111111111111111111",
+      { ciphertextSha256: digest, ciphertextBytes: 120 },
+      now,
+    );
+    expect(
+      recordEnvironmentBlob(
+        record,
+        "blob_1111111111111111111",
+        { ciphertextSha256: digest, ciphertextBytes: 120 },
+        now,
+      ),
+    ).toEqual(record);
+    expect(() =>
+      recordEnvironmentBlob(
+        record,
+        "blob_1111111111111111111",
+        { ciphertextSha256: "e".repeat(64), ciphertextBytes: 120 },
+        now,
+      ),
+    ).toThrow(EnvironmentStateError);
   });
 });

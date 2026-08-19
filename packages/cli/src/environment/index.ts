@@ -35,7 +35,10 @@ export function buildSearchIndex(
     if (input.kind === "file") {
       const lines = input.text.split(/\r?\n/u);
       for (let offset = 0; offset < lines.length; offset += 40) {
-        const text = lines.slice(offset, offset + 40).join("\n").trim();
+        const text = lines
+          .slice(offset, offset + 40)
+          .join("\n")
+          .trim();
         if (text.length === 0) continue;
         entries.push({
           source: input.source,
@@ -87,11 +90,14 @@ export function searchIndex(
         if (frequency === 0) continue;
         const documentFrequency = index.documentFrequency[term] ?? 0;
         const inverse = Math.log(
-          1 + (totalDocuments - documentFrequency + 0.5) / (documentFrequency + 0.5),
+          1 +
+            (totalDocuments - documentFrequency + 0.5) /
+              (documentFrequency + 0.5),
         );
         const normalized =
           (frequency * 2.2) /
-          (frequency + 1.2 * (0.25 + 0.75 * Math.max(1, documentLength) / 120));
+          (frequency +
+            1.2 * (0.25 + (0.75 * Math.max(1, documentLength)) / 120));
         score += inverse * normalized;
       }
       return { entry, score };

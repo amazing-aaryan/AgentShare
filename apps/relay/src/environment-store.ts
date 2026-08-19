@@ -48,7 +48,11 @@ export class InMemoryEnvironmentStore {
     const existing = this.#environments.get(request.environmentId);
     if (existing !== undefined) {
       const status = effectiveEnvironmentStatus(existing.record, now);
-      if (status !== "active") throw new RelayStoreError("CONFLICT", "Environment ID has already been consumed");
+      if (status !== "active")
+        throw new RelayStoreError(
+          "CONFLICT",
+          "Environment ID has already been consumed",
+        );
       const same =
         existing.record.readTokenDigest === request.readTokenDigest &&
         existing.record.updateTokenDigest === request.updateTokenDigest &&
@@ -68,7 +72,11 @@ export class InMemoryEnvironmentStore {
     return record;
   }
 
-  metadata(environmentId: string, readCapability: string, now: Date): EnvironmentRecord {
+  metadata(
+    environmentId: string,
+    readCapability: string,
+    now: Date,
+  ): EnvironmentRecord {
     const environment = this.#required(environmentId);
     this.#authorize(environment.record.readTokenDigest, readCapability);
     this.#assertActive(environment.record, now);
@@ -83,7 +91,9 @@ export class InMemoryEnvironmentStore {
   ): EnvironmentRecord {
     const environment = this.#required(environmentId);
     this.#authorize(environment.record.updateTokenDigest, updateCapability);
-    environment.record = this.#mapState(() => reserveEnvironmentRevision(environment.record, request, now));
+    environment.record = this.#mapState(() =>
+      reserveEnvironmentRevision(environment.record, request, now),
+    );
     return environment.record;
   }
 
@@ -99,12 +109,23 @@ export class InMemoryEnvironmentStore {
     const descriptor = descriptorFor(bytes);
     const existing = environment.manifests.get(revisionId);
     if (existing !== undefined) {
-      if (sha256Hex(existing) !== descriptor.ciphertextSha256 || existing.byteLength !== descriptor.ciphertextBytes) {
-        throw new RelayStoreError("CONFLICT", "Revision manifest already contains different ciphertext");
+      if (
+        sha256Hex(existing) !== descriptor.ciphertextSha256 ||
+        existing.byteLength !== descriptor.ciphertextBytes
+      ) {
+        throw new RelayStoreError(
+          "CONFLICT",
+          "Revision manifest already contains different ciphertext",
+        );
       }
     }
     environment.record = this.#mapState(() =>
-      recordEnvironmentManifest(environment.record, revisionId, descriptor, now),
+      recordEnvironmentManifest(
+        environment.record,
+        revisionId,
+        descriptor,
+        now,
+      ),
     );
     environment.manifests.set(revisionId, Buffer.from(bytes));
     return environment.record;
@@ -122,11 +143,19 @@ export class InMemoryEnvironmentStore {
     const descriptor = descriptorFor(bytes);
     const existing = environment.blobs.get(blobId);
     if (existing !== undefined) {
-      if (sha256Hex(existing) !== descriptor.ciphertextSha256 || existing.byteLength !== descriptor.ciphertextBytes) {
-        throw new RelayStoreError("CONFLICT", "Environment blob already contains different ciphertext");
+      if (
+        sha256Hex(existing) !== descriptor.ciphertextSha256 ||
+        existing.byteLength !== descriptor.ciphertextBytes
+      ) {
+        throw new RelayStoreError(
+          "CONFLICT",
+          "Environment blob already contains different ciphertext",
+        );
       }
     }
-    environment.record = this.#mapState(() => recordEnvironmentBlob(environment.record, blobId, descriptor, now));
+    environment.record = this.#mapState(() =>
+      recordEnvironmentBlob(environment.record, blobId, descriptor, now),
+    );
     environment.blobs.set(blobId, Buffer.from(bytes));
     return environment.record;
   }
@@ -139,7 +168,9 @@ export class InMemoryEnvironmentStore {
   ): EnvironmentRecord {
     const environment = this.#required(environmentId);
     this.#authorize(environment.record.updateTokenDigest, updateCapability);
-    environment.record = this.#mapState(() => commitEnvironmentRevision(environment.record, revisionId, now));
+    environment.record = this.#mapState(() =>
+      commitEnvironmentRevision(environment.record, revisionId, now),
+    );
     return environment.record;
   }
 
@@ -156,7 +187,11 @@ export class InMemoryEnvironmentStore {
       throw new RelayStoreError("NOT_FOUND", "Committed revision not found");
     }
     const bytes = environment.manifests.get(revisionId);
-    if (bytes === undefined) throw new RelayStoreError("NOT_FOUND", "Revision manifest is unavailable");
+    if (bytes === undefined)
+      throw new RelayStoreError(
+        "NOT_FOUND",
+        "Revision manifest is unavailable",
+      );
     return Buffer.from(bytes);
   }
 
@@ -169,14 +204,21 @@ export class InMemoryEnvironmentStore {
     const environment = this.#required(environmentId);
     this.#authorize(environment.record.readTokenDigest, readCapability);
     this.#assertActive(environment.record, now);
-    const referencedByCommittedRevision = Object.values(environment.record.revisions).some(
+    const referencedByCommittedRevision = Object.values(
+      environment.record.revisions,
+    ).some(
       (revision) =>
         revision.status === "committed" &&
         revision.request.blobs.some((blob) => blob.blobId === blobId),
     );
-    if (!referencedByCommittedRevision) throw new RelayStoreError("NOT_FOUND", "Environment blob is not committed");
+    if (!referencedByCommittedRevision)
+      throw new RelayStoreError(
+        "NOT_FOUND",
+        "Environment blob is not committed",
+      );
     const bytes = environment.blobs.get(blobId);
-    if (bytes === undefined) throw new RelayStoreError("NOT_FOUND", "Environment blob is unavailable");
+    if (bytes === undefined)
+      throw new RelayStoreError("NOT_FOUND", "Environment blob is unavailable");
     return Buffer.from(bytes);
   }
 
@@ -189,16 +231,27 @@ export class InMemoryEnvironmentStore {
   ): EnvironmentRecord {
     const environment = this.#required(environmentId);
     if (environment.record.proposalTokenDigest === undefined) {
-      throw new RelayStoreError("NOT_FOUND", "Environment does not accept proposals");
+      throw new RelayStoreError(
+        "NOT_FOUND",
+        "Environment does not accept proposals",
+      );
     }
     this.#authorize(environment.record.proposalTokenDigest, proposalCapability);
     this.#assertActive(environment.record, now);
     assertBytesMatch(descriptor, bytes, "Proposal ciphertext");
     const existing = environment.proposals.get(descriptor.proposalId);
-    if (existing !== undefined && sha256Hex(existing) !== descriptor.ciphertextSha256) {
-      throw new RelayStoreError("CONFLICT", "Proposal id already contains different ciphertext");
+    if (
+      existing !== undefined &&
+      sha256Hex(existing) !== descriptor.ciphertextSha256
+    ) {
+      throw new RelayStoreError(
+        "CONFLICT",
+        "Proposal id already contains different ciphertext",
+      );
     }
-    environment.record = this.#mapState(() => addEnvironmentProposal(environment.record, descriptor, now));
+    environment.record = this.#mapState(() =>
+      addEnvironmentProposal(environment.record, descriptor, now),
+    );
     environment.proposals.set(descriptor.proposalId, Buffer.from(bytes));
     return environment.record;
   }
@@ -229,7 +282,11 @@ export class InMemoryEnvironmentStore {
       throw new RelayStoreError("NOT_FOUND", "Proposal not found");
     }
     const bytes = environment.proposals.get(proposalId);
-    if (bytes === undefined) throw new RelayStoreError("NOT_FOUND", "Proposal ciphertext is unavailable");
+    if (bytes === undefined)
+      throw new RelayStoreError(
+        "NOT_FOUND",
+        "Proposal ciphertext is unavailable",
+      );
     return Buffer.from(bytes);
   }
 
@@ -260,22 +317,28 @@ export class InMemoryEnvironmentStore {
 
   #required(environmentId: string): StoredEnvironment {
     const environment = this.#environments.get(environmentId);
-    if (environment === undefined) throw new RelayStoreError("NOT_FOUND", "Environment not found");
+    if (environment === undefined)
+      throw new RelayStoreError("NOT_FOUND", "Environment not found");
     return environment;
   }
 
   #authorize(expectedDigest: string, capability: string): void {
     const actual = Buffer.from(capabilityDigest(capability), "hex");
     const expected = Buffer.from(expectedDigest, "hex");
-    if (actual.byteLength !== expected.byteLength || !timingSafeEqual(actual, expected)) {
+    if (
+      actual.byteLength !== expected.byteLength ||
+      !timingSafeEqual(actual, expected)
+    ) {
       throw new RelayStoreError("UNAUTHORIZED", "Invalid capability");
     }
   }
 
   #assertActive(record: EnvironmentRecord, now: Date): void {
     const status = effectiveEnvironmentStatus(record, now);
-    if (status === "expired") throw new RelayStoreError("EXPIRED", "Environment expired");
-    if (status === "revoked") throw new RelayStoreError("REVOKED", "Environment revoked");
+    if (status === "expired")
+      throw new RelayStoreError("EXPIRED", "Environment expired");
+    if (status === "revoked")
+      throw new RelayStoreError("REVOKED", "Environment revoked");
   }
 
   #mapState<T>(operation: () => T): T {
@@ -284,8 +347,19 @@ export class InMemoryEnvironmentStore {
     } catch (error) {
       if (error instanceof Error && "code" in error) {
         const code = String(error.code);
-        if (["NOT_FOUND", "CONFLICT", "EXPIRED", "REVOKED", "PAYLOAD_TOO_LARGE"].includes(code)) {
-          throw new RelayStoreError(code as RelayStoreError["code"], error.message);
+        if (
+          [
+            "NOT_FOUND",
+            "CONFLICT",
+            "EXPIRED",
+            "REVOKED",
+            "PAYLOAD_TOO_LARGE",
+          ].includes(code)
+        ) {
+          throw new RelayStoreError(
+            code as RelayStoreError["code"],
+            error.message,
+          );
         }
       }
       throw error;
@@ -294,15 +368,24 @@ export class InMemoryEnvironmentStore {
 }
 
 function descriptorFor(bytes: Uint8Array): CiphertextDescriptor {
-  return { ciphertextSha256: sha256Hex(bytes), ciphertextBytes: bytes.byteLength };
+  return {
+    ciphertextSha256: sha256Hex(bytes),
+    ciphertextBytes: bytes.byteLength,
+  };
 }
 
 function assertBytesMatch(
-  descriptor: Pick<CiphertextDescriptor, "ciphertextSha256" | "ciphertextBytes">,
+  descriptor: Pick<
+    CiphertextDescriptor,
+    "ciphertextSha256" | "ciphertextBytes"
+  >,
   bytes: Uint8Array,
   label: string,
 ): void {
-  if (bytes.byteLength !== descriptor.ciphertextBytes || sha256Hex(bytes) !== descriptor.ciphertextSha256) {
+  if (
+    bytes.byteLength !== descriptor.ciphertextBytes ||
+    sha256Hex(bytes) !== descriptor.ciphertextSha256
+  ) {
     throw new RelayStoreError("CONFLICT", `${label} descriptor mismatch`);
   }
 }

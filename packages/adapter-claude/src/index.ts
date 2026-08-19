@@ -25,7 +25,9 @@ export async function exportCurrentClaudeCapture(
     );
   }
   const root = options.projectsRoot ?? join(homedir(), ".claude", "projects");
-  const matches = (await findJsonl(root)).filter((path) => basename(path, ".jsonl") === sessionId);
+  const matches = (await findJsonl(root)).filter(
+    (path) => basename(path, ".jsonl") === sessionId,
+  );
   if (matches.length !== 1 || matches[0] === undefined) {
     throw new Error(
       `Expected one Claude session for ${sessionId}; found ${matches.length}`,

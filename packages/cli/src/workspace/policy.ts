@@ -47,9 +47,7 @@ export function normalizedWorkspacePath(value: string): string {
   return clean;
 }
 
-export function excludedByPolicy(
-  path: string,
-): ExclusionReason | undefined {
+export function excludedByPolicy(path: string): ExclusionReason | undefined {
   const normalized = normalizedWorkspacePath(path);
   const parts = normalized.split("/");
   if (parts.some((part) => ALWAYS_EXCLUDED_DIRS.has(part))) {

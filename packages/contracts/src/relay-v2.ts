@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { MAX_CIPHERTEXT_BYTES, MAX_TTL_SECONDS, sha256Schema } from "./index.js";
+import {
+  MAX_CIPHERTEXT_BYTES,
+  MAX_TTL_SECONDS,
+  sha256Schema,
+} from "./index.js";
 
 const objectIdSchema = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{19,99}$/u);
 
@@ -81,16 +85,17 @@ export const environmentMetadataSchema = z.object({
   }),
 });
 
-export const environmentMetadataResponseSchema = environmentMetadataSchema.extend({
-  currentRevision: z
-    .object({
-      revisionId: objectIdSchema,
-      parentRevisionId: objectIdSchema.optional(),
-      manifest: ciphertextDescriptorSchema,
-      blobs: z.array(environmentBlobDescriptorSchema),
-    })
-    .nullable(),
-});
+export const environmentMetadataResponseSchema =
+  environmentMetadataSchema.extend({
+    currentRevision: z
+      .object({
+        revisionId: objectIdSchema,
+        parentRevisionId: objectIdSchema.optional(),
+        manifest: ciphertextDescriptorSchema,
+        blobs: z.array(environmentBlobDescriptorSchema),
+      })
+      .nullable(),
+  });
 
 export const proposalListResponseSchema = z.object({
   proposals: z.array(
@@ -102,12 +107,20 @@ export const proposalListResponseSchema = z.object({
 });
 
 export type CiphertextDescriptor = z.infer<typeof ciphertextDescriptorSchema>;
-export type EnvironmentBlobDescriptor = z.infer<typeof environmentBlobDescriptorSchema>;
-export type CreateEnvironmentRequest = z.infer<typeof createEnvironmentRequestSchema>;
-export type ReserveRevisionRequest = z.infer<typeof reserveRevisionRequestSchema>;
+export type EnvironmentBlobDescriptor = z.infer<
+  typeof environmentBlobDescriptorSchema
+>;
+export type CreateEnvironmentRequest = z.infer<
+  typeof createEnvironmentRequestSchema
+>;
+export type ReserveRevisionRequest = z.infer<
+  typeof reserveRevisionRequestSchema
+>;
 export type ProposalDescriptor = z.infer<typeof proposalDescriptorSchema>;
 export type EnvironmentMetadata = z.infer<typeof environmentMetadataSchema>;
-export type EnvironmentMetadataResponse = z.infer<typeof environmentMetadataResponseSchema>;
+export type EnvironmentMetadataResponse = z.infer<
+  typeof environmentMetadataResponseSchema
+>;
 export type EnvironmentStatus = z.infer<typeof environmentStatusSchema>;
 export type RevisionStatus = z.infer<typeof revisionStatusSchema>;
 export type ProposalStatus = z.infer<typeof proposalStatusSchema>;

@@ -37,7 +37,9 @@ export class EnvironmentRelayClient {
     return this.#origin;
   }
 
-  async create(request: CreateEnvironmentRequest): Promise<EnvironmentMetadataResponse> {
+  async create(
+    request: CreateEnvironmentRequest,
+  ): Promise<EnvironmentMetadataResponse> {
     return this.#metadata(
       await this.#request("/v2/environments", {
         method: "POST",
@@ -47,11 +49,17 @@ export class EnvironmentRelayClient {
     );
   }
 
-  async metadata(environmentId: string, readCapability: string): Promise<EnvironmentMetadataResponse> {
+  async metadata(
+    environmentId: string,
+    readCapability: string,
+  ): Promise<EnvironmentMetadataResponse> {
     return this.#metadata(
-      await this.#request(`/v2/environments/${encodeURIComponent(environmentId)}/meta`, {
-        headers: auth(readCapability),
-      }),
+      await this.#request(
+        `/v2/environments/${encodeURIComponent(environmentId)}/meta`,
+        {
+          headers: auth(readCapability),
+        },
+      ),
     );
   }
 
@@ -61,11 +69,17 @@ export class EnvironmentRelayClient {
     request: ReserveRevisionRequest,
   ): Promise<EnvironmentMetadataResponse> {
     return this.#metadata(
-      await this.#request(`/v2/environments/${encodeURIComponent(environmentId)}/revisions`, {
-        method: "POST",
-        headers: { ...auth(updateCapability), "content-type": "application/json" },
-        body: JSON.stringify(reserveRevisionRequestSchema.parse(request)),
-      }),
+      await this.#request(
+        `/v2/environments/${encodeURIComponent(environmentId)}/revisions`,
+        {
+          method: "POST",
+          headers: {
+            ...auth(updateCapability),
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(reserveRevisionRequestSchema.parse(request)),
+        },
+      ),
     );
   }
 
@@ -78,7 +92,11 @@ export class EnvironmentRelayClient {
     return this.#metadata(
       await this.#request(
         `/v2/environments/${encodeURIComponent(environmentId)}/revisions/${encodeURIComponent(revisionId)}/manifest`,
-        { method: "PUT", headers: auth(updateCapability), body: Buffer.from(bytes) },
+        {
+          method: "PUT",
+          headers: auth(updateCapability),
+          body: Buffer.from(bytes),
+        },
       ),
     );
   }
@@ -92,7 +110,11 @@ export class EnvironmentRelayClient {
     return this.#metadata(
       await this.#request(
         `/v2/environments/${encodeURIComponent(environmentId)}/blobs/${encodeURIComponent(blobId)}`,
-        { method: "PUT", headers: auth(updateCapability), body: Buffer.from(bytes) },
+        {
+          method: "PUT",
+          headers: auth(updateCapability),
+          body: Buffer.from(bytes),
+        },
       ),
     );
   }
@@ -143,14 +165,20 @@ export class EnvironmentRelayClient {
     bytes: Uint8Array,
   ): Promise<EnvironmentMetadataResponse> {
     return this.#metadata(
-      await this.#request(`/v2/environments/${encodeURIComponent(environmentId)}/proposals`, {
-        method: "POST",
-        headers: { ...auth(proposalCapability), "content-type": "application/json" },
-        body: JSON.stringify({
-          descriptor: proposalDescriptorSchema.parse(descriptor),
-          ciphertextBase64: Buffer.from(bytes).toString("base64"),
-        }),
-      }),
+      await this.#request(
+        `/v2/environments/${encodeURIComponent(environmentId)}/proposals`,
+        {
+          method: "POST",
+          headers: {
+            ...auth(proposalCapability),
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            descriptor: proposalDescriptorSchema.parse(descriptor),
+            ciphertextBase64: Buffer.from(bytes).toString("base64"),
+          }),
+        },
+      ),
     );
   }
 
@@ -187,7 +215,10 @@ export class EnvironmentRelayClient {
         `/v2/environments/${encodeURIComponent(environmentId)}/proposals/${encodeURIComponent(proposalId)}/status`,
         {
           method: "POST",
-          headers: { ...auth(inboxCapability), "content-type": "application/json" },
+          headers: {
+            ...auth(inboxCapability),
+            "content-type": "application/json",
+          },
           body: JSON.stringify({ status }),
         },
       ),
@@ -199,10 +230,13 @@ export class EnvironmentRelayClient {
     revokeCapability: string,
   ): Promise<EnvironmentMetadataResponse> {
     return this.#metadata(
-      await this.#request(`/v2/environments/${encodeURIComponent(environmentId)}`, {
-        method: "DELETE",
-        headers: auth(revokeCapability),
-      }),
+      await this.#request(
+        `/v2/environments/${encodeURIComponent(environmentId)}`,
+        {
+          method: "DELETE",
+          headers: auth(revokeCapability),
+        },
+      ),
     );
   }
 
@@ -223,11 +257,17 @@ export class EnvironmentRelayClient {
     await ensureOk(response);
     const declared = Number(response.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > 50 * 1024 * 1024) {
-      throw new EnvironmentRelayClientError(413, "Ciphertext exceeds client limit");
+      throw new EnvironmentRelayClientError(
+        413,
+        "Ciphertext exceeds client limit",
+      );
     }
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength > 50 * 1024 * 1024) {
-      throw new EnvironmentRelayClientError(413, "Ciphertext exceeds client limit");
+      throw new EnvironmentRelayClientError(
+        413,
+        "Ciphertext exceeds client limit",
+      );
     }
     return bytes;
   }
@@ -238,7 +278,9 @@ function auth(capability: string): Record<string, string> {
 }
 
 function isLoopback(hostname: string): boolean {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  return (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
+  );
 }
 
 async function ensureOk(response: Response): Promise<void> {

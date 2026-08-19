@@ -13,7 +13,9 @@ const propose = "propose_" + "p".repeat(37);
 const inbox = "inbox_" + "i".repeat(39);
 const revoke = "revoke_" + "v".repeat(38);
 
-async function createEnvironment(handler: (request: Request) => Promise<Response>) {
+async function createEnvironment(
+  handler: (request: Request) => Promise<Response>,
+) {
   return handler(
     new Request("http://relay.test/v2/environments", {
       method: "POST",
@@ -40,46 +42,70 @@ describe("v2 environment HTTP routes", () => {
     const manifest = Buffer.from("encrypted-manifest");
     const blob = Buffer.from("encrypted-blob");
     const reserved = await handler(
-      new Request(`http://relay.test/v2/environments/${environmentId}/revisions`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${update}`, "content-type": "application/json" },
-        body: JSON.stringify({
-          revisionId,
-          manifest: { ciphertextSha256: sha256Hex(manifest), ciphertextBytes: manifest.byteLength },
-          blobs: [{ blobId, ciphertextSha256: sha256Hex(blob), ciphertextBytes: blob.byteLength }],
-        }),
-      }),
+      new Request(
+        `http://relay.test/v2/environments/${environmentId}/revisions`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${update}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            revisionId,
+            manifest: {
+              ciphertextSha256: sha256Hex(manifest),
+              ciphertextBytes: manifest.byteLength,
+            },
+            blobs: [
+              {
+                blobId,
+                ciphertextSha256: sha256Hex(blob),
+                ciphertextBytes: blob.byteLength,
+              },
+            ],
+          }),
+        },
+      ),
     );
     expect(reserved.status).toBe(201);
     expect(
       (
         await handler(
-          new Request(`http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/manifest`, {
-            method: "PUT",
-            headers: { authorization: `Bearer ${update}` },
-            body: manifest,
-          }),
+          new Request(
+            `http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/manifest`,
+            {
+              method: "PUT",
+              headers: { authorization: `Bearer ${update}` },
+              body: manifest,
+            },
+          ),
         )
       ).status,
     ).toBe(200);
     expect(
       (
         await handler(
-          new Request(`http://relay.test/v2/environments/${environmentId}/blobs/${blobId}`, {
-            method: "PUT",
-            headers: { authorization: `Bearer ${update}` },
-            body: blob,
-          }),
+          new Request(
+            `http://relay.test/v2/environments/${environmentId}/blobs/${blobId}`,
+            {
+              method: "PUT",
+              headers: { authorization: `Bearer ${update}` },
+              body: blob,
+            },
+          ),
         )
       ).status,
     ).toBe(200);
     expect(
       (
         await handler(
-          new Request(`http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/commit`, {
-            method: "POST",
-            headers: { authorization: `Bearer ${update}` },
-          }),
+          new Request(
+            `http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/commit`,
+            {
+              method: "POST",
+              headers: { authorization: `Bearer ${update}` },
+            },
+          ),
         )
       ).status,
     ).toBe(200);
@@ -89,17 +115,27 @@ describe("v2 environment HTTP routes", () => {
         headers: { authorization: `Bearer ${read}` },
       }),
     );
-    expect((await meta.json() as { currentRevisionId: string }).currentRevisionId).toBe(revisionId);
+    expect(
+      ((await meta.json()) as { currentRevisionId: string }).currentRevisionId,
+    ).toBe(revisionId);
     const downloadedManifest = await handler(
-      new Request(`http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/manifest`, {
-        headers: { authorization: `Bearer ${read}` },
-      }),
+      new Request(
+        `http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/manifest`,
+        {
+          headers: { authorization: `Bearer ${read}` },
+        },
+      ),
     );
-    expect(Buffer.from(await downloadedManifest.arrayBuffer())).toEqual(manifest);
+    expect(Buffer.from(await downloadedManifest.arrayBuffer())).toEqual(
+      manifest,
+    );
     const downloadedBlob = await handler(
-      new Request(`http://relay.test/v2/environments/${environmentId}/blobs/${blobId}`, {
-        headers: { authorization: `Bearer ${read}` },
-      }),
+      new Request(
+        `http://relay.test/v2/environments/${environmentId}/blobs/${blobId}`,
+        {
+          headers: { authorization: `Bearer ${read}` },
+        },
+      ),
     );
     expect(Buffer.from(await downloadedBlob.arrayBuffer())).toEqual(blob);
   });
@@ -110,44 +146,101 @@ describe("v2 environment HTTP routes", () => {
     });
     await createEnvironment(handler);
     const manifest = Buffer.from("m");
-    await handler(new Request(`http://relay.test/v2/environments/${environmentId}/revisions`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${update}`, "content-type": "application/json" },
-      body: JSON.stringify({ revisionId, manifest: { ciphertextSha256: sha256Hex(manifest), ciphertextBytes: 1 }, blobs: [] }),
-    }));
-    await handler(new Request(`http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/manifest`, {
-      method: "PUT", headers: { authorization: `Bearer ${update}` }, body: manifest,
-    }));
-    await handler(new Request(`http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/commit`, {
-      method: "POST", headers: { authorization: `Bearer ${update}` },
-    }));
+    await handler(
+      new Request(
+        `http://relay.test/v2/environments/${environmentId}/revisions`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${update}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            revisionId,
+            manifest: {
+              ciphertextSha256: sha256Hex(manifest),
+              ciphertextBytes: 1,
+            },
+            blobs: [],
+          }),
+        },
+      ),
+    );
+    await handler(
+      new Request(
+        `http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/manifest`,
+        {
+          method: "PUT",
+          headers: { authorization: `Bearer ${update}` },
+          body: manifest,
+        },
+      ),
+    );
+    await handler(
+      new Request(
+        `http://relay.test/v2/environments/${environmentId}/revisions/${revisionId}/commit`,
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${update}` },
+        },
+      ),
+    );
 
     const ciphertext = Buffer.from("proposal-ciphertext");
-    const submitted = await handler(new Request(`http://relay.test/v2/environments/${environmentId}/proposals`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${propose}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        descriptor: {
-          proposalId,
-          baseRevisionId: revisionId,
-          ciphertextSha256: sha256Hex(ciphertext),
-          ciphertextBytes: ciphertext.byteLength,
-          ephemeralPublicKey: "k".repeat(43),
+    const submitted = await handler(
+      new Request(
+        `http://relay.test/v2/environments/${environmentId}/proposals`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${propose}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            descriptor: {
+              proposalId,
+              baseRevisionId: revisionId,
+              ciphertextSha256: sha256Hex(ciphertext),
+              ciphertextBytes: ciphertext.byteLength,
+              ephemeralPublicKey: "k".repeat(43),
+            },
+            ciphertextBase64: ciphertext.toString("base64"),
+          }),
         },
-        ciphertextBase64: ciphertext.toString("base64"),
-      }),
-    }));
+      ),
+    );
     expect(submitted.status).toBe(201);
-    expect((await handler(new Request(`http://relay.test/v2/environments/${environmentId}/proposals`, {
-      headers: { authorization: `Bearer ${propose}` },
-    }))).status).toBe(401);
-    const listed = await handler(new Request(`http://relay.test/v2/environments/${environmentId}/proposals`, {
-      headers: { authorization: `Bearer ${inbox}` },
-    }));
-    expect((await listed.json() as { proposals: unknown[] }).proposals).toHaveLength(1);
-    const downloaded = await handler(new Request(`http://relay.test/v2/environments/${environmentId}/proposals/${proposalId}`, {
-      headers: { authorization: `Bearer ${inbox}` },
-    }));
+    expect(
+      (
+        await handler(
+          new Request(
+            `http://relay.test/v2/environments/${environmentId}/proposals`,
+            {
+              headers: { authorization: `Bearer ${propose}` },
+            },
+          ),
+        )
+      ).status,
+    ).toBe(401);
+    const listed = await handler(
+      new Request(
+        `http://relay.test/v2/environments/${environmentId}/proposals`,
+        {
+          headers: { authorization: `Bearer ${inbox}` },
+        },
+      ),
+    );
+    expect(
+      ((await listed.json()) as { proposals: unknown[] }).proposals,
+    ).toHaveLength(1);
+    const downloaded = await handler(
+      new Request(
+        `http://relay.test/v2/environments/${environmentId}/proposals/${proposalId}`,
+        {
+          headers: { authorization: `Bearer ${inbox}` },
+        },
+      ),
+    );
     expect(Buffer.from(await downloaded.arrayBuffer())).toEqual(ciphertext);
   });
 });

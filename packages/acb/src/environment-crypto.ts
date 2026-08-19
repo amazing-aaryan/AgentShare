@@ -53,13 +53,22 @@ export function decryptEnvironmentObject(
   context: EnvironmentObjectContext,
 ): Uint8Array {
   const envelope = Buffer.from(encrypted);
-  if (envelope.byteLength < HEADER_BYTES) throw new Error("Invalid AgentShare environment envelope");
+  if (envelope.byteLength < HEADER_BYTES)
+    throw new Error("Invalid AgentShare environment envelope");
   const magic = envelope.subarray(0, MAGIC.byteLength);
-  if (!timingSafeEqual(magic, MAGIC)) throw new Error("Unknown AgentShare environment envelope version");
-  const nonce = envelope.subarray(MAGIC.byteLength, MAGIC.byteLength + NONCE_BYTES);
+  if (!timingSafeEqual(magic, MAGIC))
+    throw new Error("Unknown AgentShare environment envelope version");
+  const nonce = envelope.subarray(
+    MAGIC.byteLength,
+    MAGIC.byteLength + NONCE_BYTES,
+  );
   const tag = envelope.subarray(MAGIC.byteLength + NONCE_BYTES, HEADER_BYTES);
   const ciphertext = envelope.subarray(HEADER_BYTES);
-  const decipher = createDecipheriv("aes-256-gcm", deriveEnvironmentObjectKey(masterKey, context), nonce);
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    deriveEnvironmentObjectKey(masterKey, context),
+    nonce,
+  );
   decipher.setAAD(canonicalEnvironmentAad(context));
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
@@ -69,7 +78,8 @@ export function deriveEnvironmentObjectKey(
   masterKey: Uint8Array,
   context: EnvironmentObjectContext,
 ): Uint8Array {
-  if (masterKey.byteLength !== KEY_BYTES) throw new RangeError("Environment master key must be 32 bytes");
+  if (masterKey.byteLength !== KEY_BYTES)
+    throw new RangeError("Environment master key must be 32 bytes");
   const info = Buffer.from(
     `agentshare/environment/${context.kind}/${context.revisionId}/${context.objectId}`,
     "utf8",

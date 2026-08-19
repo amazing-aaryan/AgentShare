@@ -33,8 +33,12 @@ export type EncryptedProposal = ProposalEncryptionContext & {
 export function generateProposalKeyPair(): ProposalKeyPair {
   const { publicKey, privateKey } = generateKeyPairSync("x25519");
   return {
-    publicKey: publicKey.export({ type: "spki", format: "der" }).toString("base64url"),
-    privateKey: privateKey.export({ type: "pkcs8", format: "der" }).toString("base64url"),
+    publicKey: publicKey
+      .export({ type: "spki", format: "der" })
+      .toString("base64url"),
+    privateKey: privateKey
+      .export({ type: "pkcs8", format: "der" })
+      .toString("base64url"),
   };
 }
 
@@ -70,9 +74,11 @@ export function decryptProposalForOwner(
   ownerPrivateKey: string,
 ): Uint8Array {
   const envelope = Buffer.from(encrypted.envelope);
-  if (envelope.byteLength < HEADER_BYTES) throw new Error("Invalid AgentShare proposal envelope");
+  if (envelope.byteLength < HEADER_BYTES)
+    throw new Error("Invalid AgentShare proposal envelope");
   const magic = envelope.subarray(0, MAGIC.byteLength);
-  if (!timingSafeEqual(magic, MAGIC)) throw new Error("Unknown AgentShare proposal envelope version");
+  if (!timingSafeEqual(magic, MAGIC))
+    throw new Error("Unknown AgentShare proposal envelope version");
   const shared = diffieHellman({
     privateKey: decodePrivateKey(ownerPrivateKey),
     publicKey: decodePublicKey(encrypted.ephemeralPublicKey),
@@ -81,16 +87,26 @@ export function decryptProposalForOwner(
     environmentId: encrypted.environmentId,
     proposalId: encrypted.proposalId,
   };
-  const nonce = envelope.subarray(MAGIC.byteLength, MAGIC.byteLength + NONCE_BYTES);
+  const nonce = envelope.subarray(
+    MAGIC.byteLength,
+    MAGIC.byteLength + NONCE_BYTES,
+  );
   const tag = envelope.subarray(MAGIC.byteLength + NONCE_BYTES, HEADER_BYTES);
   const ciphertext = envelope.subarray(HEADER_BYTES);
-  const decipher = createDecipheriv("aes-256-gcm", deriveProposalKey(shared, context), nonce);
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    deriveProposalKey(shared, context),
+    nonce,
+  );
   decipher.setAAD(proposalAad(context));
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
 
-function deriveProposalKey(shared: Uint8Array, context: ProposalEncryptionContext): Buffer {
+function deriveProposalKey(
+  shared: Uint8Array,
+  context: ProposalEncryptionContext,
+): Buffer {
   return Buffer.from(
     hkdfSync(
       "sha256",
