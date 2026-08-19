@@ -1,7 +1,4 @@
-import {
-  buildEnvironmentUrl,
-  keyFromFragment,
-} from "@agentshare/acb";
+import { buildEnvironmentUrl, keyFromFragment } from "@agentshare/acb";
 import { exportCurrentClaudeCapture } from "@agentshare/adapter-claude";
 import { exportCurrentCodexCapture } from "@agentshare/adapter-codex";
 import {
@@ -25,6 +22,7 @@ import {
   SHARE_SCOPE_OPTIONS,
   type SelectedShareOptions,
 } from "../tui/share-flow.js";
+import { reviewProposalInbox } from "./inbox-v2.js";
 
 const DEFAULT_RELAY =
   "https://agentshare-relay.carnation-vermicelli.workers.dev";
@@ -42,9 +40,10 @@ export async function shareCurrentV2(
   source: "codex" | "claude",
   options: ShareV2Options = {},
 ): Promise<CreateEnvironmentResult> {
-  const capture = source === "codex"
-    ? await exportCurrentCodexCapture()
-    : await exportCurrentClaudeCapture();
+  const capture =
+    source === "codex"
+      ? await exportCurrentCodexCapture()
+      : await exportCurrentClaudeCapture();
   return shareCaptureV2(capture, options);
 }
 
@@ -52,12 +51,21 @@ export async function shareCaptureV2(
   capture: HostCapture,
   options: ShareV2Options = {},
 ): Promise<CreateEnvironmentResult> {
-  const client = options.client ?? new EnvironmentRelayClient(
-    options.relayOrigin ?? process.env.AGENTSHARE_RELAY ?? DEFAULT_RELAY,
-  );
-  const existing = options.existingEnvironmentId === undefined
-    ? await findOwnedEnvironmentForWorkspace(capture.workspaceRoot, options.statePath)
-    : await findOwnedEnvironment(options.existingEnvironmentId, options.statePath);
+  const client =
+    options.client ??
+    new EnvironmentRelayClient(
+      options.relayOrigin ?? process.env.AGENTSHARE_RELAY ?? DEFAULT_RELAY,
+    );
+  const existing =
+    options.existingEnvironmentId === undefined
+      ? await findOwnedEnvironmentForWorkspace(
+          capture.workspaceRoot,
+          options.statePath,
+        )
+      : await findOwnedEnvironment(
+          options.existingEnvironmentId,
+          options.statePath,
+        );
 
   if (existing !== undefined && options.selection === undefined) {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -67,14 +75,25 @@ export async function shareCaptureV2(
       `AgentShare - ${existing.environmentId}`,
       [
         "Update shared environment",
+        "Review proposed changes",
         "Copy existing link",
         "Create separate share",
       ],
       0,
     );
     if (action === 0) return updateEnvironment(capture, existing, client, options);
-    if (action === 1) return existingResult(existing);
-  } else if (existing !== undefined && options.existingEnvironmentId !== undefined) {
+    if (action === 1) {
+      await reviewProposalInbox(capture.sourceAgent, options.statePath);
+      const refreshed =
+        (await findOwnedEnvironment(existing.environmentId, options.statePath)) ??
+        existing;
+      return existingResult(refreshed);
+    }
+    if (action === 2) return existingResult(existing);
+  } else if (
+    existing !== undefined &&
+    options.existingEnvironmentId !== undefined
+  ) {
     return updateEnvironment(capture, existing, client, options);
   }
 
@@ -128,12 +147,19 @@ async function updateEnvironment(
   client: EnvironmentRelayClient,
   options: ShareV2Options,
 ): Promise<CreateEnvironmentResult> {
-  const published = await publishEnvironmentRevision(capture, environment, client, {
-    ...(options.statePath === undefined ? {} : { statePath: options.statePath }),
-    ...(options.workspaceOptions === undefined
-      ? {}
-      : { workspaceOptions: options.workspaceOptions }),
-  });
+  const published = await publishEnvironmentRevision(
+    capture,
+    environment,
+    client,
+    {
+      ...(options.statePath === undefined
+        ? {}
+        : { statePath: options.statePath }),
+      ...(options.workspaceOptions === undefined
+        ? {}
+        : { workspaceOptions: options.workspaceOptions }),
+    },
+  );
   return {
     environment: published.environment,
     url: ownedEnvironmentUrl(published.environment),
@@ -141,7 +167,9 @@ async function updateEnvironment(
   };
 }
 
-function existingResult(environment: OwnedEnvironment): CreateEnvironmentResult {
+function existingResult(
+  environment: OwnedEnvironment,
+): CreateEnvironmentResult {
   return {
     environment,
     url: ownedEnvironmentUrl(environment),
