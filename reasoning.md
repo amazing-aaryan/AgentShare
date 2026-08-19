@@ -164,3 +164,8 @@ live 404 window; strict real-agent gates, anonymous asset verification, and live
 browser QA all passed. **Impact:** Expanded reviewed Codex/Claude support,
 pre-link validation, and the complete risk-aware recipient walkthrough are now
 public. Rollback remains v0.1.8 plus the prior Worker deployment.
+
+## [2026-08-19 11:35] Blocked v0.1.10 publication on expired Claude OAuth
+**Decision:** Deploy and verify handoff Worker, but stop release publication after strict gate failed Claude real-agent tests.
+**Why:** Claude Code `2.1.210` is reviewed, but OAuth session expired and could not refresh; production rules require zero failed/skipped real-agent tests and forbid faking release success.
+**Impact:** Handoff deployment `385fd884-d162-4ccc-9934-9fe59d2f1646` is live; rerun strict gate and all downstream immutable artifact/publication checks after `claude auth login`.
