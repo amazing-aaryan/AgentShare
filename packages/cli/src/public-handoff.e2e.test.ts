@@ -50,7 +50,10 @@ describe("complete AgentShare handoff", () => {
           ? `http://127.0.0.1:${address.port}`
           : undefined);
       if (origin === undefined) throw new Error("Missing E2E relay address");
-      if (configuredOrigin !== undefined && configuredHandoffOrigin === undefined) {
+      if (
+        configuredOrigin !== undefined &&
+        configuredHandoffOrigin === undefined
+      ) {
         throw new Error(
           "AGENTSHARE_E2E_HANDOFF is required with AGENTSHARE_E2E_RELAY",
         );
@@ -60,7 +63,9 @@ describe("complete AgentShare handoff", () => {
         configuredOrigin !== undefined &&
         new URL(handoffOrigin).origin === new URL(origin).origin
       ) {
-        throw new Error("Production relay and handoff origins must be distinct");
+        throw new Error(
+          "Production relay and handoff origins must be distinct",
+        );
       }
       const url = await shareCommand({
         inputPath,
@@ -127,7 +132,10 @@ describe("complete AgentShare handoff", () => {
   it.skipIf(configuredOrigin === undefined)(
     "enforces production replay, expiry, concurrent upload, and handoff CORS semantics",
     async () => {
-      if (configuredOrigin === undefined || configuredHandoffOrigin === undefined)
+      if (
+        configuredOrigin === undefined ||
+        configuredHandoffOrigin === undefined
+      )
         return;
       const client = new RelayClient(configuredOrigin);
       const shareId = randomCapability(18);

@@ -2,7 +2,8 @@
 
 AgentShare v0.1.10 uses two public Workers with different responsibilities:
 
-- `agentshare-relay` stores ciphertext and capability digests in Durable Objects.
+- `agentshare-relay` stores ciphertext and capability digests in Durable
+  Objects.
 - `agentshare-handoff` serves the trusted static browser page that can read the
   capability fragment. It has no ciphertext, Durable Object, or quota bindings.
 
