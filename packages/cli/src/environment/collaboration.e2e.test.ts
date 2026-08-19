@@ -22,8 +22,12 @@ describe("AgentShare v2 collaboration journey", () => {
     await writeFile(join(workspace, "value.txt"), "one\n", "utf8");
 
     const handler = createRelayHandler(new InMemoryRelayStore());
-    const fetchImpl: typeof fetch = (input, init) => handler(new Request(input, init));
-    const client = new EnvironmentRelayClient("http://127.0.0.1:8787", fetchImpl);
+    const fetchImpl: typeof fetch = (input, init) =>
+      handler(new Request(input, init));
+    const client = new EnvironmentRelayClient(
+      "http://127.0.0.1:8787",
+      fetchImpl,
+    );
     const capture = {
       sourceAgent: "codex" as const,
       title: "demo",
