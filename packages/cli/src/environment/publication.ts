@@ -126,7 +126,9 @@ export async function createEnvironmentFromCapture(
     includeWorkspace: options.includeWorkspace,
     proposalsEnabled: options.proposalsEnabled,
     now: now(),
-    workspaceOptions: options.workspaceOptions,
+    ...(options.workspaceOptions === undefined
+      ? {}
+      : { workspaceOptions: options.workspaceOptions }),
   });
   environment = await publishPreparedRevision(
     environment,
@@ -165,7 +167,9 @@ export async function publishEnvironmentRevision(
     includeWorkspace: environment.sharePolicy.includeWorkspace,
     proposalsEnabled: environment.sharePolicy.proposalsEnabled,
     now: options.now ?? new Date(),
-    workspaceOptions: options.workspaceOptions,
+    ...(options.workspaceOptions === undefined
+      ? {}
+      : { workspaceOptions: options.workspaceOptions }),
   });
   const published = await publishPreparedRevision(
     environment,
