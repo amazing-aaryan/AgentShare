@@ -14,7 +14,7 @@ afterEach(async () => {
 });
 
 describe("host integrations", () => {
-  it("installs exact Claude /share and explicit Codex $agentshare idempotently", async () => {
+  it("installs explicit creator skills and automatic direct-paste receiver skills idempotently", async () => {
     const root = await mkdtemp(join(tmpdir(), "agentshare-integration-"));
     directories.push(root);
     const roots = {
@@ -23,15 +23,27 @@ describe("host integrations", () => {
     };
     await installIntegrations(roots);
     await installIntegrations(roots);
-    expect(
-      await readFile(join(roots.claudeSkills, "share", "SKILL.md"), "utf8"),
-    ).toContain("name: share");
-    expect(
-      await readFile(
-        join(roots.codexSkills, "agentshare", "agents", "openai.yaml"),
-        "utf8",
-      ),
-    ).toContain("allow_implicit_invocation: false");
+    const claudeCreator = await readFile(
+      join(roots.claudeSkills, "share", "SKILL.md"),
+      "utf8",
+    );
+    const claudeReceiver = await readFile(
+      join(roots.claudeSkills, "agentshare", "SKILL.md"),
+      "utf8",
+    );
+    const codexCreator = await readFile(
+      join(roots.codexSkills, "agentshare", "agents", "openai.yaml"),
+      "utf8",
+    );
+    const codexReceiver = await readFile(
+      join(roots.codexSkills, "agentshare-receive", "agents", "openai.yaml"),
+      "utf8",
+    );
+    expect(claudeCreator).toContain("disable-model-invocation: true");
+    expect(claudeReceiver).toContain("/e/");
+    expect(claudeReceiver).toContain("agentshare ask");
+    expect(codexCreator).toContain("allow_implicit_invocation: false");
+    expect(codexReceiver).toContain("allow_implicit_invocation: true");
     await removeIntegrations(roots);
   });
 
