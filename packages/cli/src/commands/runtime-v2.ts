@@ -1,8 +1,8 @@
+import { resumePendingRevision } from "../environment/publication.js";
 import { EnvironmentRelayClient } from "../environment/relay-client.js";
 import {
   loadEnvironmentState,
   removeOwnedEnvironment,
-  resumePendingRevision,
   type AttachedEnvironment,
 } from "../environment/state.js";
 
