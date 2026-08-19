@@ -1,0 +1,32 @@
+name: format-production-readiness
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - fix/handoff-trust-and-lifecycle
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write docs/operations/cloudflare-deployment.md docs/releases/v0.1.10-release-verification.md packages/cli/src/public-handoff.e2e.test.ts
+      - name: Commit formatting if changed
+        shell: bash
+        run: |
+          if git diff --quiet -- docs/operations/cloudflare-deployment.md docs/releases/v0.1.10-release-verification.md packages/cli/src/public-handoff.e2e.test.ts; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/operations/cloudflare-deployment.md docs/releases/v0.1.10-release-verification.md packages/cli/src/public-handoff.e2e.test.ts
+          git commit -m "style: format production readiness changes"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
