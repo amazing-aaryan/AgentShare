@@ -29,7 +29,7 @@ export async function buildWorkspaceSnapshot(
   const root = await discoverWorkspaceRoot(cwd);
   const maxFileBytes = options.maxFileBytes ?? MAX_RESOURCE_BYTES;
   const enumeration = await enumerateWorkspace(root, {
-    preferGit: options.preferGit,
+    ...(options.preferGit === undefined ? {} : { preferGit: options.preferGit }),
   });
   const files: WorkspaceSnapshotFile[] = [];
   const excluded = [...enumeration.excluded];
