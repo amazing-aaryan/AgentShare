@@ -7,6 +7,7 @@ import {
   type CreateEnvironmentResult,
   type HostCapture,
 } from "../environment/publication.js";
+import { previewEnvironmentCapture } from "../environment/preview.js";
 import { EnvironmentRelayClient } from "../environment/relay-client.js";
 import {
   findOwnedEnvironment,
@@ -101,6 +102,11 @@ export async function shareCaptureV2(
   }
 
   const selection = options.selection ?? (await interactiveSelection());
+  await reviewBeforePublication(
+    capture,
+    selection,
+    options.workspaceOptions,
+  );
   return createEnvironmentFromCapture(capture, {
     client,
     ttlSeconds: selection.ttlSeconds,
@@ -136,14 +142,75 @@ async function interactiveSelection(): Promise<SelectedShareOptions> {
     SHARE_EXPIRY_OPTIONS,
     defaults.expiry,
   );
-  const selection = selectionToShareOptions({ scope, access, expiry });
-  const confirm = await chooseOption(
-    "AgentShare - Ready to create encrypted share",
-    ["Create share", "Cancel"],
-    0,
-  );
-  if (confirm !== 0) throw new Error("AgentShare cancelled");
-  return selection;
+  return selectionToShareOptions({ scope, access, expiry });
+}
+
+async function reviewBeforePublication(
+  capture: HostCapture,
+  selection: SelectedShareOptions,
+  workspaceOptions?: { preferGit?: boolean; maxFileBytes?: number },
+): Promise<void> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return;
+  const preview = await previewEnvironmentCapture(capture, {
+    includeConversation: selection.includeConversation,
+    includeWorkspace: selection.includeWorkspace,
+    proposalsEnabled: selection.proposalsEnabled,
+    ...(workspaceOptions === undefined ? {} : { workspaceOptions }),
+  });
+  while (true) {
+    const summary = [
+      "AgentShare - Share summary",
+      "",
+      `Project: ${capture.title}`,
+      `Conversation events: ${preview.summary.conversationEvents}`,
+      `Files: ${preview.summary.files}`,
+      `Workspace bytes: ${preview.summary.totalWorkspaceBytes}`,
+      `Excluded files: ${preview.summary.excludedFiles}`,
+      `Secret redactions: ${preview.summary.redactions}`,
+      `Access: ${selection.proposalsEnabled ? "Read + propose changes" : "Read only"}`,
+      `Expires in: ${selection.ttlSeconds / 3600} hour${selection.ttlSeconds === 3600 ? "" : "s"}`,
+    ].join("\n");
+    const action = await chooseOption(
+      summary,
+      [
+        "Create share",
+        "Review included files",
+        "Review exclusions and redactions",
+        "Cancel",
+      ],
+      0,
+    );
+    if (action === 0) return;
+    if (action === 1) {
+      await chooseOption(
+        `Included files (${preview.includedPaths.length})\n\n${preview.includedPaths.join("\n") || "<none>"}`,
+        ["Back"],
+        0,
+      );
+      continue;
+    }
+    if (action === 2) {
+      const excluded = preview.excluded.map(
+        (item) => `${item.path} - ${item.reason}`,
+      );
+      const findings = preview.findings.map(
+        (item) => `${item.kind} - ${item.location} - ${item.redactedPreview}`,
+      );
+      await chooseOption(
+        [
+          `Excluded (${excluded.length})`,
+          ...excluded,
+          "",
+          `Redactions (${findings.length})`,
+          ...findings,
+        ].join("\n"),
+        ["Back"],
+        0,
+      );
+      continue;
+    }
+    throw new Error("AgentShare cancelled");
+  }
 }
 
 async function updateEnvironment(
@@ -152,6 +219,19 @@ async function updateEnvironment(
   client: EnvironmentRelayClient,
   options: ShareV2Options,
 ): Promise<CreateEnvironmentResult> {
+  await reviewBeforePublication(
+    capture,
+    {
+      includeConversation: environment.sharePolicy.includeConversation,
+      includeWorkspace: environment.sharePolicy.includeWorkspace,
+      proposalsEnabled: environment.sharePolicy.proposalsEnabled,
+      ttlSeconds: Math.max(
+        0,
+        Math.round((Date.parse(environment.expiresAt) - Date.now()) / 1000),
+      ),
+    },
+    options.workspaceOptions,
+  );
   const published = await publishEnvironmentRevision(
     capture,
     environment,
