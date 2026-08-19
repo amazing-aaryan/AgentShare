@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  captureProcess,
   claudeArgs,
   codexArgs,
   discoverUserSkills,
@@ -37,33 +38,32 @@ export async function runEnvironmentTarget(
   try {
     await verifyTarget(target);
     const executable = resolveAgentExecutable(target);
+    await verifyEnvironmentMcpSupport(target, executable);
     const cliPath = process.argv[1];
-    if (cliPath === undefined) throw new Error("AgentShare CLI entrypoint is unavailable");
-    const args = target === "codex"
-      ? codexEnvironmentArgs(
-          workspace,
-          environmentId,
-          process.execPath,
-          cliPath,
-          options,
-          await discoverUserSkills(),
-        )
-      : claudeEnvironmentArgs(
-          environmentId,
-          process.execPath,
-          cliPath,
-          options,
-        );
-    const child = spawn(
-      executable.command,
-      [...executable.prefixArgs, ...args],
-      {
-        cwd: workspace,
-        env: safeEnvironment(),
-        stdio: ["pipe", "pipe", "pipe"],
-        windowsHide: true,
-      },
-    );
+    if (cliPath === undefined)
+      throw new Error("AgentShare CLI entrypoint is unavailable");
+    const args =
+      target === "codex"
+        ? codexEnvironmentArgs(
+            workspace,
+            environmentId,
+            process.execPath,
+            cliPath,
+            options,
+            await discoverUserSkills(),
+          )
+        : claudeEnvironmentArgs(
+            environmentId,
+            process.execPath,
+            cliPath,
+            options,
+          );
+    const child = spawn(executable.command, [...executable.prefixArgs, ...args], {
+      cwd: workspace,
+      env: safeEnvironment(),
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
     let output = "";
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -76,7 +76,10 @@ export async function runEnvironmentTarget(
       process.stderr.write(sanitizeTerminalText(chunk));
     });
     child.stdin.end(prompt);
-    return { exitCode: await waitForTargetClose(child), output: output.trim() };
+    return {
+      exitCode: await waitForTargetClose(child),
+      output: output.trim(),
+    };
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
@@ -116,7 +119,9 @@ export function claudeEnvironmentArgs(
   const args = [...claudeArgs()];
   const configIndex = args.indexOf("--mcp-config");
   if (configIndex === -1 || args[configIndex + 1] === undefined) {
-    throw new Error("Claude AgentShare launcher is missing MCP configuration support");
+    throw new Error(
+      "Claude AgentShare launcher is missing MCP configuration support",
+    );
   }
   args[configIndex + 1] = JSON.stringify({
     mcpServers: {
@@ -131,6 +136,36 @@ export function claudeEnvironmentArgs(
     MCP_TOOLS.map((name) => `mcp__agentshare__${name}`).join(","),
   );
   return args;
+}
+
+async function verifyEnvironmentMcpSupport(
+  target: TargetAgent,
+  executable: { command: string; prefixArgs: string[] },
+): Promise<void> {
+  if (target === "claude") {
+    const help = await captureProcess(executable.command, [
+      ...executable.prefixArgs,
+      "--help",
+    ]);
+    for (const required of ["--mcp-config", "--allowedTools"]) {
+      if (!help.includes(required)) {
+        throw new Error(
+          `claude no longer advertises required AgentShare MCP control ${required}; refusing to weaken isolation`,
+        );
+      }
+    }
+    return;
+  }
+  const help = await captureProcess(executable.command, [
+    ...executable.prefixArgs,
+    "mcp",
+    "--help",
+  ]);
+  if (!/\bmcp\b/iu.test(help) && !/model context protocol/iu.test(help)) {
+    throw new Error(
+      "codex no longer advertises MCP client support; refusing to weaken AgentShare isolation",
+    );
+  }
 }
 
 function internalMcpArgs(
