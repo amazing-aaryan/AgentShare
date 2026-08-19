@@ -7,8 +7,16 @@ import { previewEnvironmentCapture } from "./preview.js";
 describe("environment publication preview", () => {
   it("reports included files, exclusions, and redactions without contacting a relay", async () => {
     const root = await mkdtemp(join(tmpdir(), "agentshare-preview-"));
-    await writeFile(join(root, "safe.txt"), "api_key=abcdefghijklmnop\n", "utf8");
-    await writeFile(join(root, ".env"), "PASSWORD=secretsecretsecret\n", "utf8");
+    await writeFile(
+      join(root, "safe.txt"),
+      "api_key=abcdefghijklmnop\n",
+      "utf8",
+    );
+    await writeFile(
+      join(root, ".env"),
+      "PASSWORD=secretsecretsecret\n",
+      "utf8",
+    );
     const preview = await previewEnvironmentCapture(
       {
         sourceAgent: "codex",

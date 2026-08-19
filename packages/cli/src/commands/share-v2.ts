@@ -102,11 +102,7 @@ export async function shareCaptureV2(
   }
 
   const selection = options.selection ?? (await interactiveSelection());
-  await reviewBeforePublication(
-    capture,
-    selection,
-    options.workspaceOptions,
-  );
+  await reviewBeforePublication(capture, selection, options.workspaceOptions);
   return createEnvironmentFromCapture(capture, {
     client,
     ttlSeconds: selection.ttlSeconds,

@@ -391,18 +391,19 @@ export class EnvironmentObject {
     const control = this.control();
     if (control === undefined) return undefined;
     const response = await control.fetch(
-      new Request(
-        `https://control/v1/reservations/${record.environmentId}`,
-        {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ actorDigest, expiresAt: record.expiresAt }),
-        },
-      ),
+      new Request(`https://control/v1/reservations/${record.environmentId}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ actorDigest, expiresAt: record.expiresAt }),
+      }),
     );
     return response.ok
       ? undefined
-      : error("CAPACITY", "Public relay is at active-environment capacity", 503);
+      : error(
+          "CAPACITY",
+          "Public relay is at active-environment capacity",
+          503,
+        );
   }
 
   private async reserveBytes(
@@ -414,18 +415,15 @@ export class EnvironmentObject {
     if (bytes <= 0) return undefined;
     const actorDigest = await this.ownerActorDigest();
     const response = await control.fetch(
-      new Request(
-        `https://control/v1/reservations/${record.environmentId}`,
-        {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            actorDigest,
-            bytes,
-            expiresAt: record.expiresAt,
-          }),
-        },
-      ),
+      new Request(`https://control/v1/reservations/${record.environmentId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          actorDigest,
+          bytes,
+          expiresAt: record.expiresAt,
+        }),
+      }),
     );
     return response.ok
       ? undefined
@@ -493,7 +491,8 @@ function totalCiphertextBytes(record: EnvironmentRecord): number {
 
 function internalActorDigest(request: Request): string {
   const value = request.headers.get(ACTOR_HEADER);
-  if (!isActorDigest(value)) throw new BadRequestError("Missing actor identity");
+  if (!isActorDigest(value))
+    throw new BadRequestError("Missing actor identity");
   return value;
 }
 

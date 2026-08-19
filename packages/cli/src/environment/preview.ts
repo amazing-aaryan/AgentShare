@@ -4,10 +4,7 @@ import {
   buildWorkspaceSnapshot,
   type WorkspaceSnapshot,
 } from "../workspace/index.js";
-import type {
-  HostCapture,
-  PublicationSummary,
-} from "./publication.js";
+import type { HostCapture, PublicationSummary } from "./publication.js";
 
 export type EnvironmentPublicationPreview = {
   summary: PublicationSummary;

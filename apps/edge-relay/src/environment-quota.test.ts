@@ -9,18 +9,23 @@ class MemoryStorage {
   }
   put(key: string | Record<string, unknown>, value?: unknown): Promise<void> {
     if (typeof key === "string") this.values.set(key, value);
-    else for (const [name, item] of Object.entries(key)) this.values.set(name, item);
+    else
+      for (const [name, item] of Object.entries(key))
+        this.values.set(name, item);
     return Promise.resolve();
   }
   transaction<T>(callback: (storage: MemoryStorage) => Promise<T>): Promise<T> {
     return callback(this);
   }
   delete(keys: string | string[]): Promise<void> {
-    for (const key of typeof keys === "string" ? [keys] : keys) this.values.delete(key);
+    for (const key of typeof keys === "string" ? [keys] : keys)
+      this.values.delete(key);
     return Promise.resolve();
   }
   list({ prefix }: { prefix: string }): Promise<Map<string, unknown>> {
-    return Promise.resolve(new Map([...this.values].filter(([key]) => key.startsWith(prefix))));
+    return Promise.resolve(
+      new Map([...this.values].filter(([key]) => key.startsWith(prefix))),
+    );
   }
   setAlarm(): Promise<void> {
     return Promise.resolve();
@@ -50,7 +55,10 @@ describe("edge environment quota accounting", () => {
             ? { body: await request.json() }
             : {}),
         });
-        return Response.json({ reserved: true }, { status: request.method === "PUT" ? 201 : 200 });
+        return Response.json(
+          { reserved: true },
+          { status: request.method === "PUT" ? 201 : 200 },
+        );
       },
     };
     const env = {
@@ -102,24 +110,27 @@ describe("edge environment quota accounting", () => {
     const manifest = Buffer.from("encrypted manifest");
     const blob = Buffer.from("encrypted blob");
     await object.fetch(
-      new Request(`https://relay.test/v2/environments/${environmentId}/revisions`, {
-        method: "POST",
-        headers: { ...auth(update), "content-type": "application/json" },
-        body: JSON.stringify({
-          revisionId,
-          manifest: {
-            ciphertextSha256: sha256Hex(manifest),
-            ciphertextBytes: manifest.byteLength,
-          },
-          blobs: [
-            {
-              blobId,
-              ciphertextSha256: sha256Hex(blob),
-              ciphertextBytes: blob.byteLength,
+      new Request(
+        `https://relay.test/v2/environments/${environmentId}/revisions`,
+        {
+          method: "POST",
+          headers: { ...auth(update), "content-type": "application/json" },
+          body: JSON.stringify({
+            revisionId,
+            manifest: {
+              ciphertextSha256: sha256Hex(manifest),
+              ciphertextBytes: manifest.byteLength,
             },
-          ],
-        }),
-      }),
+            blobs: [
+              {
+                blobId,
+                ciphertextSha256: sha256Hex(blob),
+                ciphertextBytes: blob.byteLength,
+              },
+            ],
+          }),
+        },
+      ),
     );
     await object.fetch(
       new Request(
@@ -132,11 +143,14 @@ describe("edge environment quota accounting", () => {
       body: { actorDigest, bytes: manifest.byteLength },
     });
     await object.fetch(
-      new Request(`https://relay.test/v2/environments/${environmentId}/blobs/${blobId}`, {
-        method: "PUT",
-        headers: auth(update),
-        body: blob,
-      }),
+      new Request(
+        `https://relay.test/v2/environments/${environmentId}/blobs/${blobId}`,
+        {
+          method: "PUT",
+          headers: auth(update),
+          body: blob,
+        },
+      ),
     );
     expect(calls.at(-1)).toMatchObject({
       method: "PATCH",
