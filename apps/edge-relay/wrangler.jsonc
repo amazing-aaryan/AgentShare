@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "agentshare-relay",
-  "main": "src/index.ts",
+  "main": "src/worker.ts",
   "compatibility_date": "2026-08-08",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
@@ -11,6 +11,10 @@
       {
         "name": "SHARES",
         "class_name": "ShareObject",
+      },
+      {
+        "name": "ENVIRONMENTS",
+        "class_name": "EnvironmentObject",
       },
       {
         "name": "CONTROL",
@@ -26,6 +30,10 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["RelayControl"],
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["EnvironmentObject"],
     },
   ],
   "ratelimits": [
