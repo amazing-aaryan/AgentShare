@@ -101,10 +101,12 @@ updates that creator reservation with the total bytes of:
 - encrypted proposals still retained by the environment.
 
 Proposal traffic remains charged to the creator reservation rather than the
-recipient IP that submitted the proposal. Revocation and expiry delete retained
-ciphertext and release the global reservation. Capacity checks happen before a
-new ciphertext object is committed to Durable Object storage, so a failed quota
-update cannot create unaccounted retained bytes.
+recipient IP that submitted the proposal. This prevents recipients from changing
+quota ownership simply by being the party that uploads proposal ciphertext.
+Revocation and expiry delete retained ciphertext and release the global
+reservation. Capacity checks happen before a new ciphertext object is committed
+to Durable Object storage, so a failed quota update cannot create unaccounted
+retained bytes.
 
 The outer Worker also applies the existing create/upload rate limiters to v2
 routes. V1 `ShareObject` and its quotas remain unchanged.
