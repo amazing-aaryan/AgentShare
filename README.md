@@ -292,16 +292,27 @@ npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
 npm audit --audit-level=high
 ```
 
-Strict release gate against the production relay and authenticated target CLIs:
+Strict release gate against the production relay, independent handoff service,
+and authenticated target CLIs:
 
 ```powershell
 $env:AGENTSHARE_E2E_RELAY="https://agentshare-relay.carnation-vermicelli.workers.dev"
+$env:AGENTSHARE_E2E_HANDOFF="https://agentshare-handoff.carnation-vermicelli.workers.dev"
 npm run test:release
 ```
 
-The release gate tests production create/upload/open/revoke/expiry semantics and
-real Codex and Claude filesystem/network isolation. A one-agent diagnostic is
-available through `npm run test:live:diagnostic`, but is not a release pass.
+The release gate requires distinct live HTTPS relay and handoff origins. It
+tests the real handoff page and security headers, relay CORS and
+create/upload/open/revoke/expiry semantics, and real Codex and Claude
+filesystem/network isolation. A one-agent diagnostic is available through
+`npm run test:live:diagnostic`, but is not a release pass.
+
+For v0.1.10, deploy and verify the independent handoff Worker before publishing
+the creator package. That ordering prevents a newly published CLI from creating
+links whose browser endpoint is not live yet. After publication, verify the
+immutable package SHA and perform a fresh isolated recipient install before
+announcing the release. See
+[the Cloudflare deployment runbook](docs/operations/cloudflare-deployment.md).
 
 Local relay development:
 
