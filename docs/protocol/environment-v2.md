@@ -89,6 +89,26 @@ Capability authorization is endpoint-specific: readers cannot publish or list
 proposals; proposers cannot read the owner inbox; inbox holders cannot publish
 revisions; only the revoke capability revokes the environment.
 
+## Public-relay quota accounting
+
+The production `EnvironmentObject` participates in the same global reservation
+controller used by v1 shares. Environment creation reserves one active slot and
+records the creator actor digest. As ciphertext is retained, the environment
+updates that creator reservation with the total bytes of:
+
+- uploaded revision manifests;
+- unique uploaded resource blobs;
+- encrypted proposals still retained by the environment.
+
+Proposal traffic remains charged to the creator reservation rather than the
+recipient IP that submitted the proposal. Revocation and expiry delete retained
+ciphertext and release the global reservation. Capacity checks happen before a
+new ciphertext object is committed to Durable Object storage, so a failed quota
+update cannot create unaccounted retained bytes.
+
+The outer Worker also applies the existing create/upload rate limiters to v2
+routes. V1 `ShareObject` and its quotas remain unchanged.
+
 ## Compatibility
 
 The existing v1 `/s/` routes, one-blob share state machine, `agentshare open`,
