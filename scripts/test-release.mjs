@@ -19,6 +19,7 @@ const result = spawnSync(
     "node_modules/vitest/vitest.mjs",
     "run",
     "packages/cli/src/public-handoff.e2e.test.ts",
+    "packages/cli/src/environment/public-environment.e2e.test.ts",
     "packages/cli/src/launcher.security.e2e.test.ts",
     "--reporter=verbose",
   ],
