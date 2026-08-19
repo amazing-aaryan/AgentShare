@@ -106,6 +106,37 @@ describe("ACB", () => {
     expect(parsed.safeUrl).not.toContain(parsed.readCapability);
   });
 
+  it("separates the trusted handoff origin from the ciphertext relay", () => {
+    const encrypted = encryptBundle(encodeAcb(manifest), metadata);
+    const link = buildShareUrl({
+      handoffOrigin: "https://handoff.example",
+      relayOrigin: "https://relay.example",
+      shareId: metadata.shareId,
+      readCapability: "reader-secret",
+      fragmentKey: keyToFragment(encrypted.key),
+    });
+    const parsed = parseShareUrl(link);
+
+    expect(new URL(link).origin).toBe("https://handoff.example");
+    expect(new URL(link).searchParams.get("relay")).toBe(
+      "https://relay.example",
+    );
+    expect(parsed.handoffOrigin).toBe("https://handoff.example");
+    expect(parsed.relayOrigin).toBe("https://relay.example");
+    expect(parsed.safeUrl).not.toContain(parsed.fragmentKey);
+    expect(parsed.safeUrl).not.toContain(parsed.readCapability);
+  });
+
+  it("keeps legacy relay-origin links readable", () => {
+    const link =
+      "https://legacy-relay.example/s/abcdefghijklmnopqrstuvwx#r=reader-secret&k=" +
+      "A".repeat(43);
+    const parsed = parseShareUrl(link);
+
+    expect(parsed.handoffOrigin).toBe("https://legacy-relay.example");
+    expect(parsed.relayOrigin).toBe("https://legacy-relay.example");
+  });
+
   it.each([
     ["malformed Base64", { contentBase64: "%%%" }],
     ["wrong byte length", { byteLength: 999 }],
