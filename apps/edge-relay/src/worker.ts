@@ -4,6 +4,8 @@ import { EnvironmentObject } from "./environment-object.js";
 
 export { EnvironmentObject, RelayControl, ShareObject };
 
+const ACTOR_HEADER = "x-agentshare-actor-digest";
+
 type RateLimiter = {
   limit(input: { key: string }): Promise<{ success: boolean }>;
 };
@@ -91,7 +93,9 @@ export default {
     const stub = env.ENVIRONMENTS.get(
       env.ENVIRONMENTS.idFromName(environmentId),
     );
-    return cors(await stub.fetch(request));
+    const headers = new Headers(request.headers);
+    headers.set(ACTOR_HEADER, await requestActorDigest(request));
+    return cors(await stub.fetch(new Request(request, { headers })));
   },
 };
 
@@ -102,6 +106,17 @@ async function allow(
 ): Promise<boolean> {
   const actor = request.headers.get("cf-connecting-ip") ?? "unknown";
   return (await limiter.limit({ key: `${operation}:${actor}` })).success;
+}
+
+async function requestActorDigest(request: Request): Promise<string> {
+  const actor = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(actor),
+  );
+  return [...new Uint8Array(digest)]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function cors(response: Response): Response {
