@@ -19,6 +19,7 @@ import { retrieveEvidence } from "./retrieval.js";
 import { loadState } from "./state.js";
 
 const configuredOrigin = process.env.AGENTSHARE_E2E_RELAY;
+const configuredHandoffOrigin = process.env.AGENTSHARE_E2E_HANDOFF;
 
 describe("complete AgentShare handoff", () => {
   it("publishes, opens, queries, and revokes one encrypted context bundle", async () => {
@@ -49,10 +50,22 @@ describe("complete AgentShare handoff", () => {
           ? `http://127.0.0.1:${address.port}`
           : undefined);
       if (origin === undefined) throw new Error("Missing E2E relay address");
+      if (configuredOrigin !== undefined && configuredHandoffOrigin === undefined) {
+        throw new Error(
+          "AGENTSHARE_E2E_HANDOFF is required with AGENTSHARE_E2E_RELAY",
+        );
+      }
+      const handoffOrigin = configuredHandoffOrigin ?? origin;
+      if (
+        configuredOrigin !== undefined &&
+        new URL(handoffOrigin).origin === new URL(origin).origin
+      ) {
+        throw new Error("Production relay and handoff origins must be distinct");
+      }
       const url = await shareCommand({
         inputPath,
         relayOrigin: origin,
-        handoffOrigin: origin,
+        handoffOrigin,
         ttlSeconds: 60,
         sourceAgent: "generic",
         assumeApproved: true,
@@ -62,6 +75,12 @@ describe("complete AgentShare handoff", () => {
 
       const page = await fetch(url);
       expect(page.status).toBe(200);
+      expect(page.headers.get("cache-control")).toBe("no-store");
+      expect(page.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(page.headers.get("x-frame-options")).toBe("DENY");
+      expect(page.headers.get("content-security-policy")).toContain(
+        `connect-src ${new URL(origin).origin}`,
+      );
       expect(await page.text()).toContain("agentshare open --target codex");
 
       const opened = await openShare(url);
@@ -75,6 +94,8 @@ describe("complete AgentShare handoff", () => {
       const [saved] = (await loadState(statePath)).shares;
       if (saved === undefined) throw new Error("Share state was not saved");
       const parsed = parseShareUrl(url);
+      expect(parsed.handoffOrigin).toBe(new URL(handoffOrigin).origin);
+      expect(parsed.relayOrigin).toBe(new URL(origin).origin);
       await new RelayClient(origin).revoke(
         parsed.shareId,
         saved.revokeCapability,
@@ -85,7 +106,7 @@ describe("complete AgentShare handoff", () => {
       const replacement = await shareCommand({
         inputPath,
         relayOrigin: origin,
-        handoffOrigin: origin,
+        handoffOrigin,
         ttlSeconds: 60,
         sourceAgent: "generic",
         assumeApproved: true,
@@ -104,9 +125,10 @@ describe("complete AgentShare handoff", () => {
   });
 
   it.skipIf(configuredOrigin === undefined)(
-    "enforces production replay, expiry, and concurrent upload semantics",
+    "enforces production replay, expiry, concurrent upload, and handoff CORS semantics",
     async () => {
-      if (configuredOrigin === undefined) return;
+      if (configuredOrigin === undefined || configuredHandoffOrigin === undefined)
+        return;
       const client = new RelayClient(configuredOrigin);
       const shareId = randomCapability(18);
       const upload = randomCapability();
@@ -131,6 +153,19 @@ describe("complete AgentShare handoff", () => {
         client.upload(uploadRequest),
         client.upload(uploadRequest),
       ]);
+      const browserMetadata = await fetch(
+        `${configuredOrigin}/v1/shares/${encodeURIComponent(shareId)}/meta`,
+        {
+          headers: {
+            authorization: `Bearer ${read}`,
+            origin: configuredHandoffOrigin,
+          },
+        },
+      );
+      expect(browserMetadata.status).toBe(200);
+      expect(browserMetadata.headers.get("access-control-allow-origin")).toBe(
+        "*",
+      );
       await expect(
         client.upload({
           ...uploadRequest,
