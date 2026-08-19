@@ -95,10 +95,12 @@ describe.skipIf(!relay)("public AgentShare v2 environment", () => {
         }),
       ).toBe("two\n");
     } finally {
-      await client.revoke(
-        created.environment.environmentId,
-        created.environment.revokeCapability,
-      ).catch(() => undefined);
+      await client
+        .revoke(
+          created.environment.environmentId,
+          created.environment.revokeCapability,
+        )
+        .catch(() => undefined);
     }
   });
 });
