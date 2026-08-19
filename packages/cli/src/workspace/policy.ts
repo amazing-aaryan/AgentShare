@@ -28,6 +28,7 @@ export type ExclusionReason =
   | "credential-policy"
   | "symlink"
   | "unsupported-file-type"
+  | "file-too-large"
   | "ignored";
 
 export function normalizedWorkspacePath(value: string): string {
