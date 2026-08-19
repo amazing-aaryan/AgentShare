@@ -23,11 +23,19 @@ import {
 
 const CHUNK_BYTES = 1_500_000;
 const MAX_JSON_BODY = 70 * 1024 * 1024;
+const ACTOR_HEADER = "x-agentshare-actor-digest";
+
+type EnvironmentObjectEnv = {
+  CONTROL: DurableObjectNamespace;
+};
 
 export class EnvironmentObject {
   private operationTail: Promise<void> = Promise.resolve();
 
-  constructor(private readonly state: DurableObjectState) {}
+  constructor(
+    private readonly state: DurableObjectState,
+    private readonly env?: EnvironmentObjectEnv,
+  ) {}
 
   async fetch(request: Request): Promise<Response> {
     const write = request.method !== "GET";
@@ -44,6 +52,9 @@ export class EnvironmentObject {
         ...record,
         status: record.status === "revoked" ? "revoked" : "expired",
       } satisfies EnvironmentRecord);
+      if (!(await this.releaseCapacity(record.environmentId))) {
+        throw new Error("Environment capacity release unavailable");
+      }
     });
   }
 
@@ -55,6 +66,7 @@ export class EnvironmentObject {
           createEnvironmentRequestSchema.parse(
             await readJson(request, 1024 * 1024),
           ),
+          request,
         );
       }
 
@@ -73,6 +85,9 @@ export class EnvironmentObject {
         if (record.status !== "revoked") await this.deletePayloads();
         const revoked = revokeEnvironment(record);
         await this.state.storage.put("record", revoked);
+        if (!(await this.releaseCapacity(environmentId))) {
+          return error("INTERNAL", "Capacity release unavailable", 503);
+        }
         return json(toMetadata(revoked));
       }
 
@@ -119,6 +134,8 @@ export class EnvironmentObject {
             descriptor,
             new Date(),
           );
+          const capacity = await this.reserveBytes(next);
+          if (capacity !== undefined) return capacity;
           await this.storeBytes(manifestPrefix(revisionId), bytes);
           await this.state.storage.put("record", next);
           return json(toMetadata(next));
@@ -165,6 +182,8 @@ export class EnvironmentObject {
             descriptor,
             new Date(),
           );
+          const capacity = await this.reserveBytes(next);
+          if (capacity !== undefined) return capacity;
           await this.storeBytes(blobPrefix(blobId), bytes);
           await this.state.storage.put("record", next);
           return json(toMetadata(next));
@@ -213,6 +232,8 @@ export class EnvironmentObject {
             );
           }
           const next = addEnvironmentProposal(record, descriptor, new Date());
+          const capacity = await this.reserveBytes(next);
+          if (capacity !== undefined) return capacity;
           await this.storeBytes(proposalPrefix(descriptor.proposalId), bytes);
           await this.state.storage.put("record", next);
           return json(toMetadata(next), 201);
@@ -269,7 +290,10 @@ export class EnvironmentObject {
     }
   }
 
-  private async create(request: CreateEnvironmentRequest): Promise<Response> {
+  private async create(
+    request: CreateEnvironmentRequest,
+    rawRequest: Request,
+  ): Promise<Response> {
     const existing = await this.state.storage.get<EnvironmentRecord>("record");
     if (existing !== undefined) {
       const active =
@@ -285,6 +309,13 @@ export class EnvironmentObject {
         : error("CONFLICT", "Environment ID already exists", 409);
     }
     const record = createEnvironmentRecord(request, new Date());
+    const actorDigest =
+      this.env === undefined ? undefined : internalActorDigest(rawRequest);
+    if (actorDigest !== undefined) {
+      const capacity = await this.reserveActive(record, actorDigest);
+      if (capacity !== undefined) return capacity;
+      await this.state.storage.put("actorDigest", actorDigest);
+    }
     await this.state.storage.setAlarm(Date.parse(record.expiresAt));
     await this.state.storage.put("record", record);
     return json(toMetadata(record), 201);
@@ -353,6 +384,78 @@ export class EnvironmentObject {
     }
   }
 
+  private async reserveActive(
+    record: EnvironmentRecord,
+    actorDigest: string,
+  ): Promise<Response | undefined> {
+    const control = this.control();
+    if (control === undefined) return undefined;
+    const response = await control.fetch(
+      new Request(
+        `https://control/v1/reservations/${record.environmentId}`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ actorDigest, expiresAt: record.expiresAt }),
+        },
+      ),
+    );
+    return response.ok
+      ? undefined
+      : error("CAPACITY", "Public relay is at active-environment capacity", 503);
+  }
+
+  private async reserveBytes(
+    record: EnvironmentRecord,
+  ): Promise<Response | undefined> {
+    const control = this.control();
+    if (control === undefined) return undefined;
+    const bytes = totalCiphertextBytes(record);
+    if (bytes <= 0) return undefined;
+    const actorDigest = await this.ownerActorDigest();
+    const response = await control.fetch(
+      new Request(
+        `https://control/v1/reservations/${record.environmentId}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            actorDigest,
+            bytes,
+            expiresAt: record.expiresAt,
+          }),
+        },
+      ),
+    );
+    return response.ok
+      ? undefined
+      : error("CAPACITY", "Public relay is at ciphertext capacity", 503);
+  }
+
+  private async releaseCapacity(environmentId: string): Promise<boolean> {
+    const control = this.control();
+    if (control === undefined) return true;
+    return (
+      await control.fetch(
+        new Request(`https://control/v1/reservations/${environmentId}`, {
+          method: "DELETE",
+        }),
+      )
+    ).ok;
+  }
+
+  private control(): DurableObjectStub | undefined {
+    return this.env?.CONTROL.get(this.env.CONTROL.idFromName("global"));
+  }
+
+  private async ownerActorDigest(): Promise<string> {
+    const actorDigest = await this.state.storage.get<string>("actorDigest");
+    if (actorDigest === undefined || !isActorDigest(actorDigest)) {
+      throw new Error("Missing environment owner actor identity");
+    }
+    return actorDigest;
+  }
+
   private async serialize<T>(operation: () => Promise<T>): Promise<T> {
     const previous = this.operationTail;
     let release!: () => void;
@@ -366,6 +469,36 @@ export class EnvironmentObject {
       release();
     }
   }
+}
+
+function totalCiphertextBytes(record: EnvironmentRecord): number {
+  const manifests = Object.values(record.revisions).reduce(
+    (total, revision) =>
+      total +
+      (revision.manifestUploaded
+        ? revision.request.manifest.ciphertextBytes
+        : 0),
+    0,
+  );
+  const blobs = Object.values(record.blobs).reduce(
+    (total, descriptor) => total + descriptor.ciphertextBytes,
+    0,
+  );
+  const proposals = Object.values(record.proposals).reduce(
+    (total, proposal) => total + proposal.descriptor.ciphertextBytes,
+    0,
+  );
+  return manifests + blobs + proposals;
+}
+
+function internalActorDigest(request: Request): string {
+  const value = request.headers.get(ACTOR_HEADER);
+  if (!isActorDigest(value)) throw new BadRequestError("Missing actor identity");
+  return value;
+}
+
+function isActorDigest(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
 }
 
 function toMetadata(record: EnvironmentRecord): unknown {
