@@ -51,9 +51,8 @@ export async function acceptEnvironmentLink(
 ): Promise<AcceptEnvironmentResult> {
   const parsed = parseEnvironmentUrl(link);
   const client =
-    options.client ??
-    new EnvironmentRelayClient(new URL(parsed.safeUrl).origin);
-  if (client.origin !== new URL(parsed.safeUrl).origin) {
+    options.client ?? new EnvironmentRelayClient(parsed.relayOrigin);
+  if (client.origin !== parsed.relayOrigin) {
     throw new Error("AgentShare environment link relay does not match client");
   }
   const metadata = await client.metadata(
