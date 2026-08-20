@@ -22,7 +22,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/check-repository-hygiene.mjs
-      - run: npm run format:check
+      - name: Show formatter delta
+        shell: bash
+        run: |
+          npx prettier --write docs/operations/repository-security.md docs/protocol/relay-v1.md docs/releases/v0.1.10-release-verification.md scripts/check-repository-hygiene.mjs
+          git diff -- docs/operations/repository-security.md docs/protocol/relay-v1.md docs/releases/v0.1.10-release-verification.md scripts/check-repository-hygiene.mjs
+          exit 1
       - run: npm run lint
       - run: npm run build
       - run: npm run test:coverage
