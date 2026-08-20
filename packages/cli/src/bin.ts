@@ -5,6 +5,11 @@ import {
   removeIntegrations,
 } from "@agentshare/integrations";
 import { sanitizeTerminalText } from "./terminal.js";
+import {
+  checkForUpdate,
+  passiveUpdateNotice,
+  updateAgentShare,
+} from "./update.js";
 import { AGENTSHARE_VERSION } from "./version.js";
 
 const DEFAULT_RELAY_ORIGIN =
@@ -18,6 +23,27 @@ try {
   if (command === "--version") {
     assertKnownOptions(args, new Set());
     process.stdout.write(`${AGENTSHARE_VERSION}\n`);
+  } else if (command === "update") {
+    assertKnownOptions(args, new Set(["--check"]));
+    if (args.includes("--check")) {
+      const result = await checkForUpdate({ force: true });
+      if (result.status === "available") {
+        process.stdout.write(
+          `AgentShare v${result.latestVersion} is available (installed v${result.currentVersion}).\nRun \`agentshare update\` to install it.\n`,
+        );
+      } else {
+        process.stdout.write(`AgentShare v${result.currentVersion} is up to date.\n`);
+      }
+    } else {
+      const result = await updateAgentShare();
+      if (result.status === "updated") {
+        process.stdout.write(
+          `AgentShare updated from v${result.fromVersion} to v${result.toVersion}. Integrations repaired.\n`,
+        );
+      } else {
+        process.stdout.write(`AgentShare v${result.currentVersion} is up to date.\n`);
+      }
+    }
   } else if (command === "share") {
     assertKnownOptions(
       args,
@@ -59,6 +85,13 @@ try {
     usage();
     process.exitCode = command === undefined ? 0 : 1;
   }
+
+  if (shouldRunPassiveUpdateCheck(command)) {
+    const notice = await passiveUpdateNotice();
+    if (notice !== undefined) {
+      process.stderr.write(sanitizeTerminalText(`${notice}\n`));
+    }
+  }
 } catch (error) {
   process.stderr.write(
     sanitizeTerminalText(
@@ -66,6 +99,16 @@ try {
     ),
   );
   process.exitCode = 1;
+}
+
+function shouldRunPassiveUpdateCheck(command: string | undefined): boolean {
+  return (
+    command === "share" ||
+    command === "open" ||
+    command === "revoke" ||
+    command === "init" ||
+    command === "repair"
+  );
 }
 
 function assertKnownOptions(
@@ -115,5 +158,8 @@ function usage(): void {
   );
   process.stdout.write(`  agentshare open --target codex|claude\n`);
   process.stdout.write(`  agentshare revoke\n`);
+  process.stdout.write(`  agentshare update --check\n`);
+  process.stdout.write(`  agentshare update\n`);
   process.stdout.write(`  agentshare init|repair|remove\n`);
+  process.stdout.write(`  agentshare --version\n`);
 }
