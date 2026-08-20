@@ -35,14 +35,16 @@ describe("Windows update process invocation", () => {
     await updateAgentShare({
       currentVersion: "0.1.10",
       cachePath: join(directory, "update-check-v1.json"),
-      fetchImpl: async () =>
-        new Response(
-          JSON.stringify({
-            tag_name: "v0.1.11",
-            draft: false,
-            prerelease: false,
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
+      fetchImpl: () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              tag_name: "v0.1.11",
+              draft: false,
+              prerelease: false,
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
         ),
       runProcess: runner,
       platform: "win32",
