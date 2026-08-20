@@ -6,6 +6,7 @@ permissions:
 on:
   push:
     branches: [feat/cli-managed-updates]
+  pull_request:
 
 jobs:
   format:
