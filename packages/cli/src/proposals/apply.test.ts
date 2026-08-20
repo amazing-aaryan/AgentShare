@@ -117,7 +117,12 @@ describe("creator proposal approval", () => {
         /\/proposals\/[^/]+\/status$/u.test(new URL(request.url).pathname)
       ) {
         return Response.json(
-          { error: { code: "TEST_FAILURE", message: "temporary status failure" } },
+          {
+            error: {
+              code: "TEST_FAILURE",
+              message: "temporary status failure",
+            },
+          },
           { status: 503 },
         );
       }
@@ -194,8 +199,13 @@ describe("creator proposal approval", () => {
     expect(interrupted?.pendingRevision?.proposalId).toBe(proposal.proposalId);
 
     failProposalAcceptance = false;
-    if (interrupted === undefined) throw new Error("Missing interrupted owner state");
-    const recovered = await resumePendingRevision(interrupted, client, ownerState);
+    if (interrupted === undefined)
+      throw new Error("Missing interrupted owner state");
+    const recovered = await resumePendingRevision(
+      interrupted,
+      client,
+      ownerState,
+    );
     expect(recovered.pendingRevision).toBeUndefined();
     const inbox = await listOwnedProposals(shared.environment.environmentId, {
       client,

@@ -28,7 +28,14 @@ try {
   if (command === "share") {
     assertKnownOptions(
       args,
-      new Set(["--current", "--relay", "--ttl", "--source", "--new", "--legacy"]),
+      new Set([
+        "--current",
+        "--relay",
+        "--ttl",
+        "--source",
+        "--new",
+        "--legacy",
+      ]),
     );
     const current = args.includes("--current");
     const selectedSource = sourceAgent(option(args, "--source") ?? "generic");
