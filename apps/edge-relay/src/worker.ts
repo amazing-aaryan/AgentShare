@@ -62,10 +62,14 @@ export default {
         return cors(error("RATE_LIMITED", "Create rate limit exceeded", 429));
       }
       try {
-        const body = (await request.clone().json()) as {
-          environmentId?: unknown;
-        };
-        if (typeof body.environmentId === "string") {
+        const body: unknown = await request.clone().json();
+        if (
+          typeof body === "object" &&
+          body !== null &&
+          !Array.isArray(body) &&
+          "environmentId" in body &&
+          typeof body.environmentId === "string"
+        ) {
           environmentId = body.environmentId;
         }
       } catch {
