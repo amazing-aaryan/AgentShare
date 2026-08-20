@@ -1,4 +1,9 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -33,6 +38,24 @@ describe("host integrations", () => {
       ),
     ).toContain("allow_implicit_invocation: false");
     await removeIntegrations(roots);
+  });
+
+  it("refreshes older AgentShare-managed integration content", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-integration-"));
+    directories.push(root);
+    const roots = {
+      codexSkills: join(root, "codex"),
+      claudeSkills: join(root, "claude"),
+    };
+    await installIntegrations(roots);
+    const path = join(roots.codexSkills, "agentshare", "SKILL.md");
+    await writeFile(path, "<!-- managed-by: agentshare -->\nold content\n", "utf8");
+
+    await installIntegrations(roots);
+
+    const refreshed = await readFile(path, "utf8");
+    expect(refreshed).not.toContain("old content");
+    expect(refreshed).toContain("agentshare share --current --source codex");
   });
 
   it("refuses to overwrite unmanaged skills", async () => {
