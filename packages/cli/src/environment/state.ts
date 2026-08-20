@@ -41,6 +41,7 @@ export type OwnedEnvironment = {
   pendingRevision?: {
     reservation: ReserveRevisionRequest;
     manifestBase64: string;
+    proposalId?: string;
     blobs: Array<{
       blobId: string;
       ciphertextBase64: string;
