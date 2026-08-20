@@ -152,17 +152,12 @@ export async function approveOwnedProposal(
       ? {}
       : { statePath: options.statePath }),
     now: (options.now ?? (() => new Date()))(),
+    proposalId: proposal.proposalId,
     ...(options.workspaceOptions === undefined
       ? {}
       : { workspaceOptions: options.workspaceOptions }),
   });
   owned = published.environment;
-  await client.setProposalStatus(
-    environmentId,
-    proposal.proposalId,
-    owned.inboxCapability,
-    "accepted",
-  );
   await rm(journalPath, { force: true });
   await removeTransaction(proposal.proposalId, options.statePath);
   return { environment: owned, summary: published.summary };
