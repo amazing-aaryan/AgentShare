@@ -24,7 +24,10 @@ const violations = tracked.filter((path) => {
   if (forbiddenDirectories.some((prefix) => normalized.startsWith(prefix))) {
     return true;
   }
-  if (basename === ".env" || (basename.startsWith(".env.") && basename !== ".env.example")) {
+  if (
+    basename === ".env" ||
+    (basename.startsWith(".env.") && basename !== ".env.example")
+  ) {
     return true;
   }
   return privateKeyExtensions.has(extname(basename).toLowerCase());
@@ -35,5 +38,7 @@ if (violations.length > 0) {
   for (const path of violations) console.error(`- ${path}`);
   process.exitCode = 1;
 } else {
-  console.log(`Repository hygiene check passed (${tracked.length} tracked files).`);
+  console.log(
+    `Repository hygiene check passed (${tracked.length} tracked files).`,
+  );
 }
