@@ -11,10 +11,10 @@ Close the concrete findings from the August 2026 repository security audit witho
    - Create, upload, revoke, and blob download routes do not emit permissive CORS headers.
    - Preflight only succeeds for the metadata GET flow from the trusted handoff origin.
    - `POST /v1/shares` rejects oversized request bodies before JSON parsing, with an 8 KiB limit.
-   - The edge parses the create request once and forwards a canonical validated JSON body to the Durable Object.
+   - The edge performs the only unbounded-network read, validates it within the 8 KiB cap, and forwards only canonical validated JSON to the Durable Object. The Durable Object reparses that already-bounded canonical body to preserve the existing request interface.
 
 2. **Creator-side secret scanning**
-   - Extend detection to common standalone credential families not reliably caught by generic assignment patterns: npm, GitLab, Slack, Stripe, Google API, and Cloudflare API tokens.
+   - Extend detection to common credential families not reliably caught by generic assignment patterns: npm, GitLab, Slack, Stripe, Google API, and named Cloudflare API token assignments.
    - Preserve redaction behavior for text and fail-closed behavior for binary resources.
    - Add synthetic regression cases only; never add live credentials to fixtures.
 
@@ -27,7 +27,7 @@ Close the concrete findings from the August 2026 repository security audit witho
    - Mark historical implementation plans/specs as historical where their release ordering differs from the current runbook.
 
 4. **Repository security gates**
-   - Add a lightweight repository-content secret scan to CI using a pinned third-party action or deterministic local scanner with read-only permissions.
+   - Rely on GitHub's repository-level secret scanning for history-aware provider detection and add deterministic source-tree hygiene checks where they can run without treating synthetic scanner fixtures as leaks.
    - Keep package allowlist verification in CI and document the required package contents.
    - Add `docs/operations/repository-security.md` describing admin-only settings: protect `master`, require CI, prevent force pushes, inspect secret-scanning alerts, enable/verify immutable releases, and prefer signed commits/releases.
 
@@ -40,13 +40,13 @@ The production handoff origin for v0.1.10 is `https://agentshare-handoff.carnati
 ## Error Behavior
 
 - Oversized create request: HTTP 413 with `PAYLOAD_TOO_LARGE`.
-- Invalid/missing create body length or malformed JSON: existing 400 behavior remains.
+- Invalid create body or malformed JSON: HTTP 400.
 - Disallowed browser preflight: HTTP 404/405 without an `Access-Control-Allow-Origin` header.
 - Allowed metadata responses include `Access-Control-Allow-Origin` for the trusted handoff origin and `Vary: Origin`.
 
 ## Testing
 
-Use regression-first tests. Edge tests cover allowed metadata CORS, rejected mutation/blob CORS, preflight behavior, oversized create bodies, and single-parse forwarding. Scanner tests cover each new synthetic credential family and verify benign near-misses remain untouched. Existing unit, edge-runtime, package, formatting, lint, build, coverage, audit, and Wrangler dry-run checks must remain green.
+Use regression-first tests. Edge tests cover allowed metadata CORS, rejected mutation CORS, preflight behavior, oversized create bodies, and bounded canonical forwarding. Scanner tests cover each new synthetic credential family and verify benign near-misses remain untouched. Existing unit, edge-runtime, package, formatting, lint, build, coverage, audit, and Wrangler dry-run checks must remain green.
 
 ## Non-Code Administration
 
