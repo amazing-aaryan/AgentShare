@@ -1,9 +1,4 @@
-import {
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -49,7 +44,11 @@ describe("host integrations", () => {
     };
     await installIntegrations(roots);
     const path = join(roots.codexSkills, "agentshare", "SKILL.md");
-    await writeFile(path, "<!-- managed-by: agentshare -->\nold content\n", "utf8");
+    await writeFile(
+      path,
+      "<!-- managed-by: agentshare -->\nold content\n",
+      "utf8",
+    );
 
     await installIntegrations(roots);
 
