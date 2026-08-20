@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import {
   addEnvironmentProposal,
   commitEnvironmentRevision,
@@ -62,7 +63,7 @@ export class EnvironmentObject {
     try {
       const url = new URL(request.url);
       if (request.method === "POST" && url.pathname === "/v2/environments") {
-        return this.create(
+        return await this.create(
           createEnvironmentRequestSchema.parse(
             await readJson(request, 1024 * 1024),
           ),
@@ -144,12 +145,11 @@ export class EnvironmentObject {
           if (!(await authorize(record.readTokenDigest, request))) {
             return unauthorized();
           }
-          if (record.revisions[revisionId]?.status !== "committed") {
+          const revision = record.revisions[revisionId];
+          if (revision?.status !== "committed") {
             return notFound("Committed revision not found");
           }
-          const descriptor = record.revisions[revisionId]?.request.manifest;
-          if (descriptor === undefined) return notFound();
-          return this.download(manifestPrefix(revisionId), descriptor);
+          return this.download(manifestPrefix(revisionId), revision.request.manifest);
         }
       }
 
