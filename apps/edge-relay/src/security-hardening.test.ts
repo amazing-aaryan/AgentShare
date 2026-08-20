@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import worker from "./index.js";
 
-const HANDOFF_ORIGIN = "https://agentshare-handoff.carnation-vermicelli.workers.dev";
+const HANDOFF_ORIGIN =
+  "https://agentshare-handoff.carnation-vermicelli.workers.dev";
 const SHARE_ID = "s".repeat(24);
 
 function env(status = 200) {
