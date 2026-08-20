@@ -117,7 +117,9 @@ export async function fetchLatestRelease(
   }
   const release = payload as Record<string, unknown>;
   if (release.draft !== false || release.prerelease !== false) {
-    throw new Error("Latest AgentShare release is not a stable published release");
+    throw new Error(
+      "Latest AgentShare release is not a stable published release",
+    );
   }
   if (typeof release.tag_name !== "string") {
     throw new Error("Latest AgentShare release tag is missing");
@@ -146,8 +148,12 @@ export async function checkForUpdate(
   }
 
   const release = await fetchLatestRelease({
-    ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
-    ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+    ...(options.fetchImpl === undefined
+      ? {}
+      : { fetchImpl: options.fetchImpl }),
+    ...(options.timeoutMs === undefined
+      ? {}
+      : { timeoutMs: options.timeoutMs }),
   });
   await saveUpdateCache(cachePath, {
     checkedAt: new Date(now()).toISOString(),
@@ -162,11 +168,17 @@ export async function updateAgentShare(
   const currentVersion = options.currentVersion ?? AGENTSHARE_VERSION;
   const check = await checkForUpdate({
     currentVersion,
-    ...(options.cachePath === undefined ? {} : { cachePath: options.cachePath }),
+    ...(options.cachePath === undefined
+      ? {}
+      : { cachePath: options.cachePath }),
     force: true,
-    ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+    ...(options.fetchImpl === undefined
+      ? {}
+      : { fetchImpl: options.fetchImpl }),
     ...(options.now === undefined ? {} : { now: options.now }),
-    ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+    ...(options.timeoutMs === undefined
+      ? {}
+      : { timeoutMs: options.timeoutMs }),
   });
   if (check.status === "current") return check;
 
@@ -193,7 +205,10 @@ export async function updateAgentShare(
     [cliEntrypoint, "--version"],
     { inherit: false },
   );
-  assertProcessSucceeded(verification, "Updated AgentShare CLI verification failed");
+  assertProcessSucceeded(
+    verification,
+    "Updated AgentShare CLI verification failed",
+  );
   if (verification.stdout.trim() !== check.latestVersion) {
     throw new Error(
       `AgentShare update verification expected v${check.latestVersion} but found ${verification.stdout.trim() || "no version output"}`,
@@ -226,8 +241,12 @@ export async function passiveUpdateNotice(
       ...(options.currentVersion === undefined
         ? {}
         : { currentVersion: options.currentVersion }),
-      ...(options.cachePath === undefined ? {} : { cachePath: options.cachePath }),
-      ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+      ...(options.cachePath === undefined
+        ? {}
+        : { cachePath: options.cachePath }),
+      ...(options.fetchImpl === undefined
+        ? {}
+        : { fetchImpl: options.fetchImpl }),
       ...(options.now === undefined ? {} : { now: options.now }),
       timeoutMs: options.timeoutMs ?? 2_500,
     });
@@ -249,11 +268,16 @@ function versionFromTag(tag: string): string {
   return version;
 }
 
-function parseStableVersion(version: string): readonly [bigint, bigint, bigint] {
-  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(
-    version,
-  );
-  if (match === null || match[1] === undefined || match[2] === undefined || match[3] === undefined) {
+function parseStableVersion(
+  version: string,
+): readonly [bigint, bigint, bigint] {
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
+  if (
+    match === null ||
+    match[1] === undefined ||
+    match[2] === undefined ||
+    match[3] === undefined
+  ) {
     throw new Error(`Invalid stable AgentShare version: ${version}`);
   }
   return [BigInt(match[1]), BigInt(match[2]), BigInt(match[3])];
@@ -315,7 +339,10 @@ function isFresh(cache: UpdateCache, now: number): boolean {
   return age >= 0 && age < UPDATE_CHECK_INTERVAL_MS;
 }
 
-async function saveUpdateCache(path: string, cache: UpdateCache): Promise<void> {
+async function saveUpdateCache(
+  path: string,
+  cache: UpdateCache,
+): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(cache, null, 2)}\n`, {
     encoding: "utf8",
