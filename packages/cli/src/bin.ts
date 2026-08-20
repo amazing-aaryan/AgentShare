@@ -44,10 +44,9 @@ try {
       (selectedSource === "codex" || selectedSource === "claude") &&
       !args.includes("--legacy")
     ) {
+      const relayOrigin = option(args, "--relay");
       const result = await shareCurrentV2(selectedSource, {
-        ...(option(args, "--relay") === undefined
-          ? {}
-          : { relayOrigin: option(args, "--relay") }),
+        ...(relayOrigin === undefined ? {} : { relayOrigin }),
       });
       process.stdout.write(`${result.url}\n`);
     } else {
@@ -73,14 +72,7 @@ try {
     );
   } else if (command === "bootstrap" || command === "accept") {
     assertKnownOptions(args, new Set(["--state-path", "--cache-root"]));
-    const result = await bootstrapEnvironment({
-      ...(option(args, "--state-path") === undefined
-        ? {}
-        : { statePath: option(args, "--state-path") }),
-      ...(option(args, "--cache-root") === undefined
-        ? {}
-        : { cacheRoot: option(args, "--cache-root") }),
-    });
+    const result = await bootstrapEnvironment(v2StorageOptions(args));
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } else if (command === "ask") {
     assertKnownOptions(
@@ -104,12 +96,7 @@ try {
     if (question === undefined) throw new Error("Missing --question");
     const answer = await askAttachedEnvironment(environmentId, question, {
       target: targetAgent(option(args, "--target") ?? "codex"),
-      ...(option(args, "--state-path") === undefined
-        ? {}
-        : { statePath: option(args, "--state-path") }),
-      ...(option(args, "--cache-root") === undefined
-        ? {}
-        : { cacheRoot: option(args, "--cache-root") }),
+      ...v2StorageOptions(args),
     });
     process.stdout.write(`${answer}\n`);
   } else if (command === "propose") {
@@ -137,12 +124,7 @@ try {
       instruction,
       {
         target: targetAgent(option(args, "--target") ?? "codex"),
-        ...(option(args, "--state-path") === undefined
-          ? {}
-          : { statePath: option(args, "--state-path") }),
-        ...(option(args, "--cache-root") === undefined
-          ? {}
-          : { cacheRoot: option(args, "--cache-root") }),
+        ...v2StorageOptions(args),
       },
     );
     process.stdout.write(`${result}\n`);
@@ -159,14 +141,7 @@ try {
     );
     const environmentId = option(args, "--environment");
     if (environmentId === undefined) throw new Error("Missing --environment");
-    await runInternalMcpServer(environmentId, {
-      ...(option(args, "--state-path") === undefined
-        ? {}
-        : { statePath: option(args, "--state-path") }),
-      ...(option(args, "--cache-root") === undefined
-        ? {}
-        : { cacheRoot: option(args, "--cache-root") }),
-    });
+    await runInternalMcpServer(environmentId, v2StorageOptions(args));
   } else if (command === "revoke-environment") {
     assertKnownOptions(args, new Set(["--environment", "--state-path"]));
     const environmentId = option(args, "--environment");
@@ -227,6 +202,18 @@ async function legacyShare(
     sourceAgent: selectedSource,
     forceNew: args.includes("--new"),
   });
+}
+
+function v2StorageOptions(args: string[]): {
+  statePath?: string;
+  cacheRoot?: string;
+} {
+  const statePath = option(args, "--state-path");
+  const cacheRoot = option(args, "--cache-root");
+  return {
+    ...(statePath === undefined ? {} : { statePath }),
+    ...(cacheRoot === undefined ? {} : { cacheRoot }),
+  };
 }
 
 function assertKnownOptions(
