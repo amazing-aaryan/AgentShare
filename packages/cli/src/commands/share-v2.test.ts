@@ -13,7 +13,7 @@ async function fixture() {
 }
 
 describe("v2 share command", () => {
-  it("creates a 24-hour read-plus-propose environment without free-form input", async () => {
+  it("creates a split-origin 24-hour read-plus-propose environment without free-form input", async () => {
     const root = await fixture();
     const statePath = join(root, "state-v2.json");
     const handler = createRelayHandler(new InMemoryRelayStore());
@@ -40,6 +40,7 @@ describe("v2 share command", () => {
       },
       {
         client,
+        handoffOrigin: "https://handoff.example",
         statePath,
         selection: {
           includeConversation: true,
@@ -50,7 +51,10 @@ describe("v2 share command", () => {
         workspaceOptions: { preferGit: false },
       },
     );
-    expect(result.url).toContain("/e/");
+    expect(new URL(result.url).origin).toBe("https://handoff.example");
+    expect(new URL(result.url).searchParams.get("relay")).toBe(
+      "http://127.0.0.1:8787",
+    );
     expect(result.summary.files).toBe(1);
     expect(result.environment.sharePolicy.proposalsEnabled).toBe(true);
   });
@@ -81,6 +85,7 @@ describe("v2 share command", () => {
     };
     const first = await shareCaptureV2(capture, {
       client,
+      handoffOrigin: "https://handoff.example",
       statePath,
       selection: {
         includeConversation: true,
@@ -93,6 +98,7 @@ describe("v2 share command", () => {
     await writeFile(join(root, "README.md"), "second revision\n", "utf8");
     const second = await shareCaptureV2(capture, {
       client,
+      handoffOrigin: "https://handoff.example",
       statePath,
       existingEnvironmentId: first.environment.environmentId,
       workspaceOptions: { preferGit: false },
