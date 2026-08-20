@@ -6,6 +6,7 @@ import {
   buildReleasePackageUrl,
   checkForUpdate,
   fetchLatestRelease,
+  passiveUpdateNotice,
   updateAgentShare,
   type ProcessRunner,
 } from "./update.js";
@@ -155,6 +156,47 @@ describe("AgentShare update discovery", () => {
       latestVersion: "0.1.11",
     });
   });
+
+  it("suppresses passive network failures and honors the opt-out", async () => {
+    let requests = 0;
+    const fetchImpl: typeof fetch = async () => {
+      requests += 1;
+      throw new Error("offline");
+    };
+
+    expect(
+      await passiveUpdateNotice({
+        currentVersion: "0.1.10",
+        env: { AGENTSHARE_NO_UPDATE_CHECK: "1" },
+        fetchImpl,
+      }),
+    ).toBeUndefined();
+    expect(requests).toBe(0);
+
+    expect(
+      await passiveUpdateNotice({
+        currentVersion: "0.1.10",
+        cachePath: join(await temporaryDirectory(), "cache.json"),
+        env: {},
+        fetchImpl,
+      }),
+    ).toBeUndefined();
+    expect(requests).toBe(1);
+  });
+
+  it("formats a passive notice only when a newer release exists", async () => {
+    const directory = await temporaryDirectory();
+    expect(
+      await passiveUpdateNotice({
+        currentVersion: "0.1.10",
+        cachePath: join(directory, "cache.json"),
+        env: {},
+        fetchImpl: releaseFetch("v0.1.11"),
+      }),
+    ).toBe(
+      "Update available: AgentShare v0.1.11 (installed v0.1.10). Run `agentshare update` to install it.",
+    );
+  });
 });
 
 describe("AgentShare explicit update", () => {
@@ -163,12 +205,13 @@ describe("AgentShare explicit update", () => {
       [];
     const runner: ProcessRunner = (command, args, { inherit }) => {
       calls.push({ command, args, inherit });
-      if (args[0] === "--version") {
+      if (args.at(-1) === "--version") {
         return { status: 0, stdout: "0.1.11\n", stderr: "" };
       }
       return { status: 0, stdout: "", stderr: "" };
     };
     const directory = await temporaryDirectory();
+    const cliEntrypoint = "/installed/agentshare/dist/bin.js";
 
     const result = await updateAgentShare({
       currentVersion: "0.1.10",
@@ -176,6 +219,8 @@ describe("AgentShare explicit update", () => {
       fetchImpl: releaseFetch("v0.1.11"),
       runProcess: runner,
       platform: "linux",
+      nodeExecutable: "node",
+      cliEntrypoint,
     });
 
     expect(result).toEqual({
@@ -193,8 +238,16 @@ describe("AgentShare explicit update", () => {
         ],
         inherit: true,
       },
-      { command: "agentshare", args: ["--version"], inherit: false },
-      { command: "agentshare", args: ["repair"], inherit: true },
+      {
+        command: "node",
+        args: [cliEntrypoint, "--version"],
+        inherit: false,
+      },
+      {
+        command: "node",
+        args: [cliEntrypoint, "repair"],
+        inherit: true,
+      },
     ]);
   });
 
@@ -239,15 +292,17 @@ describe("AgentShare explicit update", () => {
         currentVersion: "0.1.10",
         cachePath: join(directory, "mismatch.json"),
         fetchImpl: releaseFetch("v0.1.11"),
+        nodeExecutable: "node",
+        cliEntrypoint: "/installed/agentshare/dist/bin.js",
         runProcess: (_command, args) => {
           calls.push(args);
-          return args[0] === "--version"
+          return args.at(-1) === "--version"
             ? { status: 0, stdout: "0.1.10\n", stderr: "" }
             : { status: 0, stdout: "", stderr: "" };
         },
       }),
     ).rejects.toThrow("expected v0.1.11");
-    expect(calls.some((args) => args[0] === "repair")).toBe(false);
+    expect(calls.some((args) => args.at(-1) === "repair")).toBe(false);
   });
 
   it("reports a partial update when integration repair fails", async () => {
@@ -258,10 +313,12 @@ describe("AgentShare explicit update", () => {
         currentVersion: "0.1.10",
         cachePath: join(directory, "repair-failure.json"),
         fetchImpl: releaseFetch("v0.1.11"),
+        nodeExecutable: "node",
+        cliEntrypoint: "/installed/agentshare/dist/bin.js",
         runProcess: (_command, args) => {
-          if (args[0] === "--version")
+          if (args.at(-1) === "--version")
             return { status: 0, stdout: "0.1.11\n", stderr: "" };
-          if (args[0] === "repair")
+          if (args.at(-1) === "repair")
             return { status: 1, stdout: "", stderr: "unmanaged integration" };
           return { status: 0, stdout: "", stderr: "" };
         },
