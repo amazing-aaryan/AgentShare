@@ -21,7 +21,7 @@ function manifest(text: string): AcbManifest {
   };
 }
 
-describe("standalone credential families", () => {
+describe("credential families", () => {
   it.each([
     ["npm-token", `npm_${"a".repeat(36)}`],
     ["gitlab-token", `glpat-${"b".repeat(20)}`],
@@ -31,6 +31,7 @@ describe("standalone credential families", () => {
     ],
     ["stripe-secret-key", `sk_live_${"d".repeat(24)}`],
     ["google-api-key", `AIza${"E".repeat(35)}`],
+    ["cloudflare-api-token", `CLOUDFLARE_API_TOKEN=${"f".repeat(40)}`],
   ])("redacts %s", (kind, token) => {
     const result = scanAndRedact(manifest(`credential ${token}`));
 
@@ -44,6 +45,7 @@ describe("standalone credential families", () => {
     "xoxb-not-a-token",
     "sk_test_too-short",
     "AIza-short",
+    "CLOUDFLARE_API_TOKEN=short",
   ])("leaves benign near-miss %s untouched", (value) => {
     const result = scanAndRedact(manifest(value));
 
