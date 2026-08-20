@@ -67,14 +67,16 @@ describe("environmentManifestSchema", () => {
   });
 
   it("requires a proposal public key when proposals are enabled", () => {
-    const input = validManifest();
-    input.proposalPolicy = { enabled: true } as never;
+    const input = {
+      ...validManifest(),
+      proposalPolicy: { enabled: true },
+    };
     expect(() => environmentManifestSchema.parse(input)).toThrow();
   });
 
   it("requires parentRevisionId to differ from revisionId", () => {
-    const input = validManifest();
-    (input as Record<string, unknown>).parentRevisionId = input.revisionId;
+    const valid = validManifest();
+    const input = { ...valid, parentRevisionId: valid.revisionId };
     expect(() => environmentManifestSchema.parse(input)).toThrow();
   });
 });
