@@ -290,8 +290,8 @@ npm uninstall --global agentshare
 The updater accepts only exact stable releases from the canonical AgentShare
 repository, derives the immutable tarball URL locally, verifies the newly
 installed CLI version, and then runs the new CLI's `repair`. AgentShare-managed
-Codex and Claude skill files are refreshed; conflicting unmanaged skill files are
-left untouched.
+Codex and Claude skill files are refreshed; conflicting unmanaged skill files
+are left untouched.
 
 ## Development
 
