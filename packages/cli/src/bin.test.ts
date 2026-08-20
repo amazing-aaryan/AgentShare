@@ -1,13 +1,20 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+
+const packageVersion = (
+  JSON.parse(readFileSync(resolve("packages/cli/package.json"), "utf8")) as {
+    version: string;
+  }
+).version;
 
 describe("public CLI arguments", () => {
   it("prints the installed package version", () => {
     const result = runCli("--version");
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe("0.1.10\n");
+    expect(result.stdout).toBe(`${packageVersion}\n`);
     expect(result.stderr).toBe("");
   });
 
