@@ -35,7 +35,9 @@ describe("proposalSchema", () => {
 
   it("rejects traversal paths", () => {
     const input = baseProposal();
-    input.operations[0]!.path = "../../outside";
+    const operation = input.operations[0];
+    if (operation === undefined) throw new Error("Missing proposal operation");
+    operation.path = "../../outside";
     expect(() => proposalSchema.parse(input)).toThrow();
   });
 
