@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import worker from "./index.js";
+import worker from "./secure-worker.js";
 
 const HANDOFF_ORIGIN =
   "https://agentshare-handoff.carnation-vermicelli.workers.dev";
