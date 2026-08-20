@@ -10,18 +10,22 @@ const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error("npm_execpath is unavailable");
 
 try {
-  const [rootLicense, packageLicense, rootNotice, packageNotice] =
+  const [rootLicense, packageLicense, rootNotice, packageNotice, cliPackage] =
     await Promise.all([
       readFile("LICENSE", "utf8"),
       readFile("packages/cli/LICENSE", "utf8"),
       readFile("NOTICE", "utf8"),
       readFile("packages/cli/NOTICE", "utf8"),
+      readFile("packages/cli/package.json", "utf8").then(JSON.parse),
     ]);
   if (rootLicense !== packageLicense || rootNotice !== packageNotice) {
     throw new Error("packed license files differ from repository originals");
   }
   if (!packageNotice.includes("Copyright (c) 2025 Colin McDonnell")) {
     throw new Error("packed notice omits the bundled Zod license");
+  }
+  if (typeof cliPackage.version !== "string") {
+    throw new Error("CLI package version is missing");
   }
 
   await execute(
@@ -33,6 +37,12 @@ try {
     file.endsWith(".tgz"),
   );
   if (!archive) throw new Error("npm pack did not create an archive");
+  const expectedArchive = `agentshare-${cliPackage.version}.tgz`;
+  if (archive !== expectedArchive) {
+    throw new Error(
+      `packed CLI name must be ${expectedArchive}, received ${archive}`,
+    );
+  }
   const { stdout: manifestOutput } = await execute(
     process.execPath,
     [npmCli, "pack", "./packages/cli", "--dry-run", "--json"],
@@ -55,11 +65,14 @@ try {
       `--package=${join(directory, archive)}`,
       "--",
       "agentshare",
+      "--version",
     ],
     { cwd: directory },
   );
-  if (!stdout.includes("AgentShare")) {
-    throw new Error("packed AgentShare CLI did not execute");
+  if (stdout.trim() !== cliPackage.version) {
+    throw new Error(
+      `packed AgentShare CLI reported ${stdout.trim() || "no version"}; expected ${cliPackage.version}`,
+    );
   }
   process.stdout.write(`Packed CLI passed: ${archive}\n`);
 } finally {
