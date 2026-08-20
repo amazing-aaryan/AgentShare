@@ -25,7 +25,10 @@ describe("standalone credential families", () => {
   it.each([
     ["npm-token", `npm_${"a".repeat(36)}`],
     ["gitlab-token", `glpat-${"b".repeat(20)}`],
-    ["slack-token", `xoxb-${"1".repeat(12)}-${"2".repeat(12)}-${"c".repeat(24)}`],
+    [
+      "slack-token",
+      `xoxb-${"1".repeat(12)}-${"2".repeat(12)}-${"c".repeat(24)}`,
+    ],
     ["stripe-secret-key", `sk_live_${"d".repeat(24)}`],
     ["google-api-key", `AIza${"E".repeat(35)}`],
   ])("redacts %s", (kind, token) => {
