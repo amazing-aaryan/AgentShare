@@ -69,6 +69,30 @@ describe("environment relay state machine", () => {
     );
   });
 
+  it("keeps an identical revision reservation idempotent after commit", () => {
+    const request = revision();
+    let record = reserveEnvironmentRevision(create(), request, now);
+    record = recordEnvironmentManifest(
+      record,
+      request.revisionId,
+      request.manifest,
+      now,
+    );
+    record = recordEnvironmentBlob(
+      record,
+      request.blobs[0]?.blobId ?? "missing",
+      request.blobs[0] ?? {
+        blobId: "missing",
+        ciphertextSha256: digest,
+        ciphertextBytes: 120,
+      },
+      now,
+    );
+    record = commitEnvironmentRevision(record, request.revisionId, now);
+
+    expect(reserveEnvironmentRevision(record, request, now)).toEqual(record);
+  });
+
   it("rejects a stale parent revision", () => {
     let record = reserveEnvironmentRevision(create(), revision(), now);
     record = recordEnvironmentManifest(
