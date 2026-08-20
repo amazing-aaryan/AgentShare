@@ -276,17 +276,21 @@ function resolveNpmInvocation(options: {
     return { command: "npm", args: [] };
   }
 
+  const npmExecPath = process.env.npm_execpath;
+  let discoveredNpmCliPath: string | undefined;
+  if (npmExecPath !== undefined && existsSync(npmExecPath)) {
+    discoveredNpmCliPath = npmExecPath;
+  }
   const npmCliPath =
     options.npmCliPath ??
-    (process.env.npm_execpath && existsSync(process.env.npm_execpath)
-      ? process.env.npm_execpath
-      : join(
-          dirname(options.nodeExecutable),
-          "node_modules",
-          "npm",
-          "bin",
-          "npm-cli.js",
-        ));
+    discoveredNpmCliPath ??
+    join(
+      dirname(options.nodeExecutable),
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    );
   if (options.npmCliPath === undefined && !existsSync(npmCliPath)) {
     throw new Error(
       "Unable to locate npm-cli.js for a no-shell update. Run the documented immutable npm install command manually.",
