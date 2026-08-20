@@ -107,13 +107,6 @@ export function reserveEnvironmentRevision(
 ): EnvironmentRecord {
   assertActive(record, now);
   const request = reserveRevisionRequestSchema.parse(input);
-  const expectedParent = record.currentRevisionId ?? undefined;
-  if (request.parentRevisionId !== expectedParent) {
-    throw new EnvironmentStateError(
-      "CONFLICT",
-      `Revision parent ${request.parentRevisionId ?? "<none>"} does not match current ${expectedParent ?? "<none>"}`,
-    );
-  }
   const existing = record.revisions[request.revisionId];
   if (existing !== undefined) {
     if (JSON.stringify(existing.request) === JSON.stringify(request))
@@ -121,6 +114,13 @@ export function reserveEnvironmentRevision(
     throw new EnvironmentStateError(
       "CONFLICT",
       "Revision id already exists with different descriptors",
+    );
+  }
+  const expectedParent = record.currentRevisionId ?? undefined;
+  if (request.parentRevisionId !== expectedParent) {
+    throw new EnvironmentStateError(
+      "CONFLICT",
+      `Revision parent ${request.parentRevisionId ?? "<none>"} does not match current ${expectedParent ?? "<none>"}`,
     );
   }
   return {
