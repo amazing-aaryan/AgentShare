@@ -32,3 +32,40 @@ jobs:
           npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
       - run: npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
       - run: npm audit --audit-level=high
+
+  security-settings-diagnostic:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: read
+    steps:
+      - name: Read security feature state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          echo "security_and_analysis="
+          gh api "repos/${GITHUB_REPOSITORY}" --jq '{secret_scanning: .security_and_analysis.secret_scanning.status, push_protection: .security_and_analysis.secret_scanning_push_protection.status, dependabot_security_updates: .security_and_analysis.dependabot_security_updates.status, advanced_security: .security_and_analysis.advanced_security.status}'
+          echo "security_state_exit=$?"
+
+          open_alert_count=$(gh api "repos/${GITHUB_REPOSITORY}/secret-scanning/alerts?state=open&per_page=100" --jq 'length' 2>/tmp/secret-scanning-error)
+          alert_exit=$?
+          echo "secret_alert_query_exit=${alert_exit}"
+          if [ "${alert_exit}" -eq 0 ]; then
+            echo "open_secret_alert_count=${open_alert_count}"
+          else
+            echo "secret_alert_query_error=$(tr '\n' ' ' </tmp/secret-scanning-error)"
+          fi
+
+      - name: Verify v0.1.10 release immutability
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          gh release verify v0.1.10 --repo "${GITHUB_REPOSITORY}" >/tmp/release-verify 2>&1
+          verify_exit=$?
+          echo "release_verify_exit=${verify_exit}"
+          cat /tmp/release-verify
+          exit 0
