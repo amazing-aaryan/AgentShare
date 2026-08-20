@@ -27,9 +27,12 @@ import { reviewProposalInbox } from "./inbox-v2.js";
 
 const DEFAULT_RELAY =
   "https://agentshare-relay.carnation-vermicelli.workers.dev";
+export const DEFAULT_V2_HANDOFF_ORIGIN =
+  "https://agentshare-handoff.carnation-vermicelli.workers.dev";
 
 export type ShareV2Options = {
   relayOrigin?: string;
+  handoffOrigin?: string;
   statePath?: string;
   client?: EnvironmentRelayClient;
   selection?: SelectedShareOptions;
@@ -82,8 +85,9 @@ export async function shareCaptureV2(
       ],
       0,
     );
-    if (action === 0)
+    if (action === 0) {
       return updateEnvironment(capture, existing, client, options);
+    }
     if (action === 1) {
       await reviewProposalInbox(capture.sourceAgent, options.statePath);
       const refreshed =
@@ -91,9 +95,11 @@ export async function shareCaptureV2(
           existing.environmentId,
           options.statePath,
         )) ?? existing;
-      return existingResult(refreshed);
+      return existingResult(refreshed, options.handoffOrigin);
     }
-    if (action === 2) return existingResult(existing);
+    if (action === 2) {
+      return existingResult(existing, options.handoffOrigin);
+    }
   } else if (
     existing !== undefined &&
     options.existingEnvironmentId !== undefined
@@ -103,7 +109,7 @@ export async function shareCaptureV2(
 
   const selection = options.selection ?? (await interactiveSelection());
   await reviewBeforePublication(capture, selection, options.workspaceOptions);
-  return createEnvironmentFromCapture(capture, {
+  const created = await createEnvironmentFromCapture(capture, {
     client,
     ttlSeconds: selection.ttlSeconds,
     proposalsEnabled: selection.proposalsEnabled,
@@ -116,6 +122,10 @@ export async function shareCaptureV2(
       ? {}
       : { workspaceOptions: options.workspaceOptions }),
   });
+  return {
+    ...created,
+    url: ownedEnvironmentUrl(created.environment, options.handoffOrigin),
+  };
 }
 
 async function interactiveSelection(): Promise<SelectedShareOptions> {
@@ -243,17 +253,18 @@ async function updateEnvironment(
   );
   return {
     environment: published.environment,
-    url: ownedEnvironmentUrl(published.environment),
+    url: ownedEnvironmentUrl(published.environment, options.handoffOrigin),
     summary: published.summary,
   };
 }
 
 function existingResult(
   environment: OwnedEnvironment,
+  handoffOrigin?: string,
 ): CreateEnvironmentResult {
   return {
     environment,
-    url: ownedEnvironmentUrl(environment),
+    url: ownedEnvironmentUrl(environment, handoffOrigin),
     summary: {
       files: 0,
       conversationEvents: 0,
@@ -265,9 +276,13 @@ function existingResult(
   };
 }
 
-export function ownedEnvironmentUrl(environment: OwnedEnvironment): string {
+export function ownedEnvironmentUrl(
+  environment: OwnedEnvironment,
+  handoffOrigin = DEFAULT_V2_HANDOFF_ORIGIN,
+): string {
   return buildEnvironmentUrl({
-    origin: environment.relayOrigin,
+    handoffOrigin,
+    relayOrigin: environment.relayOrigin,
     environmentId: environment.environmentId,
     readCapability: environment.readCapability,
     environmentMasterKey: keyFromFragment(environment.environmentMasterKey),
