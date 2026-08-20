@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "agentshare-relay",
-  "main": "src/index.ts",
+  "main": "src/secure-worker.ts",
   "compatibility_date": "2026-08-08",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
@@ -10,34 +10,34 @@
     "bindings": [
       {
         "name": "SHARES",
-        "class_name": "ShareObject",
+        "class_name": "ShareObject"
       },
       {
         "name": "CONTROL",
-        "class_name": "RelayControl",
-      },
-    ],
+        "class_name": "RelayControl"
+      }
+    ]
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["ShareObject"],
+      "new_sqlite_classes": ["ShareObject"]
     },
     {
       "tag": "v2",
-      "new_sqlite_classes": ["RelayControl"],
-    },
+      "new_sqlite_classes": ["RelayControl"]
+    }
   ],
   "ratelimits": [
     {
       "name": "CREATE_RATE_LIMITER",
       "namespace_id": "1001",
-      "simple": { "limit": 10, "period": 60 },
+      "simple": { "limit": 10, "period": 60 }
     },
     {
       "name": "UPLOAD_RATE_LIMITER",
       "namespace_id": "1002",
-      "simple": { "limit": 20, "period": 60 },
-    },
-  ],
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ]
 }
