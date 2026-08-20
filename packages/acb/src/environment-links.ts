@@ -21,8 +21,7 @@ type SplitEnvironmentUrlParts = EnvironmentCapabilityFields & {
 };
 
 export type EnvironmentUrlParts =
-  | LegacyEnvironmentUrlParts
-  | SplitEnvironmentUrlParts;
+  LegacyEnvironmentUrlParts | SplitEnvironmentUrlParts;
 
 export function buildEnvironmentUrl(parts: EnvironmentUrlParts): string {
   const handoffOrigin = normalizeSecureOrigin(
