@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { installIntegrations } from "@agentshare/integrations";
 import { acceptEnvironmentLink } from "../environment/accept.js";
 import { readHiddenLine } from "../terminal.js";
@@ -21,7 +20,7 @@ export async function bootstrapEnvironment(
 export async function readCapabilityInput(): Promise<string> {
   if (process.stdin.isTTY)
     return readHiddenLine("AgentShare environment link: ");
-  return capabilityLine(await readFile(0, "utf8"));
+  return capabilityLine(await readStdinText());
 }
 
 export function capabilityLine(input: string): string {
@@ -33,4 +32,12 @@ export function capabilityLine(input: string): string {
     throw new Error("AgentShare bootstrap expects exactly one capability URL");
   }
   return lines[0];
+}
+
+async function readStdinText(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
 }
