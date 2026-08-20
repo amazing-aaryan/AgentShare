@@ -35,9 +35,16 @@ export function capabilityLine(input: string): string {
 }
 
 async function readStdinText(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  const decoder = new TextDecoder();
+  let input = "";
+  for await (const chunk of process.stdin as AsyncIterable<unknown>) {
+    if (typeof chunk === "string") {
+      input += chunk;
+    } else if (chunk instanceof Uint8Array) {
+      input += decoder.decode(chunk, { stream: true });
+    } else {
+      throw new Error("AgentShare bootstrap received invalid stdin data");
+    }
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return input + decoder.decode();
 }
