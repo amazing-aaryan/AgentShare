@@ -60,6 +60,8 @@ persistence.
 
 - Publish `agentshare` to npm; current installs use GitHub release assets.
 - Complete current-version authenticated recipient smoke tests on each release.
-- Continue independent security review as the threat model and supported hosts evolve.
+- Continue independent security review as the threat model and supported hosts
+  evolve.
 
-Cross-platform CI is an existing release gate; repository-level security controls are documented in [`repository-security.md`](repository-security.md).
+Cross-platform CI is an existing release gate; repository-level security
+controls are documented in [`repository-security.md`](repository-security.md).
