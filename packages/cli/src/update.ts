@@ -312,15 +312,13 @@ function parseStableVersion(
   version: string,
 ): readonly [bigint, bigint, bigint] {
   const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
-  if (
-    match === null ||
-    match[1] === undefined ||
-    match[2] === undefined ||
-    match[3] === undefined
-  ) {
+  const major = match?.[1];
+  const minor = match?.[2];
+  const patch = match?.[3];
+  if (major === undefined || minor === undefined || patch === undefined) {
     throw new Error(`Invalid stable AgentShare version: ${version}`);
   }
-  return [BigInt(match[1]), BigInt(match[2]), BigInt(match[3])];
+  return [BigInt(major), BigInt(minor), BigInt(patch)];
 }
 
 function compareVersions(left: string, right: string): number {
