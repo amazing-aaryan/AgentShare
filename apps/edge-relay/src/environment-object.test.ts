@@ -1,4 +1,8 @@
 import { capabilityDigest, randomCapability, sha256Hex } from "@agentshare/acb";
+import {
+  environmentMetadataResponseSchema,
+  proposalListResponseSchema,
+} from "@agentshare/contracts";
 import { describe, expect, it } from "vitest";
 import { EnvironmentObject } from "./environment-object.js";
 
@@ -147,7 +151,10 @@ describe("edge EnvironmentObject", () => {
       }),
     );
     expect(metadata.status).toBe(200);
-    expect((await metadata.json()).currentRevisionId).toBe(revisionId);
+    expect(
+      environmentMetadataResponseSchema.parse(await metadata.json())
+        .currentRevisionId,
+    ).toBe(revisionId);
     expect(
       Buffer.from(
         await (
@@ -207,7 +214,9 @@ describe("edge EnvironmentObject", () => {
       ),
     );
     expect(listed.status).toBe(200);
-    expect((await listed.json()).proposals).toHaveLength(1);
+    expect(
+      proposalListResponseSchema.parse(await listed.json()).proposals,
+    ).toHaveLength(1);
 
     expect(
       (
