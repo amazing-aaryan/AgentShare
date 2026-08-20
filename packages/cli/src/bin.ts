@@ -5,6 +5,7 @@ import {
   removeIntegrations,
 } from "@agentshare/integrations";
 import { sanitizeTerminalText } from "./terminal.js";
+import { AGENTSHARE_VERSION } from "./version.js";
 
 const DEFAULT_RELAY_ORIGIN =
   "https://agentshare-relay.carnation-vermicelli.workers.dev";
@@ -14,7 +15,10 @@ const TRUSTED_HANDOFF_ORIGIN =
 const [command, ...args] = process.argv.slice(2);
 
 try {
-  if (command === "share") {
+  if (command === "--version") {
+    assertKnownOptions(args, new Set());
+    process.stdout.write(`${AGENTSHARE_VERSION}\n`);
+  } else if (command === "share") {
     assertKnownOptions(
       args,
       new Set(["--current", "--relay", "--ttl", "--source", "--new"]),
