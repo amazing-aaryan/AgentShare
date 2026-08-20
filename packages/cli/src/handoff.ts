@@ -13,7 +13,7 @@ export async function openShare(link: string): Promise<{
   metadata: AuthoritativeMetadata;
 }> {
   const parsed = parseShareUrl(link);
-  const client = new RelayClient(new URL(parsed.safeUrl).origin);
+  const client = new RelayClient(parsed.relayOrigin);
   const response = await client.metadata(parsed.shareId, parsed.readCapability);
   const envelope = await client.download(parsed.shareId, parsed.readCapability);
   const descriptorMatches =

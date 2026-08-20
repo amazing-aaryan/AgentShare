@@ -17,10 +17,19 @@ import { shareCurrentV2 } from "./commands/share-v2.js";
 import { runInternalMcpServer } from "./worker/internal-mcp.js";
 import { sanitizeTerminalText } from "./terminal.js";
 
+const DEFAULT_RELAY_ORIGIN =
+  "https://agentshare-relay.carnation-vermicelli.workers.dev";
+const TRUSTED_HANDOFF_ORIGIN =
+  "https://agentshare-handoff.carnation-vermicelli.workers.dev";
+
 const [command, ...args] = process.argv.slice(2);
 
 try {
   if (command === "share") {
+    assertKnownOptions(
+      args,
+      new Set(["--current", "--relay", "--ttl", "--source", "--new", "--legacy"]),
+    );
     const current = args.includes("--current");
     const selectedSource = sourceAgent(option(args, "--source") ?? "generic");
     if (
@@ -41,6 +50,10 @@ try {
       );
     }
   } else if (command === "share-v1") {
+    assertKnownOptions(
+      args,
+      new Set(["--current", "--relay", "--ttl", "--source", "--new"]),
+    );
     const current = args.includes("--current");
     const inputPath = current ? undefined : positional(args, 0);
     process.stdout.write(
@@ -52,6 +65,7 @@ try {
       )}\n`,
     );
   } else if (command === "bootstrap" || command === "accept") {
+    assertKnownOptions(args, new Set(["--state-path", "--cache-root"]));
     const result = await bootstrapEnvironment({
       ...(option(args, "--state-path") === undefined
         ? {}
@@ -62,6 +76,16 @@ try {
     });
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } else if (command === "ask") {
+    assertKnownOptions(
+      args,
+      new Set([
+        "--environment",
+        "--target",
+        "--question",
+        "--state-path",
+        "--cache-root",
+      ]),
+    );
     const attached =
       option(args, "--environment") === undefined
         ? await latestAttachedEnvironment(option(args, "--state-path"))
@@ -82,6 +106,16 @@ try {
     });
     process.stdout.write(`${answer}\n`);
   } else if (command === "propose") {
+    assertKnownOptions(
+      args,
+      new Set([
+        "--environment",
+        "--target",
+        "--instruction",
+        "--state-path",
+        "--cache-root",
+      ]),
+    );
     const attached =
       option(args, "--environment") === undefined
         ? await latestAttachedEnvironment(option(args, "--state-path"))
@@ -106,11 +140,16 @@ try {
     );
     process.stdout.write(`${result}\n`);
   } else if (command === "inbox") {
+    assertKnownOptions(args, new Set(["--source", "--state-path"]));
     await reviewProposalInbox(
       targetAgent(option(args, "--source") ?? "codex"),
       option(args, "--state-path"),
     );
   } else if (command === "internal-mcp") {
+    assertKnownOptions(
+      args,
+      new Set(["--environment", "--state-path", "--cache-root"]),
+    );
     const environmentId = option(args, "--environment");
     if (environmentId === undefined) throw new Error("Missing --environment");
     await runInternalMcpServer(environmentId, {
@@ -122,16 +161,20 @@ try {
         : { cacheRoot: option(args, "--cache-root") }),
     });
   } else if (command === "revoke-environment") {
+    assertKnownOptions(args, new Set(["--environment", "--state-path"]));
     const environmentId = option(args, "--environment");
     if (environmentId === undefined) throw new Error("Missing --environment");
     await revokeOwnedEnvironment(environmentId, option(args, "--state-path"));
     process.stdout.write("Environment revoked\n");
   } else if (command === "open") {
+    assertKnownOptions(args, new Set(["--target"]));
     await openCommand(targetAgent(option(args, "--target") ?? "codex"));
   } else if (command === "revoke") {
+    assertKnownOptions(args, new Set());
     await revokeCommand();
     process.stdout.write("Share revoked\n");
   } else if (command === "init" || command === "repair") {
+    assertKnownOptions(args, new Set(["--state-path"]));
     const files = await installIntegrations();
     const repaired =
       command === "repair"
@@ -143,6 +186,7 @@ try {
       ),
     );
   } else if (command === "remove") {
+    assertKnownOptions(args, new Set());
     await removeIntegrations();
     process.stdout.write("AgentShare integrations removed\n");
   } else {
@@ -170,12 +214,23 @@ async function legacyShare(
     relayOrigin:
       option(args, "--relay") ??
       process.env.AGENTSHARE_RELAY ??
-      "https://agentshare-relay.carnation-vermicelli.workers.dev",
+      DEFAULT_RELAY_ORIGIN,
+    handoffOrigin: TRUSTED_HANDOFF_ORIGIN,
     ttlSeconds: Number(option(args, "--ttl") ?? "3600"),
     sourceAgent: selectedSource,
-    yes: args.includes("--yes"),
     forceNew: args.includes("--new"),
   });
+}
+
+function assertKnownOptions(
+  args: string[],
+  allowed: ReadonlySet<string>,
+): void {
+  for (const value of args) {
+    if (value.startsWith("--") && !allowed.has(value)) {
+      throw new Error(`Unknown option: ${value}`);
+    }
+  }
 }
 
 function option(args: string[], name: string): string | undefined {

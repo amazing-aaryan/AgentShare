@@ -50,14 +50,14 @@ describe("creator and launcher", () => {
       inputPath: input,
       relayOrigin: origin,
       ttlSeconds: 60,
-      yes: true,
+      assumeApproved: true,
       statePath: state,
     });
     const second = await shareCommand({
       inputPath: input,
       relayOrigin: origin,
       ttlSeconds: 60,
-      yes: true,
+      assumeApproved: true,
       statePath: state,
     });
     expect(second).toBe(first);
@@ -180,7 +180,7 @@ describe("creator and launcher", () => {
       inputPath: input,
       relayOrigin: origin,
       ttlSeconds: 60,
-      yes: true,
+      assumeApproved: true,
       statePath: state,
     } as const;
 

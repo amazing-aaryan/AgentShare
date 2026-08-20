@@ -9,6 +9,7 @@
     { "path": "packages/integrations" },
     { "path": "packages/cli" },
     { "path": "apps/web" },
+    { "path": "apps/handoff" },
     { "path": "apps/relay" },
     { "path": "apps/edge-relay" }
   ]

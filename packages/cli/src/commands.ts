@@ -35,13 +35,17 @@ import {
 } from "./state.js";
 import { confirm, readHiddenLine, sanitizeTerminalText } from "./terminal.js";
 
+export const DEFAULT_HANDOFF_ORIGIN =
+  "https://agentshare-handoff.carnation-vermicelli.workers.dev";
+
 export type ShareOptions = {
   inputPath?: string;
   current?: boolean;
   relayOrigin: string;
+  handoffOrigin?: string;
   ttlSeconds: number;
   sourceAgent?: "codex" | "claude" | "generic";
-  yes?: boolean;
+  assumeApproved?: boolean;
   forceNew?: boolean;
   statePath?: string;
 };
@@ -65,7 +69,13 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
         client,
         options.statePath,
       );
-      if (resumed !== undefined) return resumed;
+      if (resumed !== undefined) {
+        if (options.assumeApproved) return resumed;
+        process.stdout.write(
+          `existing live share: fingerprint=${fingerprint} expires=${reusable.expiresAt}\n`,
+        );
+        if (await confirm("Reuse this existing live share?")) return resumed;
+      }
     }
   }
 
@@ -75,13 +85,13 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
   process.stdout.write(`redactions: ${scanned.findings.length}\n`);
   process.stdout.write(
     sanitizeTerminalText(
-      `\nFinal normalized plaintext:\n${reviewPayload(scanned.manifest)}\n`,
+      `\nNormalized review payload (text exact; binary bytes summarized):\n${reviewPayload(scanned.manifest)}\n`,
     ),
   );
   process.stdout.write(`fingerprint: ${fingerprint}\n`);
   if (
-    !options.yes &&
-    !(await confirm("Share this exact normalized payload?"))
+    !options.assumeApproved &&
+    !(await confirm("Share this reviewed normalized payload?"))
   ) {
     throw new Error("Share cancelled before upload");
   }
@@ -100,7 +110,10 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
   process.stdout.write(
     `authoritative expiry: ${created.metadata.expiresAt}\nmax bytes: ${created.metadata.limits.maxCiphertextBytes}\n`,
   );
-  if (!options.yes && !(await confirm("Accept relay expiry and limits?"))) {
+  if (
+    !options.assumeApproved &&
+    !(await confirm("Accept relay expiry and limits?"))
+  ) {
     throw new Error("Share cancelled before encryption");
   }
 
@@ -109,7 +122,8 @@ export async function shareCommand(options: ShareOptions): Promise<string> {
     created.metadata,
   );
   const url = buildShareUrl({
-    origin: client.origin,
+    handoffOrigin: options.handoffOrigin ?? DEFAULT_HANDOFF_ORIGIN,
+    relayOrigin: client.origin,
     shareId,
     readCapability,
     fragmentKey: keyToFragment(encrypted.key),
@@ -218,7 +232,7 @@ async function selectManifest(
 ): Promise<AcbManifest> {
   if (
     options.current !== true ||
-    options.yes === true ||
+    options.assumeApproved === true ||
     manifest.events.length <= 1
   ) {
     return manifest;
