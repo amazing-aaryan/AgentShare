@@ -131,6 +131,7 @@ export async function approveOwnedProposal(
     } catch (rollbackError) {
       throw new Error(
         `Proposal apply failed and rollback also failed: ${displayError(error)}; rollback: ${displayError(rollbackError)}`,
+        { cause: rollbackError },
       );
     }
     throw error;
@@ -311,7 +312,7 @@ async function readJournal(
   path: string,
 ): Promise<ApplyJournal> {
   const encrypted = await readFile(path);
-  const parsed = JSON.parse(
+  const parsed: unknown = JSON.parse(
     Buffer.from(
       decryptEnvironmentObject(
         encrypted,
@@ -324,16 +325,42 @@ async function readJournal(
         },
       ),
     ).toString("utf8"),
-  ) as ApplyJournal;
-  if (
-    parsed.version !== 1 ||
-    parsed.proposalId !== proposal.proposalId ||
-    parsed.environmentId !== proposal.environmentId ||
-    !Array.isArray(parsed.entries)
-  ) {
+  );
+  if (!isApplyJournal(parsed, proposal)) {
     throw new Error("Invalid AgentShare rollback journal");
   }
   return parsed;
+}
+
+function isApplyJournal(
+  value: unknown,
+  proposal: AgentShareProposal,
+): value is ApplyJournal {
+  return (
+    isRecord(value) &&
+    value.version === 1 &&
+    value.proposalId === proposal.proposalId &&
+    value.environmentId === proposal.environmentId &&
+    Array.isArray(value.entries) &&
+    value.entries.every(isJournalEntry)
+  );
+}
+
+function isJournalEntry(value: unknown): value is JournalEntry {
+  if (!isRecord(value) || typeof value.path !== "string") return false;
+  if (value.type === "create") return true;
+  return (
+    value.type === "restore" &&
+    typeof value.contentBase64 === "string" &&
+    typeof value.mode === "number" &&
+    Number.isInteger(value.mode) &&
+    value.mode >= 0 &&
+    value.mode <= 0o777
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function verifiedNewContent(
