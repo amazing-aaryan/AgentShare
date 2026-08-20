@@ -44,8 +44,8 @@ from the exact trusted handoff origin. Allowed preflight is limited to `GET`
 plus the `authorization` header on `/v1/shares/<share-id>/meta`.
 
 Create, upload, revoke, and blob-download routes do not expose cross-origin
-browser permissions. CORS is a browser boundary, not authentication; every
-relay operation still requires the appropriate capability where applicable.
+browser permissions. CORS is a browser boundary, not authentication; every relay
+operation still requires the appropriate capability where applicable.
 
 CLI and other non-browser clients are unaffected by CORS.
 
