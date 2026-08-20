@@ -1,0 +1,47 @@
+name: v2-reconcile-final
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - feat/agentshare-v2-environments
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: feat/agentshare-v2-environments
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: >-
+          npx prettier --write
+          SECURITY.md
+          apps/handoff/package.json
+          apps/handoff/tsconfig.json
+          apps/handoff/src/index.ts
+          apps/handoff/src/index.test.ts
+          packages/acb/src/environment-links.ts
+          packages/acb/src/environment-links.test.ts
+          packages/cli/src/environment/accept.ts
+          packages/cli/src/commands/share-v2.ts
+          packages/cli/src/commands/share-v2.test.ts
+          .github/workflows/v2-split-origin-red.yml
+      - name: Commit generated metadata and formatting
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/v2-reconcile-final.yml
+          git add -- package-lock.json SECURITY.md apps/handoff/package.json apps/handoff/tsconfig.json apps/handoff/src/index.ts apps/handoff/src/index.test.ts packages/acb/src/environment-links.ts packages/acb/src/environment-links.test.ts packages/cli/src/environment/accept.ts packages/cli/src/commands/share-v2.ts packages/cli/src/commands/share-v2.test.ts .github/workflows/v2-split-origin-red.yml
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: reconcile split-origin v2 changes"
+          git push origin HEAD:feat/agentshare-v2-environments
