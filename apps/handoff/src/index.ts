@@ -1,3 +1,5 @@
+import { bootstrapDocument, renderEnvironmentPage } from "@agentshare/web/v2";
+
 const PUBLIC_RELEASE = "0.1.10";
 const PUBLIC_PACKAGE =
   `https://github.com/amazing-aaryan/AgentShare/releases/download/v${PUBLIC_RELEASE}/` +
@@ -11,7 +13,43 @@ export default {
 
 export function handleRequest(request: Request): Response {
   const url = new URL(request.url);
-  if (request.method !== "GET" || !/^\/s\/[^/]+$/u.test(url.pathname)) {
+  if (request.method !== "GET") {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const environment =
+    /^\/e\/([A-Za-z][A-Za-z0-9_-]{19,99})(?:\/(bootstrap\.json))?$/u.exec(
+      url.pathname,
+    );
+  if (environment?.[1] !== undefined) {
+    try {
+      validateRelayOrigin(url.searchParams.get("relay"));
+    } catch {
+      return new Response("Invalid AgentShare relay origin", {
+        status: 400,
+        headers: staticSecurityHeaders(),
+      });
+    }
+    if (environment[2] === "bootstrap.json") {
+      return Response.json(bootstrapDocument(), {
+        headers: {
+          "cache-control": "public, max-age=300",
+          "content-security-policy": "default-src 'none'",
+          "referrer-policy": "no-referrer",
+          "x-content-type-options": "nosniff",
+          "x-frame-options": "DENY",
+        },
+      });
+    }
+    return new Response(renderEnvironmentPage(environment[1]), {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        ...staticSecurityHeaders(),
+      },
+    });
+  }
+
+  if (!/^\/s\/[^/]+$/u.test(url.pathname)) {
     return new Response("Not found", { status: 404 });
   }
   const relayValue = url.searchParams.get("relay");
@@ -38,6 +76,17 @@ function securityHeaders(connectOrigin: string): Record<string, string> {
     "content-security-policy":
       "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; " +
       `connect-src ${connectOrigin}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+  };
+}
+
+function staticSecurityHeaders(): Record<string, string> {
+  return {
+    "cache-control": "no-store",
+    "content-security-policy":
+      "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     "referrer-policy": "no-referrer",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY",
