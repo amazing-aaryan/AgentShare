@@ -314,17 +314,19 @@ export async function createEnvironmentMcpRuntime(
       staged.set(path, { type: "delete", path, baseSha256: file.sha256 });
       return { staged: "delete", path };
     },
-    async proposalDiff() {
-      return [...staged.values()].map((operation) => ({
-        type: operation.type,
-        path: operation.path,
-        ...(operation.type === "delete"
-          ? {}
-          : {
-              newBytes: Buffer.from(operation.contentBase64, "base64")
-                .byteLength,
-            }),
-      }));
+    proposalDiff() {
+      return Promise.resolve(
+        [...staged.values()].map((operation) => ({
+          type: operation.type,
+          path: operation.path,
+          ...(operation.type === "delete"
+            ? {}
+            : {
+                newBytes: Buffer.from(operation.contentBase64, "base64")
+                  .byteLength,
+              }),
+        })),
+      );
     },
     async proposalSubmit(summary: string) {
       if (staged.size === 0) throw new Error("No proposal changes are staged");
