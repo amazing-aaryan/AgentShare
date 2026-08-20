@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { capabilityDigest, randomCapability, sha256Hex } from "@agentshare/acb";
 import { describe, expect, it } from "vitest";
 import { EnvironmentObject } from "./environment-object.js";
@@ -39,7 +40,7 @@ function id(prefix: string): string {
   return `${prefix}_${randomCapability(18)}`;
 }
 
-function auth(capability: string): HeadersInit {
+function auth(capability: string): Record<string, string> {
   return { authorization: `Bearer ${capability}` };
 }
 
