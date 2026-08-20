@@ -18,7 +18,7 @@ export async function chooseOption(
   return await new Promise<number>((resolve, reject) => {
     const cleanup = () => {
       process.stdin.removeListener("keypress", onKey);
-      process.stdin.setRawMode(Boolean(wasRaw));
+      process.stdin.setRawMode(wasRaw);
       if (!wasRaw) process.stdin.pause();
     };
     const onKey = (_input: string, key: { name?: string; ctrl?: boolean }) => {
