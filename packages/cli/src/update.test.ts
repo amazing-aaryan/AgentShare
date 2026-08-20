@@ -51,12 +51,14 @@ describe("AgentShare update discovery", () => {
   it("rejects GitHub failures and malformed JSON", async () => {
     await expect(
       fetchLatestRelease({
-        fetchImpl: async () => new Response("rate limited", { status: 403 }),
+        fetchImpl: () =>
+          Promise.resolve(new Response("rate limited", { status: 403 })),
       }),
     ).rejects.toThrow("GitHub HTTP 403");
     await expect(
       fetchLatestRelease({
-        fetchImpl: async () => new Response("not-json", { status: 200 }),
+        fetchImpl: () =>
+          Promise.resolve(new Response("not-json", { status: 200 })),
       }),
     ).rejects.toThrow();
   });
@@ -79,9 +81,9 @@ describe("AgentShare update discovery", () => {
       currentVersion: "0.1.10",
       cachePath,
       now: () => now,
-      fetchImpl: async () => {
+      fetchImpl: () => {
         requests += 1;
-        return new Response(null, { status: 500 });
+        return Promise.resolve(new Response(null, { status: 500 }));
       },
     });
 
@@ -99,9 +101,9 @@ describe("AgentShare update discovery", () => {
       currentVersion: "0.1.10",
       cachePath,
       now: () => Date.parse("2026-08-20T09:00:00.000Z"),
-      fetchImpl: async () => {
+      fetchImpl: () => {
         requests += 1;
-        return releaseResponse("v0.1.11");
+        return Promise.resolve(releaseResponse("v0.1.11"));
       },
     });
 
@@ -131,9 +133,9 @@ describe("AgentShare update discovery", () => {
       cachePath,
       force: true,
       now: () => Date.parse("2026-08-20T09:00:00.000Z"),
-      fetchImpl: async () => {
+      fetchImpl: () => {
         requests += 1;
-        return releaseResponse("v0.1.11");
+        return Promise.resolve(releaseResponse("v0.1.11"));
       },
     });
 
@@ -159,9 +161,9 @@ describe("AgentShare update discovery", () => {
 
   it("suppresses passive network failures and honors the opt-out", async () => {
     let requests = 0;
-    const fetchImpl: typeof fetch = async () => {
+    const fetchImpl: typeof fetch = () => {
       requests += 1;
-      throw new Error("offline");
+      return Promise.reject(new Error("offline"));
     };
 
     expect(
@@ -328,7 +330,7 @@ describe("AgentShare explicit update", () => {
 });
 
 function releaseFetch(tag: string): typeof fetch {
-  return async () => releaseResponse(tag);
+  return () => Promise.resolve(releaseResponse(tag));
 }
 
 function releaseResponse(tag: string): Response {
@@ -339,11 +341,13 @@ function releaseResponse(tag: string): Response {
 }
 
 function jsonFetch(payload: unknown): typeof fetch {
-  return async () =>
-    new Response(JSON.stringify(payload), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
+  return () =>
+    Promise.resolve(
+      new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
 }
 
 async function temporaryDirectory(): Promise<string> {
