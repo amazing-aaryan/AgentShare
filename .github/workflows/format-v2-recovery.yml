@@ -1,0 +1,42 @@
+name: format-v2-recovery
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - feat/agentshare-v2-environments
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: feat/agentshare-v2-environments
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: >-
+          npx prettier --write
+          packages/cli/src/bin.ts
+          packages/cli/src/environment/publication.ts
+          packages/cli/src/environment/state.ts
+          packages/cli/src/proposals/apply.test.ts
+          packages/cli/src/proposals/apply.ts
+          packages/contracts/src/environment-machine.test.ts
+          packages/contracts/src/environment-machine.ts
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: format v2 recovery fixes"
+          git push origin HEAD:feat/agentshare-v2-environments
