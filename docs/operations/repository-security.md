@@ -27,8 +27,8 @@ For this public repository:
 
 1. Open **Settings → Code security and analysis** and verify GitHub secret
    scanning and push protection are enabled where available.
-2. Open **Security → Secret scanning** and resolve every real alert. Do not close
-   an alert as a false positive without recording why the matched value is
+2. Open **Security → Secret scanning** and resolve every real alert. Do not
+   close an alert as a false positive without recording why the matched value is
    synthetic or revoked.
 3. Treat a historical credential as compromised even if it was later deleted
    from the branch. Rotate/revoke it at the provider, then remove it from
@@ -59,8 +59,8 @@ repository.
 
 ## Package contents
 
-`@agentshare/cli` uses a package allowlist. Release verification must confirm the
-packed artifact contains only the intended distributable files: bundled CLI
+`@agentshare/cli` uses a package allowlist. Release verification must confirm
+the packed artifact contains only the intended distributable files: bundled CLI
 output plus the required README/license/notice files. Source-session artifacts,
 `.env` files, local state, coverage output, and agent transcripts must never
 enter the package.
