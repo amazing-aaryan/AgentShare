@@ -37,8 +37,8 @@ and verifies the newly installed CLI version before running `agentshare repair`
 from that new installation. AgentShare-managed Codex and Claude skills are
 refreshed; unmanaged conflicting skills are not overwritten.
 
-The pinned `npm install --global ...` command remains the manual recovery path if
-an update cannot be completed automatically.
+The pinned `npm install --global ...` command remains the manual recovery path
+if an update cannot be completed automatically.
 
 Recipients may run the connector without a global installation:
 
