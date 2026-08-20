@@ -21,7 +21,7 @@ describe.skipIf(!relay)("public AgentShare v2 environment", () => {
     const ownerState = join(root, "owner-state.json");
     const recipientState = join(root, "recipient-state.json");
     const recipientCache = join(root, "recipient-cache");
-    const client = new EnvironmentRelayClient(relay!);
+    const client = new EnvironmentRelayClient(requiredRelay());
     const capture = {
       sourceAgent: "codex" as const,
       title: "AgentShare release v2",
@@ -104,3 +104,10 @@ describe.skipIf(!relay)("public AgentShare v2 environment", () => {
     }
   });
 });
+
+function requiredRelay(): string {
+  if (relay === undefined || relay.length === 0) {
+    throw new Error("AGENTSHARE_E2E_RELAY is required for the public v2 gate");
+  }
+  return relay;
+}
