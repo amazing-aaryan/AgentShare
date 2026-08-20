@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { capabilityDigest, randomCapability, sha256Hex } from "@agentshare/acb";
 import {
   environmentMetadataResponseSchema,
@@ -48,7 +49,7 @@ class MemoryStorage {
   }
 }
 
-function auth(capability: string): HeadersInit {
+function auth(capability: string): Record<string, string> {
   return { authorization: `Bearer ${capability}` };
 }
 
