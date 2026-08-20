@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -69,6 +70,7 @@ type UpdateOptions = CheckOptions & {
   runProcess?: ProcessRunner;
   platform?: NodeJS.Platform;
   nodeExecutable?: string;
+  npmCliPath?: string;
   cliEntrypoint?: string;
 };
 
@@ -184,15 +186,21 @@ export async function updateAgentShare(
 
   const runProcess = options.runProcess ?? defaultProcessRunner;
   const platform = options.platform ?? process.platform;
-  const npmCommand = platform === "win32" ? "npm.cmd" : "npm";
+  const nodeExecutable = options.nodeExecutable ?? process.execPath;
+  const npm = resolveNpmInvocation({
+    platform,
+    nodeExecutable,
+    ...(options.npmCliPath === undefined
+      ? {}
+      : { npmCliPath: options.npmCliPath }),
+  });
   const install = runProcess(
-    npmCommand,
-    ["install", "--global", check.packageUrl],
+    npm.command,
+    [...npm.args, "install", "--global", check.packageUrl],
     { inherit: true },
   );
   assertProcessSucceeded(install, "npm install failed");
 
-  const nodeExecutable = options.nodeExecutable ?? process.execPath;
   const cliEntrypoint = options.cliEntrypoint ?? process.argv[1];
   if (cliEntrypoint === undefined) {
     throw new Error(
@@ -257,6 +265,34 @@ export async function passiveUpdateNotice(
   } catch {
     return undefined;
   }
+}
+
+function resolveNpmInvocation(options: {
+  platform: NodeJS.Platform;
+  nodeExecutable: string;
+  npmCliPath?: string;
+}): { command: string; args: string[] } {
+  if (options.platform !== "win32") {
+    return { command: "npm", args: [] };
+  }
+
+  const npmCliPath =
+    options.npmCliPath ??
+    (process.env.npm_execpath && existsSync(process.env.npm_execpath)
+      ? process.env.npm_execpath
+      : join(
+          dirname(options.nodeExecutable),
+          "node_modules",
+          "npm",
+          "bin",
+          "npm-cli.js",
+        ));
+  if (options.npmCliPath === undefined && !existsSync(npmCliPath)) {
+    throw new Error(
+      "Unable to locate npm-cli.js for a no-shell update. Run the documented immutable npm install command manually.",
+    );
+  }
+  return { command: options.nodeExecutable, args: [npmCliPath] };
 }
 
 function versionFromTag(tag: string): string {
