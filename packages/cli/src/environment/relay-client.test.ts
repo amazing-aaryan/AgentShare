@@ -11,25 +11,33 @@ describe("EnvironmentRelayClient", () => {
 
   it("sends read capability only to the v2 metadata endpoint", async () => {
     const seen: Array<{ url: string; authorization: string | null }> = [];
-    const fetchImpl: typeof fetch = async (input, init) => {
+    const fetchImpl: typeof fetch = (input, init) => {
       const headers = new Headers(init?.headers);
+      const url =
+        input instanceof Request
+          ? input.url
+          : input instanceof URL
+            ? input.toString()
+            : input;
       seen.push({
-        url: String(input),
+        url,
         authorization: headers.get("authorization"),
       });
-      return Response.json({
-        protocolVersion: "agentshare-environment-relay-v2",
-        environmentId: "env_12345678901234567890",
-        createdAt: "2026-08-19T00:00:00.000Z",
-        expiresAt: "2026-08-20T00:00:00.000Z",
-        status: "active",
-        currentRevisionId: null,
-        currentRevision: null,
-        limits: {
-          maxCiphertextBytes: 50 * 1024 * 1024,
-          maxTtlSeconds: 72 * 60 * 60,
-        },
-      });
+      return Promise.resolve(
+        Response.json({
+          protocolVersion: "agentshare-environment-relay-v2",
+          environmentId: "env_12345678901234567890",
+          createdAt: "2026-08-19T00:00:00.000Z",
+          expiresAt: "2026-08-20T00:00:00.000Z",
+          status: "active",
+          currentRevisionId: null,
+          currentRevision: null,
+          limits: {
+            maxCiphertextBytes: 50 * 1024 * 1024,
+            maxTtlSeconds: 72 * 60 * 60,
+          },
+        }),
+      );
     };
     const client = new EnvironmentRelayClient(
       "https://relay.example",
