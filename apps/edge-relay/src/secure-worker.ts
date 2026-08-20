@@ -58,7 +58,8 @@ export default {
       }
     }
 
-    if (shareId === undefined) return error("NOT_FOUND", "Route not found", 404);
+    if (shareId === undefined)
+      return error("NOT_FOUND", "Route not found", 404);
     if (request.method === "PUT" && url.pathname.endsWith("/blob")) {
       if (!(await allow(env.UPLOAD_RATE_LIMITER, request, "upload"))) {
         return error("RATE_LIMITED", "Upload rate limit exceeded", 429);
@@ -83,7 +84,11 @@ async function parseBoundedCreate(request: Request) {
       return error("BAD_REQUEST", "Invalid Content-Length", 400);
     }
     if (length > MAX_CREATE_BODY_BYTES) {
-      return error("PAYLOAD_TOO_LARGE", "Create request exceeds relay limit", 413);
+      return error(
+        "PAYLOAD_TOO_LARGE",
+        "Create request exceeds relay limit",
+        413,
+      );
     }
   }
 
@@ -102,7 +107,8 @@ async function readAtMost(
   request: Request,
   maxBytes: number,
 ): Promise<Uint8Array | Response> {
-  if (request.body === null) return error("BAD_REQUEST", "Invalid request", 400);
+  if (request.body === null)
+    return error("BAD_REQUEST", "Invalid request", 400);
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -137,7 +143,9 @@ async function readAtMost(
 function metadataPreflight(request: Request, url: URL): Response {
   const origin = request.headers.get("origin");
   const requestedMethod = request.headers.get("access-control-request-method");
-  const requestedHeaders = (request.headers.get("access-control-request-headers") ?? "")
+  const requestedHeaders = (
+    request.headers.get("access-control-request-headers") ?? ""
+  )
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
