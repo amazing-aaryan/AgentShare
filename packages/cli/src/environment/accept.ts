@@ -17,6 +17,7 @@ import {
   searchIndex,
   type EnvironmentSearchHit,
   type SearchIndex,
+  type SearchIndexEntry,
 } from "./index.js";
 import { EnvironmentRelayClient } from "./relay-client.js";
 import {
@@ -184,7 +185,7 @@ export async function searchAttachedEnvironment(
   const revisionId = requiredRevision(attached);
   const root = environmentCacheDirectory(environmentId, options.cacheRoot);
   const encrypted = await readFile(join(root, "index.enc"));
-  const index = JSON.parse(
+  const parsed: unknown = JSON.parse(
     Buffer.from(
       decryptEnvironmentObject(
         encrypted,
@@ -197,10 +198,8 @@ export async function searchAttachedEnvironment(
         },
       ),
     ).toString("utf8"),
-  ) as SearchIndex;
-  if (index.version !== 1 || !Array.isArray(index.entries)) {
-    throw new Error("Invalid AgentShare environment search index");
-  }
+  );
+  const index = parseSearchIndex(parsed);
   return searchIndex(index, query);
 }
 
@@ -395,4 +394,51 @@ function assertDescriptor(
   ) {
     throw new Error(`${label} descriptor mismatch`);
   }
+}
+
+function parseSearchIndex(value: unknown): SearchIndex {
+  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.entries)) {
+    throw new Error("Invalid AgentShare environment search index");
+  }
+  if (!isNumberRecord(value.documentFrequency)) {
+    throw new Error("Invalid AgentShare environment search index");
+  }
+  if (!value.entries.every(isSearchIndexEntry)) {
+    throw new Error("Invalid AgentShare environment search index");
+  }
+  return {
+    version: 1,
+    entries: value.entries,
+    documentFrequency: value.documentFrequency,
+  };
+}
+
+function isSearchIndexEntry(value: unknown): value is SearchIndexEntry {
+  if (!isRecord(value)) return false;
+  if (
+    typeof value.source !== "string" ||
+    (value.kind !== "file" && value.kind !== "conversation") ||
+    typeof value.text !== "string" ||
+    !isNumberRecord(value.terms)
+  ) {
+    return false;
+  }
+  for (const key of ["startLine", "endLine", "sequence"] as const) {
+    const candidate = value[key];
+    if (candidate !== undefined && !Number.isInteger(candidate)) return false;
+  }
+  return true;
+}
+
+function isNumberRecord(value: unknown): value is Record<string, number> {
+  return (
+    isRecord(value) &&
+    Object.values(value).every(
+      (candidate) => typeof candidate === "number" && Number.isFinite(candidate),
+    )
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
