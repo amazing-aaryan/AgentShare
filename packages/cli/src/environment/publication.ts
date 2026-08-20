@@ -159,6 +159,7 @@ export async function publishEnvironmentRevision(
   options: {
     statePath?: string;
     now?: Date;
+    proposalId?: string;
     workspaceOptions?: { preferGit?: boolean; maxFileBytes?: number };
   } = {},
 ): Promise<{ environment: OwnedEnvironment; summary: PublicationSummary }> {
@@ -176,6 +177,7 @@ export async function publishEnvironmentRevision(
     prepared,
     client,
     options.statePath,
+    options.proposalId,
   );
   return { environment: published, summary: prepared.summary };
 }
@@ -211,6 +213,14 @@ export async function resumePendingRevision(
     pending.reservation.revisionId,
     environment.updateCapability,
   );
+  if (pending.proposalId !== undefined) {
+    await client.setProposalStatus(
+      environment.environmentId,
+      pending.proposalId,
+      environment.inboxCapability,
+      "accepted",
+    );
+  }
   const next: OwnedEnvironment = {
     ...environment,
     currentRevisionId: committed.currentRevisionId,
@@ -373,12 +383,14 @@ async function publishPreparedRevision(
   prepared: PreparedRevision,
   client: EnvironmentRelayClient,
   statePath?: string,
+  proposalId?: string,
 ): Promise<OwnedEnvironment> {
   const pending: OwnedEnvironment = {
     ...environment,
     pendingRevision: {
       reservation: prepared.reservation,
       manifestBase64: Buffer.from(prepared.manifestBytes).toString("base64"),
+      ...(proposalId === undefined ? {} : { proposalId }),
       blobs: prepared.newBlobs.map((blob) => ({
         blobId: blob.blobId,
         ciphertextBase64: Buffer.from(blob.bytes).toString("base64"),
