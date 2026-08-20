@@ -32,7 +32,9 @@ try {
           `AgentShare v${result.latestVersion} is available (installed v${result.currentVersion}).\nRun \`agentshare update\` to install it.\n`,
         );
       } else {
-        process.stdout.write(`AgentShare v${result.currentVersion} is up to date.\n`);
+        process.stdout.write(
+          `AgentShare v${result.currentVersion} is up to date.\n`,
+        );
       }
     } else {
       const result = await updateAgentShare();
@@ -41,7 +43,9 @@ try {
           `AgentShare updated from v${result.fromVersion} to v${result.toVersion}. Integrations repaired.\n`,
         );
       } else {
-        process.stdout.write(`AgentShare v${result.currentVersion} is up to date.\n`);
+        process.stdout.write(
+          `AgentShare v${result.currentVersion} is up to date.\n`,
+        );
       }
     }
   } else if (command === "share") {
@@ -104,7 +108,6 @@ try {
 function shouldRunPassiveUpdateCheck(command: string | undefined): boolean {
   return (
     command === "share" ||
-    command === "open" ||
     command === "revoke" ||
     command === "init" ||
     command === "repair"
