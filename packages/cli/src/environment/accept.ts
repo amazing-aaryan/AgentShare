@@ -397,7 +397,11 @@ function assertDescriptor(
 }
 
 function parseSearchIndex(value: unknown): SearchIndex {
-  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.entries)) {
+  if (
+    !isRecord(value) ||
+    value.version !== 1 ||
+    !Array.isArray(value.entries)
+  ) {
     throw new Error("Invalid AgentShare environment search index");
   }
   if (!isNumberRecord(value.documentFrequency)) {
@@ -434,7 +438,8 @@ function isNumberRecord(value: unknown): value is Record<string, number> {
   return (
     isRecord(value) &&
     Object.values(value).every(
-      (candidate) => typeof candidate === "number" && Number.isFinite(candidate),
+      (candidate) =>
+        typeof candidate === "number" && Number.isFinite(candidate),
     )
   );
 }
