@@ -82,7 +82,6 @@ AgentShare is intended to remain:
 - explicit about creator review;
 - portable across more agent vendors over time.
 
-See the [full guide](https://github.com/amazing-aaryan/AgentShare#readme) and
-[`docs/VISION.md`](https://github.com/amazing-aaryan/AgentShare/blob/master/docs/VISION.md).
+See the [full guide](../../README.md) and [project vision](../../docs/VISION.md).
 
 Apache-2.0.
