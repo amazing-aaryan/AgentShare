@@ -58,9 +58,9 @@ with the published Durable Object migration history intact:
 npx wrangler deploy --config apps/edge-relay/wrangler.jsonc
 ```
 
-Deployments require the `ShareObject` v1 and `RelayControl` v2 Durable Object
-migrations in `apps/edge-relay/wrangler.jsonc`. Never remove, rename, or
-renumber a published migration.
+Deployments require the `ShareObject` v1, `RelayControl` v2, and `QueryObject`
+v3 Durable Object migrations in `apps/edge-relay/wrangler.jsonc`. Never remove,
+rename, or renumber a published migration.
 
 ## Strict live release gate
 

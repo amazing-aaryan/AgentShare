@@ -222,3 +222,16 @@ exclude current security fixes and make the unchanged-relay evidence false.
 **Impact:** Candidate SHA, local gates, CI, strict production gate, and relay
 version evidence must all be regenerated. Durable Object classes and migrations
 remain unchanged, with relay rollback pinned to the pre-hardening deployment.
+
+## [2026-08-21 17:46] Restore deployed QueryObject v3 before relay hardening
+
+**Decision:** Restore the exact active `QueryObject` contract, class, `QUERIES`
+binding, and v3 migration from commit `636152e`, then route it through the new
+hardened Worker entrypoint with direct lifecycle regression coverage. **Why:**
+Cloudflare rejected the first hardened deployment because current master had
+dropped the published v3 migration. Active version `dea32c60...` confirms v3 is
+`QueryObject`; deploying v1/v2-only source could orphan a live namespace and
+break existing encrypted query clients. **Impact:** v0.1.11 cannot freeze until
+local gates and six-job CI pass again with all three migrations. Future
+deployments must preserve v1 ShareObject, v2 RelayControl, and v3 QueryObject
+even when no new migration is introduced.

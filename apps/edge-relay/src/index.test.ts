@@ -1,6 +1,6 @@
 import { capabilityDigest, randomCapability, sha256Hex } from "@agentshare/acb";
 import { describe, expect, it, vi } from "vitest";
-import worker, { RelayControl, ShareObject } from "./index.js";
+import worker, { QueryObject, RelayControl, ShareObject } from "./index.js";
 
 const MAX_ACTIVE_SHARES = 5_000;
 const MAX_ACTIVE_SHARES_PER_ACTOR = 25;
@@ -629,5 +629,98 @@ describe("production edge relay lifecycle", () => {
       } as unknown as Parameters<typeof worker.fetch>[1],
     );
     expect(response.status).toBe(429);
+  });
+});
+
+describe("deployed v3 query lifecycle", () => {
+  it("preserves encrypted question, answer, and revoke semantics", async () => {
+    const object = new QueryObject({
+      storage: new MemoryStorage(),
+    } as unknown as DurableObjectState);
+    const endpointId = randomCapability(18);
+    const requestUpload = randomCapability();
+    const requestRead = randomCapability();
+    const responseUpload = randomCapability();
+    const responseRead = randomCapability();
+    const revoke = randomCapability();
+
+    const created = await object.fetch(
+      new Request("https://relay.test/v1/queries", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          endpointId,
+          requestedTtlSeconds: 60,
+          requestUploadTokenDigest: capabilityDigest(requestUpload),
+          requestReadTokenDigest: capabilityDigest(requestRead),
+          responseUploadTokenDigest: capabilityDigest(responseUpload),
+          responseReadTokenDigest: capabilityDigest(responseRead),
+          revokeTokenDigest: capabilityDigest(revoke),
+        }),
+      }),
+    );
+    expect(created.status).toBe(201);
+
+    const question = new Uint8Array([1, 2, 3]);
+    expect(
+      (
+        await object.fetch(
+          new Request(`https://relay.test/v1/queries/${endpointId}/question`, {
+            method: "PUT",
+            headers: { authorization: `Bearer ${requestUpload}` },
+            body: question,
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    const downloadedQuestion = await object.fetch(
+      new Request(`https://relay.test/v1/queries/${endpointId}/question`, {
+        headers: { authorization: `Bearer ${requestRead}` },
+      }),
+    );
+    expect(new Uint8Array(await downloadedQuestion.arrayBuffer())).toEqual(
+      question,
+    );
+
+    const answer = new Uint8Array([4, 5]);
+    expect(
+      (
+        await object.fetch(
+          new Request(`https://relay.test/v1/queries/${endpointId}/answer`, {
+            method: "PUT",
+            headers: { authorization: `Bearer ${responseUpload}` },
+            body: answer,
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    const downloadedAnswer = await object.fetch(
+      new Request(`https://relay.test/v1/queries/${endpointId}/answer`, {
+        headers: { authorization: `Bearer ${responseRead}` },
+      }),
+    );
+    expect(new Uint8Array(await downloadedAnswer.arrayBuffer())).toEqual(
+      answer,
+    );
+
+    expect(
+      (
+        await object.fetch(
+          new Request(`https://relay.test/v1/queries/${endpointId}`, {
+            method: "DELETE",
+            headers: { authorization: `Bearer ${revoke}` },
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await object.fetch(
+          new Request(`https://relay.test/v1/queries/${endpointId}/meta`, {
+            headers: { authorization: `Bearer ${requestRead}` },
+          }),
+        )
+      ).status,
+    ).toBe(404);
   });
 });

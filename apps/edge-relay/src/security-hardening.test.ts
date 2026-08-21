@@ -7,6 +7,7 @@ const SHARE_ID = "s".repeat(24);
 
 function env(status = 200) {
   let allocations = 0;
+  let queryAllocations = 0;
   return {
     value: {
       CREATE_RATE_LIMITER: {
@@ -24,8 +25,18 @@ function env(status = 200) {
           fetch: () => Promise.resolve(new Response(null, { status })),
         }),
       },
+      QUERIES: {
+        idFromName: () => {
+          queryAllocations += 1;
+          return { name: "query" };
+        },
+        get: () => ({
+          fetch: () => Promise.resolve(new Response(null, { status: 201 })),
+        }),
+      },
     } as unknown as Parameters<typeof worker.fetch>[1],
     allocations: () => allocations,
+    queryAllocations: () => queryAllocations,
   };
 }
 
@@ -40,6 +51,30 @@ function createBody(): string {
 }
 
 describe("edge relay browser hardening", () => {
+  it("preserves the deployed v3 QueryObject route", async () => {
+    const fixture = env();
+    const response = await worker.fetch(
+      new Request("https://relay.test/v1/queries", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          endpointId: "query-12345678901234567890",
+          requestedTtlSeconds: 60,
+          requestUploadTokenDigest: "a".repeat(64),
+          requestReadTokenDigest: "b".repeat(64),
+          responseUploadTokenDigest: "c".repeat(64),
+          responseReadTokenDigest: "d".repeat(64),
+          revokeTokenDigest: "e".repeat(64),
+        }),
+      }),
+      fixture.value,
+    );
+
+    expect(response.status).toBe(201);
+    expect(fixture.queryAllocations()).toBe(1);
+    expect(fixture.allocations()).toBe(0);
+  });
+
   it("allows the trusted handoff origin to read metadata", async () => {
     const fixture = env();
     const response = await worker.fetch(

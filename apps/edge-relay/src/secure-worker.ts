@@ -1,9 +1,13 @@
-import { createShareRequestSchema } from "@agentshare/contracts";
+import {
+  createShareRequestSchema,
+  queryCreateRequestSchema,
+} from "@agentshare/contracts";
 import { renderSharePage } from "@agentshare/web";
-export { RelayControl, ShareObject } from "./index.js";
+export { QueryObject, RelayControl, ShareObject } from "./index.js";
 
 type Env = {
   SHARES: DurableObjectNamespace;
+  QUERIES: DurableObjectNamespace;
   CREATE_RATE_LIMITER: RateLimiter;
   UPLOAD_RATE_LIMITER: RateLimiter;
 };
@@ -26,6 +30,33 @@ export default {
     }
     if (request.method === "GET" && /^\/s\/[^/]+$/u.test(url.pathname)) {
       return sharePage();
+    }
+
+    let queryId: string | undefined;
+    if (request.method === "POST" && url.pathname === "/v1/queries") {
+      try {
+        queryId = queryCreateRequestSchema.parse(
+          await request.clone().json(),
+        ).endpointId;
+      } catch {
+        return error("BAD_REQUEST", "Invalid request", 400);
+      }
+    } else {
+      const match =
+        /^\/v1\/queries\/([^/]+)(?:\/(?:question|answer|meta))?$/u.exec(
+          url.pathname,
+        );
+      if (match?.[1] !== undefined) {
+        try {
+          queryId = decodeURIComponent(match[1]);
+        } catch {
+          return error("BAD_REQUEST", "Invalid query ID", 400);
+        }
+      }
+    }
+    if (queryId !== undefined) {
+      const stub = env.QUERIES.get(env.QUERIES.idFromName(queryId));
+      return await stub.fetch(request);
     }
 
     let shareId: string | undefined;

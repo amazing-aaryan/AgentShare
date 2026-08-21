@@ -16,6 +16,10 @@
         "name": "CONTROL",
         "class_name": "RelayControl",
       },
+      {
+        "name": "QUERIES",
+        "class_name": "QueryObject",
+      },
     ],
   },
   "migrations": [
@@ -26,6 +30,10 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["RelayControl"],
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["QueryObject"],
     },
   ],
   "ratelimits": [
