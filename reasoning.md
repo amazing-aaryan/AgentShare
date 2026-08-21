@@ -244,3 +244,16 @@ intentionally limits browser metadata access to the trusted handoff Worker. The
 previous wildcard expectation was stale and weaker than the deployed security
 contract. **Impact:** Future production tests must reject CORS regressions that
 broaden relay metadata access beyond the configured handoff origin.
+
+## [2026-08-21 18:35] Publish v0.1.11 but hold broad announcement
+
+**Decision:** Published immutable v0.1.11 from exact commit
+`63ad80b0a4f2afad3bf66026fff2e4ef0e69df4d`, while holding broad public-beta
+announcement. **Why:** Exact source, six-job CI, production Workers, strict
+real-agent gate, digest, fresh install, upgrade, published creator approvals,
+handoff, and two grounded cited recipient turns passed. Windows PTY automation
+did not complete the final same-flow published CLI revoke observation before
+expiry. **Impact:** Release remains available and production stays deployed.
+Future work must manually or reliably automate published CLI revoke followed by
+relay 410 before broad announcement; do not misreport that observation as
+complete.
