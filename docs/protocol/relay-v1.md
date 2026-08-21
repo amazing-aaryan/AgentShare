@@ -1,5 +1,18 @@
 # Blind Relay Protocol v1
 
+The Blind Relay Protocol is the transport half of AgentShare's open context
+handoff model. Its job is intentionally narrow: move encrypted Agent Context
+Bundles by capability without requiring the relay to receive the conversation
+plaintext, encryption key, AgentShare account, or organization membership.
+
+The complete share link is a bearer capability. This makes the protocol portable
+across people, machines, communities, and companies, but it also means link
+secrecy is access control: anyone who obtains the complete link may be able to
+read the share until expiry or revocation.
+
+See [`../VISION.md`](../VISION.md) and
+[ADR 0005](../adr/0005-open-context-transport.md) for the project direction.
+
 ## State machine
 
 `missing -> awaiting-upload -> available -> revoked|expired`
@@ -18,7 +31,21 @@
 6. Expired or revoked blobs are deleted. A permanent status tombstone prevents
    recreation of the same share ID.
 
-## v0.1.10 split-origin capability link
+## Capability authorization
+
+The base protocol deliberately does not ask a relay to decide whether two users
+belong to the same team or company. Possession of the appropriate high-entropy
+capability authorizes the corresponding operation.
+
+This keeps the core protocol account-free and cross-organization. It does not
+prevent a compatible third-party system from adding an identity layer around its
+own distribution of capabilities, but identity is not required for protocol
+interoperability.
+
+Clients must treat complete share URLs, read capabilities, upload capabilities,
+revoke capabilities, and encryption keys as secrets.
+
+## v0.1.10+ split-origin capability link
 
 Current creator links use an independent trusted handoff origin:
 
@@ -36,6 +63,10 @@ visible browser history, and sends the read capability only in an
 
 The encryption key is never sent to the relay. The handoff page has no
 third-party scripts or analytics.
+
+The independent handoff origin is a browser security measure, not an AgentShare
+account service. A recipient still needs only the complete capability link and a
+supported target agent.
 
 ### Browser CORS boundary
 
@@ -65,6 +96,23 @@ Clients must strip fragments before logging, analytics, errors, subprocess
 arguments, or environment variables. Capability URLs must be treated as secrets
 because possession grants the corresponding operation.
 
+Forwarding a complete read link forwards access. Current links do not identify
+individual readers and current revocation invalidates all readers of that share.
+Those semantics are intentional for the simple base transport and must be stated
+clearly in compatible clients.
+
+## Blind-relay data boundary
+
+A compliant relay implementation should require only what is necessary to
+transport and expire a share: ciphertext, capability digests, authenticated
+metadata, size/integrity data, timestamps/status, and admission-control state.
+It must not require conversation plaintext or the encryption key.
+
+The official Cloudflare deployment may observe normal transport metadata such as
+source network information at the infrastructure boundary and stores a hashed
+source identity for quota controls as described below. "Blind" describes the
+share-content cryptographic boundary, not network anonymity.
+
 ## Limits
 
 - Maximum requested TTL: 72 hours.
@@ -78,6 +126,10 @@ because possession grants the corresponding operation.
 - Public create rate: 10 per source IP per minute.
 - Public upload rate: 20 per source IP per minute.
 
+These are limits of the free official public relay, not protocol requirements
+for every compatible deployment. They exist to keep shared public
+infrastructure operable without introducing paid plans or accounts.
+
 The edge derives a SHA-256 source identity from Cloudflare's connection address,
 overwrites any client-supplied internal identity header, and stores only the
 digest with quota state. This is pseudonymous admission-control data, not
@@ -85,3 +137,14 @@ authentication or anonymization.
 
 The server response is authoritative. Clients fail closed on metadata mismatch,
 expiry, hash mismatch, authentication failure, or unknown protocol version.
+
+## Self-hosting and compatible relays
+
+Self-hosting is part of the normal open-protocol model, not an enterprise-only
+feature. Compatible relays may use different storage implementations or limits
+while preserving the cryptographic/capability semantics required by the
+protocol version.
+
+A custom relay must not be able to substitute browser JavaScript that reads the
+capability fragment for new-format links. That is why the current public client
+separates the trusted handoff origin from the selected ciphertext relay.
