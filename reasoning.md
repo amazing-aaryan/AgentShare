@@ -211,3 +211,14 @@ Windows uses `<prefix>/node_modules`, while macOS and Linux use
 `<prefix>/lib/node_modules`; exact-candidate CI exposed the platform mismatch.
 **Impact:** Clean-install package smoke now validates the same isolated global
 installation flow across all six CI jobs without hard-coded npm layout rules.
+
+## [2026-08-21 17:36] Integrate current master security hardening
+
+**Decision:** Merge `origin/master` security hardening into v0.1.11 and deploy
+both the hardened relay edge entrypoint and the already pinned handoff Worker.
+**Why:** Master advanced during release preparation with scanner coverage and a
+new `secure-worker.ts` production boundary; releasing the older candidate would
+exclude current security fixes and make the unchanged-relay evidence false.
+**Impact:** Candidate SHA, local gates, CI, strict production gate, and relay
+version evidence must all be regenerated. Durable Object classes and migrations
+remain unchanged, with relay rollback pinned to the pre-hardening deployment.
