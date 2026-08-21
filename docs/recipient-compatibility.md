@@ -47,6 +47,24 @@ matrix remain blocked until reviewed. Earlier release evidence for Codex 0.145.0
 and Claude 2.1.210 is also recorded in
 [`releases/v0.1.8-release-verification.md`](releases/v0.1.8-release-verification.md).
 
+## 2026-08-21 current-release review
+
+Environment: Windows NT 10.0.26200.0, Node.js 24.14.0. Exact published binaries
+were installed into isolated npm prefixes. Capability help checks passed for
+both hosts before the real production launcher tests.
+
+| Host        | Release | Filesystem           | Network              | Two-turn dialogue | Allowlisted |
+| ----------- | ------- | -------------------- | -------------------- | ----------------- | ----------- |
+| Codex CLI   | 0.149.0 | Safe startup refusal | Safe startup refusal | Fail              | No          |
+| Claude Code | 2.1.238 | Pass                 | Pass                 | Pass              | Yes         |
+
+Codex CLI 0.149.0 refused to start under AgentShare's required Windows sandbox:
+`windows unelevated restricted-token sandbox cannot enforce split filesystem read restrictions directly; refusing to run unsandboxed`.
+This is a safe failure, but the recipient workflow cannot operate, so 0.149.0
+remains blocked. Claude Code 2.1.238 denied filesystem/network attempts and
+preserved grounded two-turn answers, so that exact release was added to the
+reviewed allowlist. Newer releases remain blocked until the same review passes.
+
 ## Review procedure
 
 For each candidate:

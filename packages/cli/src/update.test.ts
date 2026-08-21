@@ -54,7 +54,9 @@ describe("AgentShare update discovery", () => {
         fetchImpl: () =>
           Promise.resolve(new Response("rate limited", { status: 403 })),
       }),
-    ).rejects.toThrow("GitHub HTTP 403");
+    ).rejects.toThrow(
+      "GitHub may be rate-limiting update checks; try again later",
+    );
     await expect(
       fetchLatestRelease({
         fetchImpl: () =>
@@ -71,14 +73,14 @@ describe("AgentShare update discovery", () => {
       cachePath,
       `${JSON.stringify({
         checkedAt: "2026-08-19T10:00:00.000Z",
-        latestVersion: "0.1.11",
+        latestVersion: "0.1.12",
       })}\n`,
       "utf8",
     );
     let requests = 0;
 
     const result = await checkForUpdate({
-      currentVersion: "0.1.10",
+      currentVersion: "0.1.11",
       cachePath,
       now: () => now,
       fetchImpl: () => {
@@ -98,12 +100,12 @@ describe("AgentShare update discovery", () => {
     let requests = 0;
 
     const result = await checkForUpdate({
-      currentVersion: "0.1.10",
+      currentVersion: "0.1.11",
       cachePath,
       now: () => Date.parse("2026-08-20T09:00:00.000Z"),
       fetchImpl: () => {
         requests += 1;
-        return Promise.resolve(releaseResponse("v0.1.11"));
+        return Promise.resolve(releaseResponse("v0.1.12"));
       },
     });
 
@@ -111,7 +113,7 @@ describe("AgentShare update discovery", () => {
     expect(result.status).toBe("available");
     expect(JSON.parse(await readFile(cachePath, "utf8"))).toEqual({
       checkedAt: "2026-08-20T09:00:00.000Z",
-      latestVersion: "0.1.11",
+      latestVersion: "0.1.12",
     });
   });
 
@@ -122,20 +124,20 @@ describe("AgentShare update discovery", () => {
       cachePath,
       `${JSON.stringify({
         checkedAt: "2026-08-20T08:59:00.000Z",
-        latestVersion: "0.1.10",
+        latestVersion: "0.1.11",
       })}\n`,
       "utf8",
     );
     let requests = 0;
 
     const result = await checkForUpdate({
-      currentVersion: "0.1.10",
+      currentVersion: "0.1.11",
       cachePath,
       force: true,
       now: () => Date.parse("2026-08-20T09:00:00.000Z"),
       fetchImpl: () => {
         requests += 1;
-        return Promise.resolve(releaseResponse("v0.1.11"));
+        return Promise.resolve(releaseResponse("v0.1.12"));
       },
     });
 
@@ -146,16 +148,16 @@ describe("AgentShare update discovery", () => {
   it("never proposes a downgrade", async () => {
     const directory = await temporaryDirectory();
     const result = await checkForUpdate({
-      currentVersion: "0.1.12",
+      currentVersion: "0.1.13",
       cachePath: join(directory, "update-check-v1.json"),
       force: true,
-      fetchImpl: releaseFetch("v0.1.11"),
+      fetchImpl: releaseFetch("v0.1.12"),
     });
 
     expect(result).toMatchObject({
       status: "current",
-      currentVersion: "0.1.12",
-      latestVersion: "0.1.11",
+      currentVersion: "0.1.13",
+      latestVersion: "0.1.12",
     });
   });
 
@@ -168,7 +170,7 @@ describe("AgentShare update discovery", () => {
 
     expect(
       await passiveUpdateNotice({
-        currentVersion: "0.1.10",
+        currentVersion: "0.1.11",
         env: { AGENTSHARE_NO_UPDATE_CHECK: "1" },
         fetchImpl,
       }),
@@ -177,7 +179,7 @@ describe("AgentShare update discovery", () => {
 
     expect(
       await passiveUpdateNotice({
-        currentVersion: "0.1.10",
+        currentVersion: "0.1.11",
         cachePath: join(await temporaryDirectory(), "cache.json"),
         env: {},
         fetchImpl,
@@ -190,13 +192,13 @@ describe("AgentShare update discovery", () => {
     const directory = await temporaryDirectory();
     expect(
       await passiveUpdateNotice({
-        currentVersion: "0.1.10",
+        currentVersion: "0.1.11",
         cachePath: join(directory, "cache.json"),
         env: {},
-        fetchImpl: releaseFetch("v0.1.11"),
+        fetchImpl: releaseFetch("v0.1.12"),
       }),
     ).toBe(
-      "Update available: AgentShare v0.1.11 (installed v0.1.10). Run `agentshare update` to install it.",
+      "Update available: AgentShare v0.1.12 (installed v0.1.11). Run `agentshare update` to install it.",
     );
   });
 });

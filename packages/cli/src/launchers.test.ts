@@ -1,7 +1,12 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureProcess, runTarget, waitForTargetClose } from "./launchers.js";
+import {
+  captureProcess,
+  runTarget,
+  supportsReviewedTargetVersion,
+  waitForTargetClose,
+} from "./launchers.js";
 
 const CLAUDE_HELP = [
   "  -p, --print  Print mode",
@@ -65,6 +70,24 @@ afterEach(() => {
 });
 
 describe("target process lifecycle", () => {
+  it("allows reviewed hosts and fails closed for unreviewed newer releases", () => {
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.147.0")).toBe(
+      true,
+    );
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.149.0")).toBe(
+      false,
+    );
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.150.0")).toBe(
+      false,
+    );
+    expect(
+      supportsReviewedTargetVersion("claude", "2.1.238 (Claude Code)"),
+    ).toBe(true);
+    expect(
+      supportsReviewedTargetVersion("claude", "2.1.239 (Claude Code)"),
+    ).toBe(false);
+  });
+
   it("waits for close so inherited stdout is fully drained", async () => {
     const child = new EventEmitter();
     let settled = false;

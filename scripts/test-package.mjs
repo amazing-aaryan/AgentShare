@@ -1,5 +1,12 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -73,6 +80,96 @@ try {
     throw new Error(
       `packed AgentShare CLI reported ${stdout.trim() || "no version"}; expected ${cliPackage.version}`,
     );
+  }
+
+  const prefix = join(directory, "prefix");
+  const home = join(directory, "home");
+  await execute(
+    process.execPath,
+    [
+      npmCli,
+      "install",
+      "--global",
+      "--prefix",
+      prefix,
+      join(directory, archive),
+    ],
+    { cwd: directory },
+  );
+  const cliEntrypoint = join(
+    prefix,
+    "node_modules",
+    "agentshare",
+    "dist",
+    "bin.js",
+  );
+  const cliEnvironment = {
+    ...process.env,
+    AGENTSHARE_NO_UPDATE_CHECK: "1",
+    HOME: home,
+    USERPROFILE: home,
+  };
+  const runCli = (args, selectedHome = home) =>
+    execute(process.execPath, [cliEntrypoint, ...args], {
+      cwd: directory,
+      env: { ...cliEnvironment, HOME: selectedHome, USERPROFILE: selectedHome },
+    });
+
+  const installedVersion = await runCli(["--version"]);
+  if (installedVersion.stdout.trim() !== cliPackage.version) {
+    throw new Error("isolated global install reported the wrong version");
+  }
+  const usage = await runCli([]);
+  if (!usage.stdout.includes("agentshare init|repair|remove")) {
+    throw new Error("isolated global install omitted normal usage output");
+  }
+
+  await runCli(["init"]);
+  const integrationFiles = [
+    join(home, ".agents", "skills", "agentshare", "SKILL.md"),
+    join(home, ".agents", "skills", "agentshare", "agents", "openai.yaml"),
+    join(home, ".claude", "skills", "share", "SKILL.md"),
+  ];
+  for (const path of integrationFiles) {
+    if (!(await readFile(path, "utf8")).includes("AgentShare")) {
+      throw new Error(`isolated init wrote invalid integration: ${path}`);
+    }
+  }
+  await runCli(["repair"]);
+  await runCli(["remove"]);
+  for (const path of integrationFiles) {
+    await readFile(path, "utf8").then(
+      () => {
+        throw new Error(`isolated remove left integration behind: ${path}`);
+      },
+      (error) => {
+        if (error?.code !== "ENOENT") throw error;
+      },
+    );
+  }
+
+  const conflictHome = join(directory, "conflict-home");
+  const conflictPath = join(
+    conflictHome,
+    ".agents",
+    "skills",
+    "agentshare",
+    "SKILL.md",
+  );
+  await mkdir(join(conflictPath, ".."), { recursive: true });
+  await writeFile(conflictPath, "unmanaged integration\n", "utf8");
+  await runCli(["init"], conflictHome).then(
+    () => {
+      throw new Error("isolated init overwrote an unmanaged integration");
+    },
+    (error) => {
+      if (!String(error?.stderr).includes("Refusing to overwrite unmanaged")) {
+        throw error;
+      }
+    },
+  );
+  if ((await readFile(conflictPath, "utf8")) !== "unmanaged integration\n") {
+    throw new Error("isolated init changed an unmanaged integration");
   }
   process.stdout.write(`Packed CLI passed: ${archive}\n`);
 } finally {

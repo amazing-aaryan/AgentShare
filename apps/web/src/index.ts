@@ -1,4 +1,4 @@
-const PUBLIC_RELEASE = "0.1.10";
+const PUBLIC_RELEASE = "0.1.11";
 const PUBLIC_PACKAGE =
   `https://github.com/amazing-aaryan/AgentShare/releases/download/v${PUBLIC_RELEASE}/` +
   `agentshare-${PUBLIC_RELEASE}.tgz`;
@@ -11,7 +11,7 @@ const TARGET_PROFILES = {
   },
   claude: {
     name: "Claude Code",
-    reviewed: "any published 2.1.210–2.1.231 except 2.1.230",
+    reviewed: "2.1.210–2.1.229, 2.1.231, or 2.1.238",
     versionCommand: "claude --version",
   },
 } as const;

@@ -174,3 +174,31 @@ require zero failed/skipped real-agent tests and forbid faking release success.
 **Impact:** Handoff deployment `385fd884-d162-4ccc-9934-9fe59d2f1646` is live;
 rerun strict gate and all downstream immutable artifact/publication checks after
 `claude auth login`.
+
+## [2026-08-21 17:10] Use staged stable release for v0.1.11
+
+**Decision:** Prepare v0.1.11 as a stable patch release in an isolated worktree,
+update only active release pins while preserving historical v0.1.10 evidence,
+review current Codex 0.149.0 and Claude Code 2.1.238 before allowlisting, then
+require exact-commit local, CI, live-agent, package, updater, and published
+smoke gates before announcement. **Why:** The delta since v0.1.10 is limited to
+CLI-managed updates, but an RC cannot validate the stable-only updater path and
+publishing before the handoff pin or compatibility review would create unsafe
+recipient failures. **Impact:** Release order is source consistency,
+compatibility review, local and six-job CI gates, handoff deployment, strict
+production gate, immutable package publication, public updater/upgrade smoke,
+live handoff/revoke smoke, and final evidence recording. Relay and Durable
+Object migrations remain unchanged unless a verified source diff requires
+otherwise.
+
+## [2026-08-21 17:20] Keep Codex 0.149 blocked and allow Claude 2.1.238
+
+**Decision:** Do not add Codex CLI 0.149.0 to the reviewed allowlist; add only
+Claude Code 2.1.238 and keep the v0.1.11 strict release gate on Codex 0.147.0.
+**Why:** Exact published 0.149.0 passed help-contract inspection but its Windows
+sandbox refused to start because it cannot enforce AgentShare's split filesystem
+read restrictions with an unelevated restricted token. Claude 2.1.238 denied
+filesystem/network attempts and passed grounded two-turn dialogue. **Impact:**
+Current Codex fails closed with an explicit unsupported-version path rather than
+weakening isolation. Compatibility docs must disclose the 0.149.0 failure, and
+future Codex releases require a fresh real isolation review.

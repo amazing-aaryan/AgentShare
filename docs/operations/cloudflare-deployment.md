@@ -1,6 +1,6 @@
 # Cloudflare deployment
 
-AgentShare v0.1.10 uses two public Workers with different responsibilities:
+AgentShare v0.1.11 uses two public Workers with different responsibilities:
 
 - `agentshare-relay` stores ciphertext and capability digests in Durable
   Objects.
@@ -30,7 +30,7 @@ npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
 npm audit --audit-level=high
 ```
 
-Do not publish the v0.1.10 creator package until the independent handoff Worker
+Do not publish the v0.1.11 creator package until the independent handoff Worker
 is live. The released CLI generates handoff-origin links immediately, so
 publishing first could create links whose browser endpoint returns 404.
 
@@ -81,7 +81,7 @@ release pass.
 
 ## Package publication and public verification
 
-Only after the live split-origin gate passes should the immutable v0.1.10 CLI
+Only after the live split-origin gate passes should the immutable v0.1.11 CLI
 asset be published. Record its byte size and SHA-256 digest. Then verify an
 anonymous download against the recorded digest and perform a fresh isolated
 installation from the release asset. The handoff page must display a command
@@ -89,20 +89,20 @@ pinned to that exact immutable asset, and a disposable live share must complete
 the browser-to-hidden-prompt recipient flow.
 
 Do not announce the release until these checks and the exact Worker deployment
-versions are recorded in `docs/releases/v0.1.10-release-verification.md`.
+versions are recorded in `docs/releases/v0.1.11-release-verification.md`.
 
 ## Rollback
 
-The primary rollback target for v0.1.10 is the published v0.1.9 package plus the
-previous relay deployment. Existing v0.1.9 links continue to use the legacy
+The primary rollback target for v0.1.11 is the published v0.1.10 package plus
+the previous relay deployment. Existing v0.1.9 links continue to use the legacy
 relay-origin page and do not depend on the new handoff Worker.
 
-If the handoff Worker fails before v0.1.10 package publication, roll it back or
-remove it and leave v0.1.9 as the public release. If a defect appears after
-v0.1.10 publication, stop promoting v0.1.10, preserve relay Durable Object
-storage, roll back the affected Worker deployment, and direct users to the
-recorded safe package version while the incident is investigated. Do not delete
-or recreate the relay Durable Object namespace as part of rollback.
+If the handoff Worker fails before v0.1.11 package publication, roll it back or
+leave v0.1.10 as the public release. If a defect appears after v0.1.11
+publication, stop promoting v0.1.11, preserve relay Durable Object storage, roll
+back the affected Worker deployment, and direct users to the recorded safe
+package version while the incident is investigated. Do not delete or recreate
+the relay Durable Object namespace as part of rollback.
 
 Cloudflare stores only ciphertext and SHA-256 capability digests. New-format
 browser requests send the relay only the read capability needed for metadata

@@ -11,7 +11,7 @@ describe("share page", () => {
     expect(html).not.toContain("analytics");
     expect(html).toContain('<meta name="description"');
     expect(html).toContain(
-      "agentshare-0.1.10.tgz -- agentshare open --target codex",
+      "agentshare-0.1.11.tgz -- agentshare open --target codex",
     );
   });
 
@@ -68,6 +68,7 @@ describe("share page", () => {
     expect(html).toContain("0.145.0");
     expect(html).toContain("0.147.0");
     expect(html).toContain("2.1.210");
+    expect(html).toContain("2.1.238");
     expect(html).toContain("2.1.231");
   });
 

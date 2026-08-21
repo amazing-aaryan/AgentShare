@@ -53,7 +53,7 @@ const TARGET_CONTRACTS: Record<
 const REVIEWED_VERSIONS: Record<TargetAgent, RegExp> = {
   codex: /^codex-cli 0\.(?:145|146|147)\.0\s*$/mu,
   claude:
-    /^2\.1\.(?:210|211|212|213|214|215|216|217|218|219|220|221|222|223|224|225|226|227|228|229|231)\s+\(Claude Code\)\s*$/mu,
+    /^2\.1\.(?:210|211|212|213|214|215|216|217|218|219|220|221|222|223|224|225|226|227|228|229|231|238)\s+\(Claude Code\)\s*$/mu,
 };
 
 export function codexArgs(

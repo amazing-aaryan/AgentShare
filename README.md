@@ -26,11 +26,11 @@ Requirements: Node.js 22 or newer, plus Codex CLI or Claude Code.
 Ask your agent to install AgentShare by pasting this prompt:
 
 ```text
-Install AgentShare v0.1.10 from its immutable GitHub release.
+Install AgentShare v0.1.11 from its immutable GitHub release.
 
 1. Confirm Node.js 22 or newer is installed.
 2. Run:
-   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
+   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
 3. Run: agentshare init
 4. Run: agentshare
 5. Confirm the CLI usage appears, list the installed integration files, and
@@ -40,7 +40,7 @@ Install AgentShare v0.1.10 from its immutable GitHub release.
 Manual install:
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
 agentshare init
 ```
 
@@ -82,7 +82,7 @@ The recipient does not need a global installation:
 Pinned Codex command:
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz -- agentshare open --target codex
 ```
 
 Replace `codex` with `claude` to use Claude Code. If browser clipboard access is
@@ -209,9 +209,11 @@ ciphertext.
 
 Reviewed recipient versions:
 
-- Codex CLI: `0.145.0`, `0.146.0`, `0.147.0`.
-- Claude Code: every published release from `2.1.210` through `2.1.231`
-  (`2.1.230` was not published).
+- Codex CLI: `0.145.0`, `0.146.0`, `0.147.0`. Current `0.149.0` remains blocked
+  because its Windows sandbox could not enforce AgentShare's required split
+  filesystem restrictions during review.
+- Claude Code: every published release from `2.1.210` through `2.1.229`, plus
+  `2.1.231` and `2.1.238`.
 
 See the [per-version compatibility evidence](docs/recipient-compatibility.md)
 and review procedure.
@@ -279,7 +281,7 @@ agentshare update --check
 agentshare update
 
 # Manual recovery: reinstall a known immutable release, then repair integrations
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
 agentshare repair
 
 # Remove integrations and CLI
@@ -323,7 +325,7 @@ create/upload/open/revoke/expiry semantics, and real Codex and Claude
 filesystem/network isolation. A one-agent diagnostic is available through
 `npm run test:live:diagnostic`, but is not a release pass.
 
-For v0.1.10, deploy and verify the independent handoff Worker before publishing
+For v0.1.11, deploy and verify the independent handoff Worker before publishing
 the creator package. That ordering prevents a newly published CLI from creating
 links whose browser endpoint is not live yet. After publication, verify the
 immutable package SHA and perform a fresh isolated recipient install before
