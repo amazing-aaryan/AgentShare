@@ -5,6 +5,11 @@ guarantee. Report vulnerabilities through
 [GitHub private vulnerability reporting](https://github.com/amazing-aaryan/AgentShare/security/advisories/new),
 not a public issue.
 
+Repository administrators should also follow
+[`docs/operations/repository-security.md`](docs/operations/repository-security.md)
+for branch protection, secret-scanning, release-immutability, and package
+verification controls.
+
 ## Supported Versions
 
 Only the latest published `0.1.x` release receives security fixes.
@@ -26,6 +31,11 @@ Security invariants for v0.1.10 new-format links:
 - The selected relay origin is non-secret link metadata. The relay stores
   ciphertext and capability digests, never conversation plaintext, decryption
   keys, or raw upload/read/revoke capabilities.
+- Cross-origin browser access to the production relay is limited to metadata GET
+  requests from the exact trusted handoff origin. Create, upload, revoke, and
+  blob-download routes are not browser-CORS enabled.
+- The production edge rejects create JSON bodies above 8 KiB before parsing and
+  forwards only validated canonical create metadata to the share object.
 - Recipient plaintext, keys, and indexes remain memory-only.
 - Host launchers fail closed when query-only isolation cannot be established.
 - Untrusted terminal output is stripped of terminal and bidirectional control
@@ -91,8 +101,10 @@ does not remove that supply-chain risk. See ADR 0004 for the decision record.
   threat model; it does not eliminate compromise of the trusted handoff service
   itself.
 - Secret scanning covers known credential formats in text plus ASCII, UTF-8,
-  UTF-16LE, and UTF-16BE views of binary resources. It cannot inspect encrypted,
-  compressed, or unknown encodings.
+  UTF-16LE, and UTF-16BE views of binary resources. It is heuristic and cannot
+  guarantee detection of every provider token or inspect encrypted, compressed,
+  or unknown encodings. Repository-level GitHub secret scanning is an
+  independent defense and must remain enabled.
 - Creator review is exact for normalized/redacted text. Binary resource bytes
   are not rendered byte-for-byte in the terminal; binary resources are
   inventoried by media type, byte length, and SHA-256, and a suspected secret
