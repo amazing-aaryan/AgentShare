@@ -64,9 +64,7 @@ describe("environment relay state machine", () => {
     );
     record = commitEnvironmentRevision(record, "rev_11111111111111111111", now);
     expect(record.currentRevisionId).toBe("rev_11111111111111111111");
-    expect(record.revisions.rev_11111111111111111111?.status).toBe(
-      "committed",
-    );
+    expect(record.revisions.rev_11111111111111111111?.status).toBe("committed");
   });
 
   it("keeps an identical revision reservation idempotent after commit", () => {
