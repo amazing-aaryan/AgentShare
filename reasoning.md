@@ -202,3 +202,12 @@ filesystem/network attempts and passed grounded two-turn dialogue. **Impact:**
 Current Codex fails closed with an explicit unsupported-version path rather than
 weakening isolation. Compatibility docs must disclose the 0.149.0 failure, and
 future Codex releases require a fresh real isolation review.
+
+## [2026-08-21 17:29] Resolve package smoke install root through npm
+
+**Decision:** Query `npm root --global --prefix <isolated-prefix>` before
+invoking the packed CLI instead of assuming `<prefix>/node_modules`. **Why:**
+Windows uses `<prefix>/node_modules`, while macOS and Linux use
+`<prefix>/lib/node_modules`; exact-candidate CI exposed the platform mismatch.
+**Impact:** Clean-install package smoke now validates the same isolated global
+installation flow across all six CI jobs without hard-coded npm layout rules.

@@ -96,13 +96,15 @@ try {
     ],
     { cwd: directory },
   );
-  const cliEntrypoint = join(
-    prefix,
-    "node_modules",
-    "agentshare",
-    "dist",
-    "bin.js",
+  const { stdout: globalRootOutput } = await execute(
+    process.execPath,
+    [npmCli, "root", "--global", "--prefix", prefix],
+    { cwd: directory },
   );
+  const globalRoot = globalRootOutput.trim();
+  if (!globalRoot)
+    throw new Error("npm did not report the global install root");
+  const cliEntrypoint = join(globalRoot, "agentshare", "dist", "bin.js");
   const cliEnvironment = {
     ...process.env,
     AGENTSHARE_NO_UPDATE_CHECK: "1",
