@@ -19,13 +19,41 @@ const PATTERNS: ReadonlyArray<{ kind: string; pattern: RegExp }> = [
     pattern:
       /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gu,
   },
-  { kind: "openai-api-key", pattern: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/gu },
-  { kind: "anthropic-api-key", pattern: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/gu },
+  {
+    kind: "openai-api-key",
+    pattern: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/gu,
+  },
+  {
+    kind: "anthropic-api-key",
+    pattern: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/gu,
+  },
   {
     kind: "github-token",
     pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b/gu,
   },
   { kind: "aws-access-key", pattern: /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/gu },
+  { kind: "npm-token", pattern: /\bnpm_[A-Za-z0-9]{36}\b/gu },
+  {
+    kind: "gitlab-token",
+    pattern: /\bglpat-[A-Za-z0-9_-]{20,}\b/gu,
+  },
+  {
+    kind: "slack-token",
+    pattern: /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/gu,
+  },
+  {
+    kind: "stripe-secret-key",
+    pattern: /\bsk_(?:live|test)_[A-Za-z0-9]{16,}\b/gu,
+  },
+  {
+    kind: "google-api-key",
+    pattern: /\bAIza[0-9A-Za-z_-]{35}\b/gu,
+  },
+  {
+    kind: "cloudflare-api-token",
+    pattern:
+      /\b(?:CLOUDFLARE_API_TOKEN|CF_API_TOKEN)\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}["']?/gu,
+  },
   {
     kind: "generic-secret",
     pattern:

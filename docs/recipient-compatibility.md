@@ -1,6 +1,6 @@
 # Recipient compatibility evidence
 
-AgentShare v0.1.9 supports only host CLI releases whose exact launcher profile
+AgentShare v0.1.10 supports only host CLI releases whose exact launcher profile
 passed real isolation checks. Runtime `--version` and `--help` checks are
 additional fail-closed drift detection, not proof that an unknown version is
 safe.
