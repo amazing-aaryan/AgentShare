@@ -257,3 +257,13 @@ expiry. **Impact:** Release remains available and production stays deployed.
 Future work must manually or reliably automate published CLI revoke followed by
 relay 410 before broad announcement; do not misreport that observation as
 complete.
+
+## [2026-08-21 18:41] Clear v0.1.11 announcement hold
+
+**Decision:** Approved broad public-beta announcement after an uninterrupted
+published-package flow completed creator approvals, browser handoff, two
+grounded cited recipient turns, hidden-link revocation, and post-revoke 410.
+**Why:** Final acceptance blocker now has direct evidence from the immutable
+public artifact instead of exact-source or partial harness proxies. **Impact:**
+v0.1.11 release evidence is complete; no source or production rollback is
+indicated.
