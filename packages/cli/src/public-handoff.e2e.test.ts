@@ -178,7 +178,7 @@ describe("complete AgentShare handoff", () => {
       );
       expect(browserMetadata.status).toBe(200);
       expect(browserMetadata.headers.get("access-control-allow-origin")).toBe(
-        "*",
+        new URL(configuredHandoffOrigin).origin,
       );
       await expect(
         client.upload({

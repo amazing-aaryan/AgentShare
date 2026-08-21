@@ -235,3 +235,12 @@ break existing encrypted query clients. **Impact:** v0.1.11 cannot freeze until
 local gates and six-job CI pass again with all three migrations. Future
 deployments must preserve v1 ShareObject, v2 RelayControl, and v3 QueryObject
 even when no new migration is introduced.
+
+## [2026-08-21 17:55] Require trusted-origin CORS in production lifecycle test
+
+**Decision:** Updated the strict production lifecycle assertion to require the
+configured handoff origin instead of wildcard CORS. **Why:** The hardened relay
+intentionally limits browser metadata access to the trusted handoff Worker. The
+previous wildcard expectation was stale and weaker than the deployed security
+contract. **Impact:** Future production tests must reject CORS regressions that
+broaden relay metadata access beyond the configured handoff origin.
