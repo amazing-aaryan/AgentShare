@@ -33,16 +33,31 @@ checks and updates surface discovery or installation failures normally.
 ## Security and privacy
 
 The passive request contains no conversation content, capability URL, encryption
-key, relay state, project path, or AgentShare share metadata. It is an HTTPS GET
-to GitHub for the public repository's latest release and includes the installed
-AgentShare version in the User-Agent. The local update cache contains only the
-check timestamp and latest stable version and is stored separately from
-`state-v1.json`.
+key, relay state, project path, AgentShare account identity, or share metadata.
+It is an HTTPS GET to GitHub for the public repository's latest release and
+includes the installed AgentShare version in the User-Agent. The local update
+cache contains only the check timestamp and latest stable version and is stored
+separately from `state-v1.json`.
+
+This fits the account-free open-transport direction in ADR 0005: release checks
+must not become a hidden login, analytics, licensing, paid-entitlement, or
+workspace-registration channel.
 
 This design intentionally does not silently install code. HTTPS and the GitHub
 repository/release account remain part of the update trust chain. Release
 checksum/signature verification can strengthen that chain later without changing
 the CLI command model.
+
+## Open-source continuity
+
+The updater is a convenience path to the canonical open-source release, not a
+control point that should make the official service mandatory. Manual immutable
+package installation must remain available, and compatible/self-hosted relay
+users must be able to update the client without registering with an AgentShare
+service.
+
+Future release distribution improvements should preserve the ability to audit
+and obtain the exact client code that handles local plaintext and capabilities.
 
 ## Consequences
 
@@ -56,3 +71,6 @@ Users in offline or tightly controlled environments can disable all passive
 release traffic while retaining explicit update commands. A failed post-install
 integration repair is reported as a partial update: the CLI may already be new,
 but unmanaged integration files remain untouched and require user resolution.
+
+See [`../VISION.md`](../VISION.md) and
+[ADR 0005](0005-open-context-transport.md).
