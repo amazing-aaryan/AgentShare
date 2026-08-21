@@ -9,6 +9,8 @@ plaintext context storage.
 
 - [`VISION.md`](VISION.md) — mission, principles, users, non-goals, and the
   long-term open transport direction.
+- [`ROADMAP.md`](ROADMAP.md) — implementation priorities that follow from the
+  vision.
 - [`../README.md`](../README.md) — current user-facing quick start and behavior.
 - [`../SECURITY.md`](../SECURITY.md) — trust boundary, capability-link security,
   and residual risks.
@@ -46,8 +48,9 @@ When documents disagree, use this order:
 3. `SECURITY.md` for current security claims;
 4. `docs/protocol/` for current protocol contracts;
 5. `docs/operations/` for current operational procedures;
-6. current compatibility/release evidence for specific versions;
-7. dated/historical plans for provenance only.
+6. `ROADMAP.md` for priorities, without overriding the contracts above;
+7. current compatibility/release evidence for specific versions;
+8. dated/historical plans for provenance only.
 
 Historical documents are intentionally preserved instead of being rewritten to
 make old releases or plans appear to have implemented the current vision.
