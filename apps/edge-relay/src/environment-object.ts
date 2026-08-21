@@ -149,7 +149,10 @@ export class EnvironmentObject {
           if (revision?.status !== "committed") {
             return notFound("Committed revision not found");
           }
-          return this.download(manifestPrefix(revisionId), revision.request.manifest);
+          return this.download(
+            manifestPrefix(revisionId),
+            revision.request.manifest,
+          );
         }
       }
 
