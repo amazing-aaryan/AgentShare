@@ -5,10 +5,37 @@ guarantee. Report vulnerabilities through
 [GitHub private vulnerability reporting](https://github.com/amazing-aaryan/AgentShare/security/advisories/new),
 not a public issue.
 
+The security model follows the project vision in
+[`docs/VISION.md`](docs/VISION.md): AgentShare is a free, open,
+capability-based transport for agent context, not an account-based workspace or
+central plaintext knowledge store.
+
 Repository administrators should also follow
 [`docs/operations/repository-security.md`](docs/operations/repository-security.md)
 for branch protection, secret-scanning, release-immutability, and package
 verification controls.
+
+## Core Trust Boundary
+
+The core handoff is intentionally authorized by possession of the complete
+capability link rather than by an AgentShare account, company membership, or
+identity provider.
+
+That enables handoffs across people, machines, communities, and companies
+without a shared control plane, but it also means the complete link is a secret.
+Anyone who obtains it may be able to read the share until it expires or is
+revoked. Current revocation invalidates all readers of that link at once.
+
+The normal AgentShare relay is designed so it does not need conversation
+plaintext or the encryption key. This guarantee applies to AgentShare transport
+infrastructure, not to the recipient's chosen model provider: after local
+decryption, selected evidence excerpts are submitted through the recipient's
+Codex or Claude account when they ask the target agent a question.
+
+No future account, workspace, analytics, or knowledge feature should silently
+weaken this trust boundary. A change that requires central plaintext processing
+or materially changes capability semantics requires explicit security review and
+an ADR.
 
 ## Supported Versions
 
@@ -18,7 +45,9 @@ Do not include secrets, capability URLs, decrypted bundles, or private source in
 reports. Include affected version, reproducible steps using synthetic data, and
 the expected impact.
 
-Security invariants for v0.1.10 new-format links:
+## New-format Link Invariants
+
+Security invariants for v0.1.10+ new-format links:
 
 - Encryption and decryption happen on clients.
 - Newly created links use an AgentShare-controlled handoff origin that is
@@ -48,6 +77,23 @@ by treating the link origin as the relay origin. Those relay-origin links retain
 the older v0.1.9 browser trust assumption: JavaScript served by that relay can
 read the URL fragment in the browser. Do not use an untrusted custom relay with
 a legacy-format link.
+
+## Capability Security
+
+AgentShare deliberately does not require recipient identity for the base
+protocol. The consequence is simple: capability secrecy is access control.
+
+- Send a link only through a channel appropriate for the sensitivity of the
+  reviewed context.
+- Do not paste complete links into issues, logs, analytics, shell history,
+  screenshots, public chat, or bug reports.
+- Prefer shorter TTLs for sensitive or one-off handoffs.
+- Revoke a share if you suspect the link was copied to the wrong place.
+- Remember that forwarding the complete link forwards access.
+
+Adding identity-bound or per-recipient schemes in compatible third-party tools
+is possible, but the base AgentShare protocol must remain usable without an
+account or shared organization.
 
 ## CLI Update Trust Boundary
 
@@ -92,9 +138,10 @@ does not remove that supply-chain risk. See ADR 0004 for the decision record.
   tool surfaces before handing it untrusted context. Launchers fail closed on
   unreviewed Codex or Claude versions.
 - Capability links can leak through clipboard managers, screenshots, browser
-  extensions, screen recording, or compromised endpoints. The handoff page
-  immediately removes query and fragment data from visible history, uses
-  `no-referrer`, loads no third-party assets, and sends no analytics.
+  extensions, screen recording, messaging systems, or compromised endpoints.
+  The handoff page immediately removes query and fragment data from visible
+  history, uses `no-referrer`, loads no third-party assets, and sends no
+  analytics.
 - Compromise of the trusted AgentShare handoff origin could replace the browser
   JavaScript and expose capability fragments. Separating the handoff origin from
   custom ciphertext relays removes relay-controlled page code from the new-link
@@ -114,3 +161,14 @@ does not remove that supply-chain risk. See ADR 0004 for the decision record.
   eliminate distributed abuse across many source addresses.
 - Hashing source addresses minimizes stored quota data; it does not anonymize
   low-entropy IP addresses or hide them from Cloudflare.
+
+## Security Direction
+
+Broader host support must not be added merely because an agent can consume a
+prompt. Each recipient integration must prove the required isolation properties
+before being supported. New creator adapters must preserve explicit selection
+and review rather than crawl additional workspace data silently.
+
+The long-term goal is wider agent interoperability with the same narrow trust
+boundary: open context format, local review, local encryption, blind transport,
+local decryption, and a safely constrained recipient agent.
