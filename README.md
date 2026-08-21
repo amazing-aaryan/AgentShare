@@ -267,8 +267,18 @@ metadata.
 
 ## Update or Remove
 
+Successful creator commands perform a best-effort release check at most once per
+24 hours. Update notices go to stderr and never install code silently. Set
+`AGENTSHARE_NO_UPDATE_CHECK=1` to disable passive checks.
+
 ```powershell
-# Update this pinned release and repair integrations
+# Check the canonical stable GitHub release without changing the installation
+agentshare update --check
+
+# Install the latest stable immutable release and refresh managed integrations
+agentshare update
+
+# Manual recovery: reinstall a known immutable release, then repair integrations
 npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
 agentshare repair
 
@@ -276,6 +286,12 @@ agentshare repair
 agentshare remove
 npm uninstall --global agentshare
 ```
+
+The updater accepts only exact stable releases from the canonical AgentShare
+repository, derives the immutable tarball URL locally, verifies the newly
+installed CLI version, and then runs the new CLI's `repair`. AgentShare-managed
+Codex and Claude skill files are refreshed; conflicting unmanaged skill files
+are left untouched.
 
 ## Development
 

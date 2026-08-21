@@ -16,6 +16,30 @@ byte-for-byte; they are inventoried by media type, byte length, and SHA-256 and
 are scanned for suspected secrets in supported text views. Review and approve
 before sending the resulting link.
 
+## Updates
+
+Check the canonical AgentShare GitHub release and install a newer stable release
+with:
+
+```sh
+agentshare update --check
+agentshare update
+```
+
+Successful creator commands perform a best-effort release check at most once per
+24 hours and write any update notice to stderr. They never install an update
+silently. Set `AGENTSHARE_NO_UPDATE_CHECK=1` to disable passive checks; explicit
+`agentshare update --check` and `agentshare update` still work.
+
+The updater accepts only exact stable `vMAJOR.MINOR.PATCH` releases from
+`amazing-aaryan/AgentShare`, derives the immutable release tarball URL locally,
+and verifies the newly installed CLI version before running `agentshare repair`
+from that new installation. AgentShare-managed Codex and Claude skills are
+refreshed; unmanaged conflicting skills are not overwritten.
+
+The pinned `npm install --global ...` command remains the manual recovery path
+if an update cannot be completed automatically.
+
 Recipients may run the connector without a global installation:
 
 ```sh
