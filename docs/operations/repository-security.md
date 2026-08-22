@@ -4,6 +4,16 @@ This runbook covers controls that cannot be enforced by application source
 alone. Repository administrators should verify these settings before merging a
 security release.
 
+AgentShare's repository is part of the trust chain for a free and open context
+transport. Protecting release integrity matters especially because the project
+deliberately avoids a central account/control plane and distributes executable
+client code that handles capability links and plaintext locally.
+
+The canonical project direction is [`../VISION.md`](../VISION.md). Changes that
+would introduce mandatory accounts, paid access to the base protocol, central
+plaintext indexing, or a proprietary-only protocol dependency require explicit
+architectural review in addition to normal code review.
+
 ## Default branch protection
 
 Protect `master` with a GitHub ruleset or branch-protection rule that:
@@ -39,6 +49,9 @@ For this public repository:
 Synthetic scanner tests should construct fake credentials programmatically
 rather than commit real provider credentials.
 
+Complete AgentShare capability links are secrets too. A public example link must
+never contain a real read capability, revoke capability, or encryption key.
+
 ## Release immutability and verification
 
 Before publishing a new release:
@@ -57,6 +70,22 @@ release was immutable when published. For `v0.1.10`, verify the existing release
 independently and record the result rather than inferring it from this
 repository.
 
+## Open-source and protocol continuity
+
+A release should not accidentally make the official hosted service a mandatory
+proprietary dependency. Before merging protocol or deployment changes, verify
+that:
+
+- ACB and relay behavior required for interoperability remains documented;
+- self-hosted/compatible relay use is not artificially blocked;
+- current hosted URLs are defaults rather than secret protocol knowledge;
+- no build step depends on private source required to understand or reproduce
+  the client/relay trust boundary;
+- no billing or account credential becomes required for the base share/open
+  path.
+
+This is a project-continuity control as well as a product principle.
+
 ## Package contents
 
 `@agentshare/cli` uses a package allowlist. Release verification must confirm
@@ -67,7 +96,7 @@ enter the package.
 
 ## Merge checklist
 
-Before merging a security-hardening PR:
+Before merging a security-hardening or protocol PR:
 
 - [ ] required CI checks are green on the final PR head;
 - [ ] `master` protection/ruleset is active and force pushes are blocked;
@@ -76,5 +105,11 @@ Before merging a security-hardening PR:
 - [ ] release immutability is enabled for future releases;
 - [ ] the current release's immutability/asset verification status is explicitly
       recorded;
-- [ ] no operational account IDs, deployment UUIDs, credentials, capability
-      URLs, decrypted handoffs, or private source were added to public docs.
+- [ ] no operational account IDs, deployment UUIDs, credentials, complete
+      capability URLs, decrypted handoffs, or private source were added to
+      public docs;
+- [ ] protocol/security changes still preserve the documented blind-relay and
+      creator-review boundaries, or a new ADR explicitly records the change;
+- [ ] current product docs do not claim unsupported agent compatibility;
+- [ ] historical release evidence was not rewritten to manufacture present-day
+      guarantees.

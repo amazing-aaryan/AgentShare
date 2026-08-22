@@ -1,6 +1,19 @@
 # AgentShare CLI
 
-Encrypted Codex and Claude Code context handoff.
+**Free, open, review-before-send AI context handoff by capability link.**
+
+AgentShare lets you select useful context from a supported agent, review what
+will cross the boundary, encrypt it locally, and send one link to another person
+or machine. The recipient does not need an AgentShare account, shared workspace,
+or company membership.
+
+The official relay transports ciphertext and does not receive conversation
+plaintext or the encryption key. The complete link is the bearer access
+capability, so treat it as a secret.
+
+Current first-class host integrations are Codex and Claude Code. The broader
+project direction is agent-agnostic through the open Agent Context Bundle rather
+than through a proprietary server-side session store.
 
 Requires Node.js 22 or newer.
 
@@ -15,6 +28,23 @@ exactly after redaction. Binary resources, when present, are not printed
 byte-for-byte; they are inventoried by media type, byte length, and SHA-256 and
 are scanned for suspected secrets in supported text views. Review and approve
 before sending the resulting link.
+
+## Open a handoff
+
+Recipients may run the connector without a global installation or AgentShare
+signup:
+
+```sh
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz -- agentshare open --target codex
+```
+
+The connector requests the complete capability link through hidden terminal
+input. Use `--target claude` for Claude Code.
+
+New-format links use an independent AgentShare handoff origin while the
+encrypted blob remains on the selected relay. Decryption happens locally. Once
+the recipient asks its chosen agent a question, selected decrypted evidence may
+be sent to that model provider under the recipient's own account and terms.
 
 ## Updates
 
@@ -40,15 +70,18 @@ refreshed; unmanaged conflicting skills are not overwritten.
 The pinned `npm install --global ...` command remains the manual recovery path
 if an update cannot be completed automatically.
 
-Recipients may run the connector without a global installation:
+## Project principles
 
-```sh
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz -- agentshare open --target codex
-```
+AgentShare is intended to remain:
 
-The connector requests the capability link through hidden terminal input. New
-v0.1.10 links use the independent AgentShare handoff origin while the encrypted
-blob remains on the selected relay. Use `--target claude` for Claude Code. See
-the [full guide](https://github.com/amazing-aaryan/AgentShare#readme).
+- free to use rather than freemium;
+- open source and self-hostable;
+- account-free for the core share/open flow;
+- capability-based across organizational boundaries;
+- blind at the relay content boundary;
+- explicit about creator review;
+- portable across more agent vendors over time.
+
+See the [full guide](../../README.md) and [project vision](../../docs/VISION.md).
 
 Apache-2.0.

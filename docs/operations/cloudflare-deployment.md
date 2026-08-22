@@ -1,17 +1,46 @@
 # Cloudflare deployment
 
+This runbook operates the **official free public transport** for AgentShare. The
+public deployment is a convenience implementation of the open protocol, not an
+account, workspace, billing, or organization control plane. Compatible
+self-hosted relays are part of the normal AgentShare model; see
+[`../VISION.md`](../VISION.md) and the
+[Blind Relay Protocol](../protocol/relay-v1.md).
+
 AgentShare v0.1.11 uses two public Workers with different responsibilities:
 
 - `agentshare-relay` stores ciphertext and capability digests in Durable
   Objects.
 - `agentshare-handoff` serves the trusted static browser page that can read the
-  capability fragment. It has no ciphertext, Durable Object, or quota bindings.
+  capability fragment. It has no ciphertext, Durable Object, user-account, or
+  quota-storage bindings.
 
 The relay uses one SQLite-backed Durable Object per share plus one global quota
 object. Ciphertext streams into 1.5 MB chunks, is capped at 50 MiB, and is
 deleted by an expiry alarm after at most three days. Expired and revoked share
 IDs retain compact tombstones. Cloudflare rate-limit bindings protect create and
 upload routes.
+
+Public size, lifetime, rate, and capacity limits exist to keep a free shared
+service operable. They are deployment policy, not a paid-tier boundary and not
+requirements for every compatible relay implementation.
+
+## Data and trust boundary
+
+The official deployment must preserve these properties:
+
+- no AgentShare account or organization database is required for share/open;
+- the relay stores encrypted share bytes, not conversation plaintext;
+- the relay does not receive the share encryption key;
+- the handoff service does not persist share ciphertext;
+- the complete capability link remains the recipient authorization primitive;
+- no analytics or third-party scripts are added to the handoff page;
+- deployment changes must not turn operational convenience into a hidden
+  server-side plaintext dependency.
+
+Normal Cloudflare infrastructure can still observe ordinary network/transport
+metadata. The blind-relay claim is about share-content cryptography, not network
+anonymity.
 
 ## Pre-deployment checks
 
@@ -79,6 +108,10 @@ create/upload/download/revoke/expiry and replay semantics, and both real target
 agents' filesystem/network isolation. A partial or one-agent diagnostic is not a
 release pass.
 
+AgentShare's agent-agnostic direction does not weaken this rule. Each new target
+agent must receive an equivalent real isolation review before public support is
+claimed.
+
 ## Package publication and public verification
 
 Only after the live split-origin gate passes should the immutable v0.1.11 CLI
@@ -104,7 +137,17 @@ back the affected Worker deployment, and direct users to the recorded safe
 package version while the incident is investigated. Do not delete or recreate
 the relay Durable Object namespace as part of rollback.
 
-Cloudflare stores only ciphertext and SHA-256 capability digests. New-format
-browser requests send the relay only the read capability needed for metadata
-validation; the encryption key remains in the URL fragment on the trusted
-handoff page.
+Cloudflare stores only ciphertext and SHA-256 capability digests for share
+content. New-format browser requests send the relay only the read capability
+needed for metadata validation; the encryption key remains in the URL fragment
+on the trusted handoff page.
+
+## Self-hosting direction
+
+The official Cloudflare deployment must not become the only viable way to use
+the protocol. Deployment documentation and protocol contracts should remain
+clear enough for compatible implementations to run elsewhere with their own
+limits and storage choices while preserving capability authentication and the
+blind-content boundary.
+
+Self-hosting is an interoperability property, not an enterprise SKU.
