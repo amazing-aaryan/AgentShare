@@ -4,8 +4,7 @@ permissions:
   contents: write
 
 on:
-  push:
-    branches: [feat/agentshare-v2-environments]
+  pull_request:
 
 jobs:
   format-and-restore:
