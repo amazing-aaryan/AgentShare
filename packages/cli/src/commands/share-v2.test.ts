@@ -144,4 +144,51 @@ describe("v2 share command", () => {
       first.environment.currentRevisionId,
     );
   });
+
+  it("creates a fresh environment and applies an explicit ttl override", async () => {
+    const root = await fixture();
+    const state = await statePath();
+    const handler = createRelayHandler(new InMemoryRelayStore());
+    const fetchImpl: typeof fetch = (input, init) =>
+      handler(new Request(input, init));
+    const client = new EnvironmentRelayClient(
+      "http://127.0.0.1:8787",
+      fetchImpl,
+    );
+    const capture = {
+      sourceAgent: "codex" as const,
+      title: "Codex: demo",
+      workspaceRoot: root,
+      conversation: [],
+    };
+    const selection = {
+      includeConversation: true,
+      includeWorkspace: true,
+      proposalsEnabled: false,
+      ttlSeconds: 86400,
+    };
+    const first = await shareCaptureV2(capture, {
+      client,
+      statePath: state,
+      selection,
+      workspaceOptions: { preferGit: false },
+    });
+    const before = Date.now();
+    const freshOptions = {
+      client,
+      statePath: state,
+      selection,
+      workspaceOptions: { preferGit: false },
+      forceNew: true,
+      ttlSeconds: 3600,
+    };
+    const second = await shareCaptureV2(capture, freshOptions);
+    const actualTtlMs = Date.parse(second.environment.expiresAt) - before;
+
+    expect(second.environment.environmentId).not.toBe(
+      first.environment.environmentId,
+    );
+    expect(actualTtlMs).toBeGreaterThanOrEqual(3_590_000);
+    expect(actualTtlMs).toBeLessThanOrEqual(3_610_000);
+  });
 });
