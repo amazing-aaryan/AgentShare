@@ -67,7 +67,9 @@ describe("proposalSchema", () => {
 
   it("rejects duplicate operation paths", () => {
     const input = baseProposal();
-    input.operations.push({ ...input.operations[0]! });
+    const operation = input.operations[0];
+    if (operation === undefined) throw new Error("Missing proposal operation");
+    input.operations.push({ ...operation });
     expect(() => proposalSchema.parse(input)).toThrow();
   });
 
