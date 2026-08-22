@@ -5,8 +5,8 @@ AgentShare is an open context transport, not an account/workspace service. The
 local relay is useful both for development and as proof that the protocol does
 not depend on the official hosted relay.
 
-Read [`../VISION.md`](../VISION.md) before designing new host adapters or service
-state.
+Read [`../VISION.md`](../VISION.md) before designing new host adapters or
+service state.
 
 ## Prerequisites
 
@@ -91,8 +91,8 @@ A recipient adapter should:
 2. use the recipient's own provider authentication;
 3. prevent the target agent from inheriting unrelated filesystem, shell,
    network, browser, plugin, memory, or host powers;
-4. keep capability URLs and keys out of arguments, environment variables,
-   logs, and persistent sessions;
+4. keep capability URLs and keys out of arguments, environment variables, logs,
+   and persistent sessions;
 5. receive real compatibility/isolation review before an exact version becomes
    supported.
 

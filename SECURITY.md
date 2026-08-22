@@ -6,9 +6,9 @@ guarantee. Report vulnerabilities through
 not a public issue.
 
 The security model follows the project vision in
-[`docs/VISION.md`](docs/VISION.md): AgentShare is a free, open,
-capability-based transport for agent context, not an account-based workspace or
-central plaintext knowledge store.
+[`docs/VISION.md`](docs/VISION.md): AgentShare is a free, open, capability-based
+transport for agent context, not an account-based workspace or central plaintext
+knowledge store.
 
 Repository administrators should also follow
 [`docs/operations/repository-security.md`](docs/operations/repository-security.md)
@@ -138,10 +138,9 @@ does not remove that supply-chain risk. See ADR 0004 for the decision record.
   tool surfaces before handing it untrusted context. Launchers fail closed on
   unreviewed Codex or Claude versions.
 - Capability links can leak through clipboard managers, screenshots, browser
-  extensions, screen recording, messaging systems, or compromised endpoints.
-  The handoff page immediately removes query and fragment data from visible
-  history, uses `no-referrer`, loads no third-party assets, and sends no
-  analytics.
+  extensions, screen recording, messaging systems, or compromised endpoints. The
+  handoff page immediately removes query and fragment data from visible history,
+  uses `no-referrer`, loads no third-party assets, and sends no analytics.
 - Compromise of the trusted AgentShare handoff origin could replace the browser
   JavaScript and expose capability fragments. Separating the handoff origin from
   custom ciphertext relays removes relay-controlled page code from the new-link

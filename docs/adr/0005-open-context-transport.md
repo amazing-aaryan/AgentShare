@@ -49,9 +49,9 @@ The following are architectural/product constraints:
 ## Consequences
 
 Near-term roadmap work should prefer additional agent adapters, ACB evolution,
-portable/self-hostable infrastructure, safe resource selection, and lower-friction
-link handoff UX over team dashboards, billing, seat management, or centralized
-transcript search.
+portable/self-hostable infrastructure, safe resource selection, and
+lower-friction link handoff UX over team dashboards, billing, seat management,
+or centralized transcript search.
 
 Documentation should distinguish the current implementation from the long-term
 agent-agnostic direction. Claims must not imply that unsupported agents work

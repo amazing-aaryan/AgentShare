@@ -152,8 +152,8 @@ Current public-beta behavior is deliberately narrower than the vision:
 - the ACB and blind-relay protocols are versioned and documented in this repo.
 
 Future work should prioritize broader adapters, a more portable context schema,
-easier self-hosting, safer resource selection, and simpler link-to-agent UX while
-preserving the principles above.
+easier self-hosting, safer resource selection, and simpler link-to-agent UX
+while preserving the principles above.
 
 ## Decision filter
 
