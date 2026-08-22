@@ -1,6 +1,4 @@
 import {
-  MAX_CIPHERTEXT_BYTES,
-  MAX_TTL_SECONDS,
   createEnvironmentRequestSchema,
   proposalDescriptorSchema,
   reserveRevisionRequestSchema,
@@ -11,7 +9,8 @@ import {
   type ProposalStatus,
   type ReserveRevisionRequest,
   type RevisionStatus,
-} from "./index.js";
+} from "./relay-v2.js";
+import { MAX_CIPHERTEXT_BYTES, MAX_TTL_SECONDS } from "./shared.js";
 
 export class EnvironmentStateError extends Error {
   constructor(
