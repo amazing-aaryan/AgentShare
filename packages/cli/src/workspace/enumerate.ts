@@ -24,7 +24,9 @@ export async function enumerateWorkspace(
     options.preferGit === false
       ? undefined
       : await listGitShareableFiles(canonicalRoot);
-  const candidates = gitFiles ?? (await recurse(canonicalRoot));
+  const fallback = gitFiles === undefined ? await recurse(canonicalRoot) : undefined;
+  const candidates = gitFiles ?? fallback?.files ?? [];
+  if (fallback !== undefined) excluded.push(...fallback.excluded);
   const files: string[] = [];
 
   for (const candidate of candidates) {
@@ -78,23 +80,29 @@ export async function enumerateWorkspace(
   };
 }
 
-async function recurse(root: string): Promise<string[]> {
-  const found: string[] = [];
+async function recurse(root: string): Promise<EnumeratedWorkspace> {
+  const files: string[] = [];
+  const excluded: EnumeratedWorkspace["excluded"] = [];
+
   async function visit(directory: string): Promise<void> {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const absolute = join(directory, entry.name);
       const path = normalizedWorkspacePath(relative(root, absolute));
       const policy = excludedByPolicy(path);
-      if (policy !== undefined) continue;
+      if (policy !== undefined) {
+        excluded.push({ path, reason: policy });
+        continue;
+      }
       if (entry.isDirectory()) {
         await visit(absolute);
       } else {
-        found.push(path);
+        files.push(path);
       }
     }
   }
+
   await visit(root);
-  return found;
+  return { files, excluded };
 }
 
 function isInside(root: string, candidate: string): boolean {
