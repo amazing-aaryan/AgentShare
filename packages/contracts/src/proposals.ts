@@ -1,6 +1,7 @@
+import { Buffer } from "node:buffer";
 import { z } from "zod";
 import { sharedWorkspacePathSchema } from "./environment.js";
-import { sha256Schema } from "./index.js";
+import { sha256Schema } from "./shared.js";
 
 const proposalIdSchema = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{19,99}$/u);
 
