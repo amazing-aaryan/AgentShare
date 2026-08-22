@@ -71,10 +71,12 @@ export async function shareCaptureV2(
           options.statePath,
         );
 
-  if (existing !== undefined && options.selection === undefined) {
-    if (!process.stdin.isTTY || !process.stdout.isTTY) {
-      return updateEnvironment(capture, existing, client, options);
-    }
+  if (
+    existing !== undefined &&
+    options.selection === undefined &&
+    options.existingEnvironmentId === undefined
+  ) {
+    assertInteractiveCreatorApproval();
     const action = await chooseOption(
       `AgentShare - ${existing.environmentId}`,
       [
@@ -129,9 +131,7 @@ export async function shareCaptureV2(
 }
 
 async function interactiveSelection(): Promise<SelectedShareOptions> {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    return selectionToShareOptions(defaultShareSelection());
-  }
+  assertInteractiveCreatorApproval();
   const defaults = defaultShareSelection();
   const scope = await chooseOption(
     "AgentShare - What do you want to share?",
@@ -149,6 +149,14 @@ async function interactiveSelection(): Promise<SelectedShareOptions> {
     defaults.expiry,
   );
   return selectionToShareOptions({ scope, access, expiry });
+}
+
+function assertInteractiveCreatorApproval(): void {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    throw new Error(
+      "Interactive creator approval requires a TTY; run AgentShare in an interactive terminal.",
+    );
+  }
 }
 
 async function reviewBeforePublication(
