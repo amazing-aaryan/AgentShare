@@ -61,7 +61,7 @@ export function buildEnvironmentEvidencePrompt(
   });
   return [
     "You are answering a question about a read-only AgentShare environment.",
-    "You may use only the AgentShare MCP tools. Do not use external facts, local host files, network access, shell commands, or unsupported assumptions.",
+    "Answer only from the AgentShare evidence available through the AgentShare MCP tools. Do not use external facts, local host files, network access, shell commands, or unsupported assumptions.",
     "Use search/read_file/read_conversation as needed to inspect more shared evidence.",
     "Cite every material claim with shared file line references or conversation event references.",
     "If the evidence is insufficient, say so explicitly.",
