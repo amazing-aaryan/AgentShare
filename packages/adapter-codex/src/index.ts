@@ -5,12 +5,19 @@ import type { AcbManifest, SessionEvent } from "@agentshare/contracts";
 
 type JsonObject = Record<string, unknown>;
 
-export async function exportCurrentCodexSession(
+export type CodexHostCapture = {
+  sourceAgent: "codex";
+  title: string;
+  workspaceRoot: string;
+  conversation: SessionEvent[];
+};
+
+export async function exportCurrentCodexCapture(
   options: {
     threadId?: string;
     sessionsRoot?: string;
   } = {},
-): Promise<AcbManifest> {
+): Promise<CodexHostCapture> {
   const threadId = options.threadId ?? process.env.CODEX_THREAD_ID;
   if (threadId === undefined || !/^[A-Za-z0-9-]+$/u.test(threadId)) {
     throw new Error(
@@ -26,22 +33,31 @@ export async function exportCurrentCodexSession(
       `Expected one Codex session for ${threadId}; found ${matches.length}`,
     );
   }
-  return parseCodexSession(await readFile(matches[0], "utf8"), threadId);
+  return parseCodexCapture(await readFile(matches[0], "utf8"), threadId);
 }
 
-export function parseCodexSession(
+export async function exportCurrentCodexSession(
+  options: {
+    threadId?: string;
+    sessionsRoot?: string;
+  } = {},
+): Promise<AcbManifest> {
+  return captureToManifest(await exportCurrentCodexCapture(options));
+}
+
+export function parseCodexCapture(
   jsonl: string,
   threadId = "codex-session",
-): AcbManifest {
+): CodexHostCapture {
   const events: SessionEvent[] = [];
-  let title = `Codex session ${threadId}`;
+  let workspaceRoot: string | undefined;
   for (const line of jsonl.split(/\r?\n/u)) {
     if (line.trim().length === 0) continue;
     const item = parseObject(line);
     if (item?.type === "session_meta") {
       const payload = asObject(item.payload);
       const cwd = stringValue(payload?.cwd);
-      if (cwd !== undefined) title = `Codex: ${basename(cwd)}`;
+      if (cwd !== undefined) workspaceRoot = cwd;
       continue;
     }
     if (item?.type !== "response_item") continue;
@@ -66,12 +82,30 @@ export function parseCodexSession(
   }
   if (events.length === 0)
     throw new Error("Codex session contains no shareable messages");
+  if (workspaceRoot === undefined)
+    throw new Error("Codex session does not contain a workspace root");
+  return {
+    sourceAgent: "codex",
+    title: `Codex: ${basename(workspaceRoot)}`,
+    workspaceRoot,
+    conversation: events,
+  };
+}
+
+export function parseCodexSession(
+  jsonl: string,
+  threadId = "codex-session",
+): AcbManifest {
+  return captureToManifest(parseCodexCapture(jsonl, threadId));
+}
+
+function captureToManifest(capture: CodexHostCapture): AcbManifest {
   return {
     version: "acb-v1",
-    title,
+    title: capture.title,
     sourceAgent: "codex",
     exportedAt: new Date().toISOString(),
-    events,
+    events: capture.conversation,
     resources: [],
   };
 }

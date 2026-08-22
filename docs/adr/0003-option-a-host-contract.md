@@ -20,11 +20,11 @@ AgentShare retrieval context.
 This is Option A from ADR 0001. It preserves current Codex and Claude support
 without weakening the query-only security boundary.
 
-The host contract is now understood as an **adapter contract**, not the permanent
-scope of AgentShare. ADR 0005 defines the broader direction: host-specific
-creator sessions normalize into the open Agent Context Bundle, and recipient
-adapters consume locally decrypted ACB evidence under an equivalent isolation
-boundary.
+The host contract is now understood as an **adapter contract**, not the
+permanent scope of AgentShare. ADR 0005 defines the broader direction:
+host-specific creator sessions normalize into the open Agent Context Bundle, and
+recipient adapters consume locally decrypted ACB evidence under an equivalent
+isolation boundary.
 
 ## Consequences
 
@@ -45,8 +45,8 @@ preserve the same higher-level requirements:
   channels;
 - exact supported releases reviewed and fail-closed on drift.
 
-Agent-agnostic direction is therefore **additive interoperability**, not a reason
-to accept weaker recipient isolation.
+Agent-agnostic direction is therefore **additive interoperability**, not a
+reason to accept weaker recipient isolation.
 
 See [`../VISION.md`](../VISION.md), ADR 0005, and
 [`../recipient-compatibility.md`](../recipient-compatibility.md).

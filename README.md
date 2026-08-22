@@ -25,10 +25,9 @@ format.
 Read the [project vision](docs/VISION.md) and
 [open-context transport ADR](docs/adr/0005-open-context-transport.md).
 
-> [!IMPORTANT]
-> AgentShare is a public beta. Do not share production credentials, regulated
-> data, or other high-risk material. Review all displayed text and the binary
-> resource inventory before upload.
+> [!IMPORTANT] AgentShare is a public beta. Do not share production credentials,
+> regulated data, or other high-risk material. Review all displayed text and the
+> binary resource inventory before upload.
 
 ## Principles
 
@@ -126,11 +125,11 @@ blocked, the page selects the secure link so it can be copied manually.
 
 ## The Use Case
 
-AI work contains state that final files often do not: failed attempts, decisions,
-constraints, discoveries, unresolved questions, and why the current approach
-exists. AgentShare lets another person or agent inherit that working context
-without requiring both sides to use the same AI product or belong to the same
-organization.
+AI work contains state that final files often do not: failed attempts,
+decisions, constraints, discoveries, unresolved questions, and why the current
+approach exists. AgentShare lets another person or agent inherit that working
+context without requiring both sides to use the same AI product or belong to the
+same organization.
 
 Typical handoffs include:
 
@@ -202,19 +201,19 @@ valid. Revocation invalidates all readers of that link at once.
 
 ## Current Capabilities
 
-| Capability                                 | Current behavior                                                                                                                                     |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Share current Codex or Claude conversation | Yes. Host adapters export user and assistant message text from the identified current session.                                                       |
-| Share an explicit text file                | Yes. Explicit path only, up to 5 MiB.                                                                                                                |
-| Read arbitrary creator workspace files     | No. `--current` reads the matching host transcript; it does not crawl the project.                                                                   |
-| Transfer original files automatically      | No. File facts transfer only when their contents already appear in exported conversation text or an explicit supported resource is shared.           |
-| Multiple recipients                        | Yes. A link is reusable by concurrent readers until expiry or revocation.                                                                            |
-| Per-recipient identity or accounts         | No by design for the core flow. Everyone with the complete link uses the bearer capability.                                                         |
-| Follow-up conversation                     | Yes. AgentShare keeps the eight most recent question/answer turns in memory.                                                                         |
-| Citations                                  | Yes. Answers cite bundle source/event identifiers such as `[session#event-4]`; these prove bundle provenance, not external truth.                    |
-| Recipient project file access              | No. Target agents run in a temporary workspace with tools disabled; Codex is read-only/network-disabled and Claude receives an empty tool list.      |
-| Web search or external fact-checking       | No. Recipient agents answer only from retrieved bundle evidence.                                                                                     |
-| Persistent recipient session               | No. Each target process is ephemeral; decrypted context, retrieval index, and chat history are memory-only.                                          |
+| Capability                                 | Current behavior                                                                                                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Share current Codex or Claude conversation | Yes. Host adapters export user and assistant message text from the identified current session.                                                  |
+| Share an explicit text file                | Yes. Explicit path only, up to 5 MiB.                                                                                                           |
+| Read arbitrary creator workspace files     | No. `--current` reads the matching host transcript; it does not crawl the project.                                                              |
+| Transfer original files automatically      | No. File facts transfer only when their contents already appear in exported conversation text or an explicit supported resource is shared.      |
+| Multiple recipients                        | Yes. A link is reusable by concurrent readers until expiry or revocation.                                                                       |
+| Per-recipient identity or accounts         | No by design for the core flow. Everyone with the complete link uses the bearer capability.                                                     |
+| Follow-up conversation                     | Yes. AgentShare keeps the eight most recent question/answer turns in memory.                                                                    |
+| Citations                                  | Yes. Answers cite bundle source/event identifiers such as `[session#event-4]`; these prove bundle provenance, not external truth.               |
+| Recipient project file access              | No. Target agents run in a temporary workspace with tools disabled; Codex is read-only/network-disabled and Claude receives an empty tool list. |
+| Web search or external fact-checking       | No. Recipient agents answer only from retrieved bundle evidence.                                                                                |
+| Persistent recipient session               | No. Each target process is ephemeral; decrypted context, retrieval index, and chat history are memory-only.                                     |
 
 ### Information quality
 
@@ -247,11 +246,11 @@ Key properties:
   checks and fail closed if the required isolation controls are unavailable.
 
 Reviewed recipient versions are tracked in
-[docs/recipient-compatibility.md](docs/recipient-compatibility.md). At the current
-v0.1.11 documentation state, reviewed support includes Codex CLI `0.145.0`
-through `0.147.0` and selected Claude Code releases through `2.1.238`; Codex
-`0.149.0` remains blocked because the required Windows isolation contract could
-not be enforced during review.
+[docs/recipient-compatibility.md](docs/recipient-compatibility.md). At the
+current v0.1.11 documentation state, reviewed support includes Codex CLI
+`0.145.0` through `0.147.0` and selected Claude Code releases through `2.1.238`;
+Codex `0.149.0` remains blocked because the required Windows isolation contract
+could not be enforced during review.
 
 Primary residual risks include capability-link forwarding or leakage,
 clipboard/history exposure, trusted-handoff-origin compromise, creator or
@@ -263,8 +262,8 @@ in the shared context.
 
 AgentShare currently documents two core interoperable objects:
 
-- [Agent Context Bundle v1](docs/protocol/acb-v1.md): canonical representation of
-  reviewed agent context and resources.
+- [Agent Context Bundle v1](docs/protocol/acb-v1.md): canonical representation
+  of reviewed agent context and resources.
 - [Blind Relay Protocol v1](docs/protocol/relay-v1.md): capability-based,
   write-once encrypted share transport.
 
@@ -327,8 +326,9 @@ npm uninstall --global agentshare
 
 The updater accepts only exact stable releases from the canonical AgentShare
 repository, derives the immutable tarball URL locally, verifies the installed
-CLI version, and then runs the new CLI's `repair`. AgentShare-managed integration
-files are refreshed; conflicting unmanaged skill files are left untouched.
+CLI version, and then runs the new CLI's `repair`. AgentShare-managed
+integration files are refreshed; conflicting unmanaged skill files are left
+untouched.
 
 ## Development
 

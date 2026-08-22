@@ -30,8 +30,8 @@ ACB should remain:
 - **versioned and fail-closed:** unknown versions are not guessed at.
 
 ACB v1 is intentionally a current, minimal schema. Broader future context such
-as richer tool evidence, decisions, unresolved questions, or additional
-resource types must be added through explicit version/schema design rather than
+as richer tool evidence, decisions, unresolved questions, or additional resource
+types must be added through explicit version/schema design rather than
 vendor-specific ad hoc fields.
 
 ## Canonicalization

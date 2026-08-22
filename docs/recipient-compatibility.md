@@ -8,8 +8,7 @@ required to consume untrusted shared context safely.
 The open interoperability boundary is the Agent Context Bundle; current
 first-class recipient adapters are Codex and Claude Code. New target adapters
 should expand portability without weakening the fail-closed recipient boundary.
-See [`VISION.md`](VISION.md) and
-[ADR 0005](adr/0005-open-context-transport.md).
+See [`VISION.md`](VISION.md) and [ADR 0005](adr/0005-open-context-transport.md).
 
 AgentShare v0.1.10+ supports only host CLI releases whose exact launcher profile
 passed real isolation checks. Runtime `--version` and `--help` checks are

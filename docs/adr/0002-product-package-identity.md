@@ -17,8 +17,8 @@ purpose rather than relying on the name alone.
 
 The current canonical description is:
 
-> **AgentShare is the free, open protocol/tool for securely handing AI context to
-> anyone through capability links.**
+> **AgentShare is the free, open protocol/tool for securely handing AI context
+> to anyone through capability links.**
 
 The current implementation is Node.js/TypeScript and first-class host adapters
 are Codex and Claude Code. Those implementation details should not be confused
@@ -33,9 +33,9 @@ release time, publish `@agentshare/cli` while retaining executable `agentshare`;
 record the change in a new ADR.
 
 Marketing and documentation should not position AgentShare as a paid team
-workspace, enterprise account system, or permanent AI-session archive. When
-name disambiguation is needed, prefer phrases such as **open agent-context
-handoff protocol** or **encrypted capability-link context transport**.
+workspace, enterprise account system, or permanent AI-session archive. When name
+disambiguation is needed, prefer phrases such as **open agent-context handoff
+protocol** or **encrypted capability-link context transport**.
 
 See [`../VISION.md`](../VISION.md) and
 [ADR 0005](0005-open-context-transport.md).

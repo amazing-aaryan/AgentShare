@@ -1,6 +1,6 @@
 {
   "name": "agentshare",
-  "version": "0.1.11",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
   "description": "Encrypted Codex and Claude context handoff CLI",

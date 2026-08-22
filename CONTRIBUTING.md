@@ -1,8 +1,9 @@
 # Contributing
 
 AgentShare is being built as a **free, open, capability-based transport for AI
-context**. Before changing product behavior, read [`docs/VISION.md`](docs/VISION.md)
-and [ADR 0005](docs/adr/0005-open-context-transport.md).
+context**. Before changing product behavior, read
+[`docs/VISION.md`](docs/VISION.md) and
+[ADR 0005](docs/adr/0005-open-context-transport.md).
 
 Contributions are especially welcome when they make the core handoff more
 portable, understandable, auditable, or useful across agent vendors without

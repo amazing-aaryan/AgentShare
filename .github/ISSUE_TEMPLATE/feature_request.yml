@@ -11,7 +11,9 @@ body:
     id: problem
     attributes:
       label: Problem
-      description: What context-handoff workflow is blocked or inefficient, and who is affected?
+      description:
+        What context-handoff workflow is blocked or inefficient, and who is
+        affected?
     validations:
       required: true
   - type: textarea

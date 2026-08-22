@@ -1,9 +1,9 @@
 # Release Verification Records
 
-Files in this directory are evidence for specific historical AgentShare releases.
-They intentionally preserve the product behavior, host versions, deployment
-state, hashes, and verification results that were true when each release was
-reviewed.
+Files in this directory are evidence for specific historical AgentShare
+releases. They intentionally preserve the product behavior, host versions,
+deployment state, hashes, and verification results that were true when each
+release was reviewed.
 
 They are **not** the canonical source of the current project vision.
 
@@ -11,8 +11,8 @@ For current direction, read:
 
 1. [`../VISION.md`](../VISION.md) — AgentShare as a free/open, account-free,
    capability-based context transport;
-2. [`../../SECURITY.md`](../../SECURITY.md) — current trust boundary and residual
-   risks;
+2. [`../../SECURITY.md`](../../SECURITY.md) — current trust boundary and
+   residual risks;
 3. [`../protocol/`](../protocol/) — current ACB and blind-relay contracts;
 4. [`../operations/`](../operations/) — current operational procedures;
 5. accepted ADRs, especially

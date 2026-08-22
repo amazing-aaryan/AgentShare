@@ -7,7 +7,8 @@ It is directional rather than a release promise.
 
 Make this flow feel ordinary:
 
-**select context -> review -> send one link -> recipient chooses an agent -> continue**
+**select context -> review -> send one link -> recipient chooses an agent ->
+continue**
 
 Do it without requiring AgentShare accounts, shared organizations, paid access,
 or a relay that receives the share plaintext or encryption key.
@@ -53,8 +54,8 @@ Current first-class adapters are Codex and Claude Code. Add new agents when both
 creator extraction and recipient isolation can meet the project contract.
 
 Likely candidates should be prioritized by real user demand, such as Cursor,
-Gemini CLI, OpenCode, VS Code/Copilot-compatible flows, and other agent harnesses
-that expose sufficient safe integration surfaces.
+Gemini CLI, OpenCode, VS Code/Copilot-compatible flows, and other agent
+harnesses that expose sufficient safe integration surfaces.
 
 Every new adapter must:
 
@@ -71,8 +72,8 @@ host configuration.
 
 ## Priority 4: Make Self-hosting Boring
 
-The official free public service should be the easiest default, not a proprietary
-requirement.
+The official free public service should be the easiest default, not a
+proprietary requirement.
 
 Improve:
 
@@ -95,8 +96,7 @@ Possible examples include:
 - clearer one-off/fresh-share creation;
 - safer explicit resource inclusion/exclusion;
 - additional local preview and redaction controls;
-- protocol-compatible capability variants if a concrete use case justifies
-  them.
+- protocol-compatible capability variants if a concrete use case justifies them.
 
 Do not introduce mandatory identity, company workspaces, or seat management to
 solve problems that capability semantics can solve more simply.

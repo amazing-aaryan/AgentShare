@@ -127,8 +127,8 @@ share-content cryptographic boundary, not network anonymity.
 - Public upload rate: 20 per source IP per minute.
 
 These are limits of the free official public relay, not protocol requirements
-for every compatible deployment. They exist to keep shared public
-infrastructure operable without introducing paid plans or accounts.
+for every compatible deployment. They exist to keep shared public infrastructure
+operable without introducing paid plans or accounts.
 
 The edge derives a SHA-256 source identity from Cloudflare's connection address,
 overwrites any client-supplied internal identity header, and stores only the
@@ -142,8 +142,8 @@ expiry, hash mismatch, authentication failure, or unknown protocol version.
 
 Self-hosting is part of the normal open-protocol model, not an enterprise-only
 feature. Compatible relays may use different storage implementations or limits
-while preserving the cryptographic/capability semantics required by the
-protocol version.
+while preserving the cryptographic/capability semantics required by the protocol
+version.
 
 A custom relay must not be able to substitute browser JavaScript that reads the
 capability fragment for new-format links. That is why the current public client

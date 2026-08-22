@@ -6,5 +6,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy:temporary": "wrangler deploy --temporary"
+  },
+  "dependencies": {
+    "@agentshare/web": "0.1.0"
   }
 }
