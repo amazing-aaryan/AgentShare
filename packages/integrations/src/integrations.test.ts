@@ -31,6 +31,10 @@ describe("host integrations", () => {
       join(roots.claudeSkills, "agentshare", "SKILL.md"),
       "utf8",
     );
+    const codexCreatorSkill = await readFile(
+      join(roots.codexSkills, "agentshare", "SKILL.md"),
+      "utf8",
+    );
     const codexCreator = await readFile(
       join(roots.codexSkills, "agentshare", "agents", "openai.yaml"),
       "utf8",
@@ -40,6 +44,8 @@ describe("host integrations", () => {
       "utf8",
     );
     expect(claudeCreator).toContain("disable-model-invocation: true");
+    expect(claudeCreator).toContain("interactive terminal");
+    expect(codexCreatorSkill).toContain("interactive terminal");
     expect(claudeReceiver).toContain("/e/");
     expect(claudeReceiver).toContain("agentshare ask");
     expect(codexCreator).toContain("allow_implicit_invocation: false");
