@@ -51,10 +51,9 @@ describe("proposalSchema", () => {
         baseSha256: hex,
       } as (typeof input.operations)[number],
     ];
-    expect(proposalSchema.parse(input).operations.map((op) => op.type)).toEqual([
-      "create",
-      "delete",
-    ]);
+    expect(proposalSchema.parse(input).operations.map((op) => op.type)).toEqual(
+      ["create", "delete"],
+    );
   });
 
   it("rejects traversal paths", () => {

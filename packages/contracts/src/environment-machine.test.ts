@@ -53,7 +53,12 @@ function revision(parentRevisionId?: string) {
 function commitBase(record = create()) {
   const request = revision();
   let next = reserveEnvironmentRevision(record, request, now);
-  next = recordEnvironmentManifest(next, request.revisionId, request.manifest, now);
+  next = recordEnvironmentManifest(
+    next,
+    request.revisionId,
+    request.manifest,
+    now,
+  );
   next = recordEnvironmentBlob(
     next,
     request.blobs[0]?.blobId ?? "missing",
@@ -186,7 +191,12 @@ describe("environment relay state machine", () => {
       now,
     );
     expect(
-      recordEnvironmentManifest(uploaded, request.revisionId, request.manifest, now),
+      recordEnvironmentManifest(
+        uploaded,
+        request.revisionId,
+        request.manifest,
+        now,
+      ),
     ).toEqual(uploaded);
   });
 
@@ -243,7 +253,12 @@ describe("environment relay state machine", () => {
     const base = commitBase();
     const next = revision("rev_11111111111111111111");
     let record = reserveEnvironmentRevision(base, next, now);
-    record = recordEnvironmentManifest(record, next.revisionId, next.manifest, now);
+    record = recordEnvironmentManifest(
+      record,
+      next.revisionId,
+      next.manifest,
+      now,
+    );
     record = recordEnvironmentBlob(
       record,
       next.blobs[0]?.blobId ?? "missing",
