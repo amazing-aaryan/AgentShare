@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sessionEventSchema, sha256Schema } from "./index.js";
+import { sessionEventSchema, sha256Schema } from "./shared.js";
 
 const objectIdSchema = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{19,99}$/u);
 
