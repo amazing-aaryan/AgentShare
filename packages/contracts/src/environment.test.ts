@@ -94,8 +94,10 @@ describe("environmentManifestSchema", () => {
 
   it("rejects duplicate workspace paths", () => {
     const input = validManifest();
+    const firstFile = input.workspace.files[0];
+    if (firstFile === undefined) throw new Error("Missing workspace fixture");
     input.workspace.files.push({
-      ...input.workspace.files[0]!,
+      ...firstFile,
       resourceId: "res_22222222222222222222",
       blobs: [
         {
@@ -110,7 +112,10 @@ describe("environmentManifestSchema", () => {
 
   it("requires declared blob lengths to equal the file length", () => {
     const input = validManifest();
-    input.workspace.files[0]!.blobs[0]!.byteLength = 11;
+    const firstFile = input.workspace.files[0];
+    const firstBlob = firstFile?.blobs[0];
+    if (firstBlob === undefined) throw new Error("Missing blob fixture");
+    firstBlob.byteLength = 11;
     expect(() => environmentManifestSchema.parse(input)).toThrow();
   });
 });
