@@ -23,7 +23,7 @@ async function fixture(): Promise<string> {
 
 describe("creator proposal approval", () => {
   it("changes the real workspace only after approval and publishes a new revision", async () => {
-    const now = new Date("2026-08-19T00:00:00.000Z");
+    const now = new Date();
     const handler = createRelayHandler(new InMemoryRelayStore(), {
       now: () => now,
     });
@@ -104,7 +104,7 @@ describe("creator proposal approval", () => {
   });
 
   it("retains proposal-linked pending state when acceptance status is interrupted", async () => {
-    const now = new Date("2026-08-19T00:00:00.000Z");
+    const now = new Date();
     const handler = createRelayHandler(new InMemoryRelayStore(), {
       now: () => now,
     });
@@ -218,7 +218,7 @@ describe("creator proposal approval", () => {
   });
 
   it("fails closed when the creator changed the base file after sharing", async () => {
-    const now = new Date("2026-08-19T00:00:00.000Z");
+    const now = new Date();
     const handler = createRelayHandler(new InMemoryRelayStore(), {
       now: () => now,
     });
