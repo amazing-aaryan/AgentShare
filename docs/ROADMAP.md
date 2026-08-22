@@ -3,6 +3,39 @@
 This roadmap translates [`VISION.md`](VISION.md) into implementation priorities.
 It is directional rather than a release promise.
 
+## Current Implementation Status
+
+The v0.2 candidate now implements the concrete foundation needed for the current
+open-context vision:
+
+- reviewed v2 collaborative environments with explicit conversation/project
+  scope, read-only or read-plus-propose access, and bounded expiry;
+- one split-origin `/e/` capability link with the relay origin as non-secret
+  metadata and read/key/proposal material in the URL fragment;
+- revisioned environment publication, same-link updates, recipient refresh, and
+  encrypted resource reuse;
+- encrypted recipient proposals plus creator-only inbox review and approval;
+- shared public-relay admission, rate, capacity, and retained-ciphertext quota
+  accounting for v1 shares and v2 environments;
+- creator preview, secret scanning, exclusions, and fail-closed interactive
+  approval before publication;
+- independently configurable relay and handoff origins for self-hosting;
+- relay-independent ACB v1 conformance fixtures and a dedicated CI gate;
+- explicit v1 compatibility through `share-v1`, `open`, and legacy revoke.
+
+Two important roadmap areas remain intentionally future work rather than hidden
+claims of completion:
+
+- richer ACB concepts such as decisions, unresolved questions, and richer tool
+  evidence require an explicit backward-compatible schema decision or a new ACB
+  version;
+- additional agent adapters remain demand-driven and blocked until exact creator
+  extraction and recipient-isolation contracts can be reviewed and tested.
+
+A v0.2 implementation being present in the repository is not the same as a
+published stable release. Public deployment, immutable-package verification, and
+authenticated real Codex/Claude release gates remain release prerequisites.
+
 ## North Star
 
 Make this flow feel ordinary:
@@ -41,8 +74,11 @@ Potential areas:
 - richer provenance for tool evidence and file-derived facts;
 - explicit resource relationships without implicit workspace crawling;
 - compatibility rules for additive fields and future versions;
-- import/export fixtures for third-party implementers;
-- conformance tests independent from the official relay.
+- additional import/export fixtures as the schema grows.
+
+The current repository already includes relay-independent ACB v1 conformance
+vectors. Future work should extend those vectors rather than coupling format
+compatibility to the official relay.
 
 Avoid turning ACB into a dump of every host-specific internal field. The format
 should represent portable working context, not reproduce a proprietary session
@@ -81,7 +117,7 @@ Improve:
 - reproducible relay/handoff deployment;
 - clear separation between protocol requirements and public-relay policy;
 - local conformance tests for compatible relays;
-- simple configuration of alternate relay origins;
+- simple configuration of alternate relay and handoff origins;
 - upgrade/rollback documentation that preserves existing shares where possible.
 
 Longer term, a very small deployment experience such as a documented one-command
@@ -92,11 +128,12 @@ or one-config path is preferable to an enterprise-oriented setup guide.
 Add useful capability semantics only when they retain the simple link model.
 Possible examples include:
 
-- easier TTL selection;
-- clearer one-off/fresh-share creation;
-- safer explicit resource inclusion/exclusion;
+- clearer resource inclusion/exclusion controls;
 - additional local preview and redaction controls;
 - protocol-compatible capability variants if a concrete use case justifies them.
+
+TTL selection, explicit fresh-share creation, and read-only versus
+read-plus-propose access are already part of the v0.2 environment flow.
 
 Do not introduce mandatory identity, company workspaces, or seat management to
 solve problems that capability semantics can solve more simply.
