@@ -23,7 +23,7 @@ async function creatorFixture(): Promise<string> {
 
 describe("recipient environment attachment", () => {
   it("accepts one link, caches ciphertext, and supports safe file search/read", async () => {
-    const now = new Date("2026-08-19T00:00:00.000Z");
+    const now = new Date();
     const handler = createRelayHandler(new InMemoryRelayStore(), {
       now: () => now,
     });
