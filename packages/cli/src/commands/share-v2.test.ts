@@ -12,10 +12,17 @@ async function fixture() {
   return root;
 }
 
+async function statePath(): Promise<string> {
+  return join(
+    await mkdtemp(join(tmpdir(), "agentshare-share-state-")),
+    "state-v2.json",
+  );
+}
+
 describe("v2 share command", () => {
   it("creates a split-origin 24-hour read-plus-propose environment without free-form input", async () => {
     const root = await fixture();
-    const statePath = join(root, "state-v2.json");
+    const state = await statePath();
     const handler = createRelayHandler(new InMemoryRelayStore());
     const fetchImpl: typeof fetch = (input, init) =>
       handler(new Request(input, init));
@@ -41,7 +48,7 @@ describe("v2 share command", () => {
       {
         client,
         handoffOrigin: "https://handoff.example",
-        statePath,
+        statePath: state,
         selection: {
           includeConversation: true,
           includeWorkspace: true,
@@ -61,7 +68,7 @@ describe("v2 share command", () => {
 
   it("updates an existing environment and keeps the same capability URL", async () => {
     const root = await fixture();
-    const statePath = join(root, "state-v2.json");
+    const state = await statePath();
     const handler = createRelayHandler(new InMemoryRelayStore());
     const fetchImpl: typeof fetch = (input, init) =>
       handler(new Request(input, init));
@@ -86,7 +93,7 @@ describe("v2 share command", () => {
     const first = await shareCaptureV2(capture, {
       client,
       handoffOrigin: "https://handoff.example",
-      statePath,
+      statePath: state,
       selection: {
         includeConversation: true,
         includeWorkspace: true,
@@ -99,7 +106,7 @@ describe("v2 share command", () => {
     const second = await shareCaptureV2(capture, {
       client,
       handoffOrigin: "https://handoff.example",
-      statePath,
+      statePath: state,
       existingEnvironmentId: first.environment.environmentId,
       workspaceOptions: { preferGit: false },
     });
