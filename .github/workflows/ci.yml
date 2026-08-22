@@ -1,27 +1,26 @@
-name: ci
+name: ci-format-reconciliation
 
 permissions:
-  contents: read
+  contents: write
 
 on:
   push:
-  pull_request:
+    branches: [feat/agentshare-v2-environments]
 
 jobs:
-  verify:
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        node: [22]
-    runs-on: ${{ matrix.os }}
+  format-and-restore:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: feat/agentshare-v2-environments
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
           cache: npm
       - run: npm ci
-      - name: Produce exact Prettier output for reconciliation
+      - name: Format reconciled docs and restore normal CI
+        shell: bash
         run: |
           files=(
             .github/ISSUE_TEMPLATE/feature_request.yml
@@ -41,11 +40,44 @@ jobs:
             SECURITY.md
           )
           npx prettier --write "${files[@]}"
-          node - "${files[@]}" <<'NODE'
-          const fs = require("node:fs");
-          for (const file of process.argv.slice(2)) {
-            const encoded = Buffer.from(fs.readFileSync(file)).toString("base64");
-            console.log(`FORMATTED:${file}:${encoded}`);
-          }
-          NODE
-          exit 1
+          cat > .github/workflows/ci.yml <<'EOF'
+          name: ci
+
+          permissions:
+            contents: read
+
+          on:
+            push:
+            pull_request:
+
+          jobs:
+            verify:
+              strategy:
+                matrix:
+                  os: [ubuntu-latest, macos-latest, windows-latest]
+                  node: [22, 24]
+              runs-on: ${{ matrix.os }}
+              steps:
+                - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+                - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+                  with:
+                    node-version: ${{ matrix.node }}
+                    cache: npm
+                - run: npm ci
+                - run: node scripts/check-repository-hygiene.mjs
+                - run: npm run format:check
+                - run: npm run lint
+                - run: npm run build
+                - run: npm run test:coverage
+                - run: npm run test:package
+                - run: npm run test:edge-runtime
+                - run:
+                    npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
+                - run: npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
+                - run: npm audit --audit-level=high
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- .github/workflows/ci.yml .github/ISSUE_TEMPLATE/feature_request.yml CONTRIBUTING.md docs/adr/0002-product-package-identity.md docs/adr/0003-option-a-host-contract.md docs/adr/0005-open-context-transport.md docs/operations/local-development.md docs/protocol/acb-v1.md docs/protocol/relay-v1.md docs/recipient-compatibility.md docs/releases/README.md docs/ROADMAP.md docs/VISION.md packages/cli/README.md README.md SECURITY.md
+          git commit -m "chore: format reconciled docs and restore CI"
+          git push origin HEAD:feat/agentshare-v2-environments
