@@ -19,11 +19,12 @@
     "format:check": "prettier --check .",
     "lint": "tsc -b --pretty false && eslint .",
     "test": "vitest run",
+    "test:conformance": "vitest run packages/acb/src/conformance.test.ts",
+    "test:coverage": "vitest run --coverage",
     "test:edge-runtime": "node scripts/test-edge-runtime.mjs",
     "test:live:diagnostic": "node scripts/test-live-diagnostic.mjs",
     "test:package": "node scripts/test-package.mjs",
     "test:release": "node scripts/test-release.mjs",
-    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false",
     "start:relay": "npm run start --workspace @agentshare/relay"

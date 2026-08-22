@@ -3,16 +3,25 @@
 AgentShare v2 changes the shared object from a one-shot handoff to a revisioned
 collaborative environment while preserving the v1 `/s/` protocol unchanged.
 
-## Environment link
+## Environment Link
 
 A recipient capability link has the form:
 
 ```text
-https://<relay>/e/<environment-id>#r=<read-capability>&k=<environment-master-key>[&p=<proposal-capability>]
+https://<handoff-origin>/e/<environment-id>?relay=https%3A%2F%2F<relay-origin>#r=<read-capability>&k=<environment-master-key>[&p=<proposal-capability>]
 ```
 
-The URL fragment is client-side secret material. The relay never receives the
-fragment in an HTTP request. A read-only link omits `p`.
+The handoff and relay origins are intentionally independent. `relay=` is
+non-secret transport metadata that tells the local client which compatible
+ciphertext relay to contact. The URL fragment is bearer secret material:
+
+- `r` is the read capability;
+- `k` is the environment master key;
+- optional `p` is the proposal capability.
+
+Browsers do not transmit the fragment in an HTTP request. The trusted handoff
+page receives only the path and non-secret relay origin. A read-only link omits
+`p`.
 
 Creator-only capabilities (`update`, `inbox`, and `revoke`) and the proposal
 private key stay in `~/.agentshare/state-v2.json` and are never placed in the
@@ -65,7 +74,7 @@ descriptor.
 The proposal inbox capability is creator-only. Other recipients cannot list or
 decrypt submitted proposals.
 
-## Relay routes
+## Relay Routes
 
 ```text
 POST   /v2/environments
@@ -89,7 +98,7 @@ Capability authorization is endpoint-specific: readers cannot publish or list
 proposals; proposers cannot read the owner inbox; inbox holders cannot publish
 revisions; only the revoke capability revokes the environment.
 
-## Public-relay quota accounting
+## Public-relay Quota Accounting
 
 The production `EnvironmentObject` participates in the same global reservation
 controller used by v1 shares. Environment creation reserves one active slot and
