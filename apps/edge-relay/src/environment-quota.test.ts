@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import { capabilityDigest, randomCapability, sha256Hex } from "@agentshare/acb";
 import { describe, expect, it } from "vitest";
 import { EnvironmentObject } from "./environment-object.js";
@@ -42,6 +41,10 @@ function id(prefix: string): string {
 
 function auth(capability: string): Record<string, string> {
   return { authorization: `Bearer ${capability}` };
+}
+
+function bytes(value: string): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(value);
 }
 
 describe("edge environment quota accounting", () => {
@@ -108,8 +111,8 @@ describe("edge environment quota accounting", () => {
       body: { actorDigest },
     });
 
-    const manifest = Buffer.from("encrypted manifest");
-    const blob = Buffer.from("encrypted blob");
+    const manifest = bytes("encrypted manifest");
+    const blob = bytes("encrypted blob");
     await object.fetch(
       new Request(
         `https://relay.test/v2/environments/${environmentId}/revisions`,

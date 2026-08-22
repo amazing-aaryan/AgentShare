@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import {
   addEnvironmentProposal,
   commitEnvironmentRevision,
@@ -220,9 +219,7 @@ export class EnvironmentObject {
           if (typeof body.ciphertextBase64 !== "string") {
             return error("BAD_REQUEST", "Missing proposal ciphertext", 400);
           }
-          const bytes = Uint8Array.from(
-            Buffer.from(body.ciphertextBase64, "base64"),
-          );
+          const bytes = decodeBase64(body.ciphertextBase64);
           const actual = await descriptorFor(bytes);
           if (
             actual.ciphertextBytes !== descriptor.ciphertextBytes ||
@@ -560,10 +557,24 @@ function constantTimeEqual(left: string, right: string): boolean {
   return difference === 0;
 }
 
+function decodeBase64(value: string): Uint8Array {
+  let binary: string;
+  try {
+    binary = atob(value);
+  } catch {
+    throw new BadRequestError("Invalid proposal ciphertext encoding");
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
 async function readJson(request: Request, maxBytes: number): Promise<unknown> {
   const bytes = await readBoundedBytes(request, maxBytes);
   try {
-    return JSON.parse(Buffer.from(bytes).toString("utf8")) as unknown;
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
   } catch {
     throw new SyntaxError("Invalid JSON");
   }
@@ -598,7 +609,13 @@ async function readBoundedBytes(
   if (declared !== undefined && total !== declared) {
     throw new BadRequestError("Content-Length mismatch");
   }
-  return Uint8Array.from(Buffer.concat(chunks, total));
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
 }
 
 function manifestPrefix(revisionId: string): string {

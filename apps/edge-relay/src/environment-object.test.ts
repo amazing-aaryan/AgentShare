@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import { capabilityDigest, randomCapability, sha256Hex } from "@agentshare/acb";
 import {
   environmentMetadataResponseSchema,
@@ -57,6 +56,16 @@ function id(prefix: string): string {
   return `${prefix}_${randomCapability(18)}`;
 }
 
+function bytes(value: string): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(value);
+}
+
+function base64(value: Uint8Array): string {
+  let binary = "";
+  for (const byte of value) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 describe("edge EnvironmentObject", () => {
   it("publishes revisions and isolates read/proposal/inbox capabilities", async () => {
     const object = new EnvironmentObject({
@@ -88,8 +97,8 @@ describe("edge EnvironmentObject", () => {
     );
     expect(created.status).toBe(201);
 
-    const manifest = Buffer.from("encrypted manifest");
-    const blob = Buffer.from("encrypted blob");
+    const manifest = bytes("encrypted manifest");
+    const blob = bytes("encrypted blob");
     const reserved = await object.fetch(
       new Request(
         `https://relay.test/v2/environments/${environmentId}/revisions`,
@@ -157,7 +166,7 @@ describe("edge EnvironmentObject", () => {
         .currentRevisionId,
     ).toBe(revisionId);
     expect(
-      Buffer.from(
+      new Uint8Array(
         await (
           await object.fetch(
             new Request(
@@ -170,7 +179,7 @@ describe("edge EnvironmentObject", () => {
     ).toEqual(blob);
 
     const proposalId = id("proposal");
-    const proposal = Buffer.from("encrypted proposal");
+    const proposal = bytes("encrypted proposal");
     expect(
       (
         await object.fetch(
@@ -190,7 +199,7 @@ describe("edge EnvironmentObject", () => {
                   ciphertextBytes: proposal.byteLength,
                   ephemeralPublicKey: randomCapability(32),
                 },
-                ciphertextBase64: proposal.toString("base64"),
+                ciphertextBase64: base64(proposal),
               }),
             },
           ),
