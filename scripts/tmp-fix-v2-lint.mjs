@@ -62,7 +62,7 @@ replaceExact(
   return \`\${prefix}_\${randomCapability(18)}\`;
 }
 
-function bytes(value: string): Uint8Array {
+function bytes(value: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(value);
 }
 
@@ -109,7 +109,7 @@ replaceExact(
   return { authorization: \`Bearer \${capability}\` };
 }
 
-function bytes(value: string): Uint8Array {
+function bytes(value: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(value);
 }`,
 );
