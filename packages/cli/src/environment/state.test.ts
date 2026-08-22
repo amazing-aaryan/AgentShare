@@ -14,6 +14,7 @@ describe("environment state v2", () => {
   it("persists owner and recipient capabilities separately", async () => {
     const dir = await mkdtemp(join(tmpdir(), "agentshare-state-v2-"));
     const path = join(dir, "state-v2.json");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     await saveOwnedEnvironment(
       {
         environmentId: "env_12345678901234567890",
@@ -27,7 +28,7 @@ describe("environment state v2", () => {
         revokeCapability: "v".repeat(43),
         proposalPrivateKey: "x".repeat(64),
         currentRevisionId: "rev_12345678901234567890",
-        expiresAt: "2026-08-20T00:00:00.000Z",
+        expiresAt,
         sharePolicy: {
           includeConversation: true,
           includeWorkspace: true,
@@ -43,8 +44,8 @@ describe("environment state v2", () => {
         environmentMasterKey: "m".repeat(43),
         readCapability: "q".repeat(43),
         currentRevisionId: null,
-        expiresAt: "2026-08-20T00:00:00.000Z",
-        attachedAt: "2026-08-19T00:00:00.000Z",
+        expiresAt,
+        attachedAt: new Date().toISOString(),
         title: "Shared project",
       },
       path,
