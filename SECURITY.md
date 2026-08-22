@@ -5,63 +5,49 @@ guarantee. Report vulnerabilities through
 [GitHub private vulnerability reporting](https://github.com/amazing-aaryan/AgentShare/security/advisories/new),
 not a public issue.
 
+The security model follows the project vision in
+[`docs/VISION.md`](docs/VISION.md): AgentShare is a free, open,
+capability-based transport for agent context, not an account-based workspace or
+central plaintext knowledge store.
+
+Repository administrators should also follow
+[`docs/operations/repository-security.md`](docs/operations/repository-security.md)
+for branch protection, secret-scanning, release-immutability, and package
+verification controls.
+
+## Core Trust Boundary
+
+The core handoff is intentionally authorized by possession of the complete
+capability link rather than by an AgentShare account, company membership, or
+identity provider.
+
+That enables handoffs across people, machines, communities, and companies
+without a shared control plane, but it also means the complete link is a secret.
+Anyone who obtains it may be able to read the share until it expires or is
+revoked. Current revocation invalidates all readers of that link at once.
+
+The normal AgentShare relay is designed so it does not need conversation
+plaintext or the encryption key. This guarantee applies to AgentShare transport
+infrastructure, not to the recipient's chosen model provider: after local
+decryption, selected evidence excerpts are submitted through the recipient's
+Codex or Claude account when they ask the target agent a question.
+
+No future account, workspace, analytics, or knowledge feature should silently
+weaken this trust boundary. A change that requires central plaintext processing
+or materially changes capability semantics requires explicit security review and
+an ADR.
+
 ## Supported Versions
 
-Only the latest published release receives security fixes. Until v0.2.0 is
-published, that remains v0.1.10.
+Only the latest published `0.1.x` release receives security fixes.
 
 Do not include secrets, capability URLs, decrypted bundles, or private source in
 reports. Include affected version, reproducible steps using synthetic data, and
 the expected impact.
 
-## v0.2.0 candidate invariants
+## New-format Link Invariants
 
-The v0.2.0 collaborative-environment implementation is unreleased while its
-release gate is being completed. Its intended security invariants are:
-
-- Environment manifests, workspace resources, local search indexes, and proposed
-  changes are encrypted on client devices. The relay receives ciphertext plus
-  operational metadata and capability digests.
-- Recipient environment links carry only read/decryption material and, when the
-  creator enables proposals, a proposal capability. Update, inbox, and revoke
-  capabilities plus the proposal private key stay on the creator device.
-- Shared paths are workspace-relative. Snapshot discovery never intentionally
-  crawls above the current project root, never dereferences symlinks, and
-  applies Git ignore rules, AgentShare exclusions, and secret scanning before
-  publish.
-- A recipient never gets write access to the creator workspace. Recipient
-  changes are deterministic create/replace/delete proposals encrypted to the
-  creator and tied to an exact base revision/file hash.
-- Proposal approval re-validates revision identity, file hashes, path
-  containment, symlink/regular-file rules, and secret scanning immediately
-  before mutation.
-- Local proposal application uses an encrypted rollback journal. A revision
-  produced by an approved proposal remains resumable until the relay commit and
-  proposal terminal status have both succeeded.
-- Recipient questions and proposal generation run in a separate reviewed
-  Codex/Claude child process. Built-in filesystem, shell, network/web, user
-  skills, plugins/apps, and unrelated MCP servers are unavailable; the child can
-  use only AgentShare's local controlled MCP surface.
-- The recipient cache stores encrypted manifests, blobs, and indexes with
-  restrictive local permissions where supported. Plaintext is reconstructed only
-  for controlled local read/search operations and model context.
-- Environment create/upload traffic uses the same public-relay admission/rate
-  limiting infrastructure as v1. Retained environment ciphertext is charged to
-  the creator reservation, including proposal ciphertext submitted by
-  recipients.
-- Expiry and creator revocation invalidate future relay access. They cannot
-  erase data that a recipient or model provider already received.
-
-The default v2 one-paste flow has an explicit privacy trade-off: when UserB
-pastes the full bearer URL into a hosted agent conversation, that model provider
-may receive the URL. The `/e/` page documents a maximum-privacy alternative for
-users who need to keep bearer material out of hosted conversation text.
-
-See `docs/security/environment-threat-model.md` for the v2 threat model.
-
-## v0.1.10 invariants
-
-Security invariants for v0.1.10 new-format links:
+Security invariants for v0.1.10+ new-format links:
 
 - Encryption and decryption happen on clients.
 - Newly created links use an AgentShare-controlled handoff origin that is
@@ -74,6 +60,11 @@ Security invariants for v0.1.10 new-format links:
 - The selected relay origin is non-secret link metadata. The relay stores
   ciphertext and capability digests, never conversation plaintext, decryption
   keys, or raw upload/read/revoke capabilities.
+- Cross-origin browser access to the production relay is limited to metadata GET
+  requests from the exact trusted handoff origin. Create, upload, revoke, and
+  blob-download routes are not browser-CORS enabled.
+- The production edge rejects create JSON bodies above 8 KiB before parsing and
+  forwards only validated canonical create metadata to the share object.
 - Recipient plaintext, keys, and indexes remain memory-only.
 - Host launchers fail closed when query-only isolation cannot be established.
 - Untrusted terminal output is stripped of terminal and bidirectional control
@@ -87,11 +78,59 @@ the older v0.1.9 browser trust assumption: JavaScript served by that relay can
 read the URL fragment in the browser. Do not use an untrusted custom relay with
 a legacy-format link.
 
+## Capability Security
+
+AgentShare deliberately does not require recipient identity for the base
+protocol. The consequence is simple: capability secrecy is access control.
+
+- Send a link only through a channel appropriate for the sensitivity of the
+  reviewed context.
+- Do not paste complete links into issues, logs, analytics, shell history,
+  screenshots, public chat, or bug reports.
+- Prefer shorter TTLs for sensitive or one-off handoffs.
+- Revoke a share if you suspect the link was copied to the wrong place.
+- Remember that forwarding the complete link forwards access.
+
+Adding identity-bound or per-recipient schemes in compatible third-party tools
+is possible, but the base AgentShare protocol must remain usable without an
+account or shared organization.
+
+## CLI Update Trust Boundary
+
+Creator installations may perform a best-effort HTTPS GET to the canonical
+`amazing-aaryan/AgentShare` GitHub Releases API at most once per 24 hours after
+a successful creator command. The request contains no conversation text,
+capability URL, encryption key, relay state, project path, or share metadata. It
+identifies the installed AgentShare version in the User-Agent. Set
+`AGENTSHARE_NO_UPDATE_CHECK=1` to disable passive checks entirely.
+
+Passive checks never install code and failures are ignored by the creator
+command that triggered them. `agentshare update --check` explicitly performs a
+fresh check. Only `agentshare update` installs a release.
+
+The updater accepts only exact stable `vMAJOR.MINOR.PATCH` tags returned by the
+fixed repository endpoint. Drafts, prereleases, malformed versions, and
+downgrades are rejected. The immutable GitHub tarball URL is derived locally
+from the validated version; AgentShare does not execute a URL or command
+supplied by a release body. npm is invoked without a shell. After installation,
+AgentShare uses the running Node executable and the same CLI entrypoint to
+verify the exact new version before invoking the new CLI's `repair` command.
+
+The update trust chain still includes GitHub HTTPS, control of the AgentShare
+repository/releases, npm's local installation behavior, and the creator device.
+Release checksum or signature verification is not yet part of this updater. A
+compromise of the canonical release account could therefore publish malicious
+code under a valid stable tag; explicit user invocation limits installation but
+does not remove that supply-chain risk. See ADR 0004 for the decision record.
+
 ## Local Residual Risks
 
 - The local relay is volatile, process-local, and not production hardened.
-- Creator state stores live links and revocation capabilities in mode-0600 local
-  files; Windows protection inherits the user's directory ACL.
+- Creator state stores live links and revocation capabilities in a mode-0600
+  local file; Windows protection inherits the user's directory ACL.
+- The update cache stores only a last-check timestamp and latest stable version
+  in `~/.agentshare/update-check-v1.json`; malformed cache content is ignored
+  and refreshed rather than trusted as executable data.
 - Decrypted recipient context exists in process memory and may appear in OS swap
   or crash dumps. AgentShare does not claim secure memory erasure.
 - Codex may enumerate skill metadata during startup, but AgentShare disables its
@@ -99,17 +138,20 @@ a legacy-format link.
   tool surfaces before handing it untrusted context. Launchers fail closed on
   unreviewed Codex or Claude versions.
 - Capability links can leak through clipboard managers, screenshots, browser
-  extensions, screen recording, or compromised endpoints. The v1 trusted handoff
-  page immediately removes query and fragment data from visible history, uses
-  `no-referrer`, loads no third-party assets, and sends no analytics.
-- Compromise of the trusted AgentShare v1 handoff origin could replace the
-  browser JavaScript and expose capability fragments. Separating the handoff
-  origin from custom ciphertext relays removes relay-controlled page code from
-  the v0.1.10 threat model; it does not eliminate compromise of the trusted
-  handoff service itself.
+  extensions, screen recording, messaging systems, or compromised endpoints.
+  The handoff page immediately removes query and fragment data from visible
+  history, uses `no-referrer`, loads no third-party assets, and sends no
+  analytics.
+- Compromise of the trusted AgentShare handoff origin could replace the browser
+  JavaScript and expose capability fragments. Separating the handoff origin from
+  custom ciphertext relays removes relay-controlled page code from the new-link
+  threat model; it does not eliminate compromise of the trusted handoff service
+  itself.
 - Secret scanning covers known credential formats in text plus ASCII, UTF-8,
-  UTF-16LE, and UTF-16BE views of binary resources. It cannot inspect encrypted,
-  compressed, or unknown encodings.
+  UTF-16LE, and UTF-16BE views of binary resources. It is heuristic and cannot
+  guarantee detection of every provider token or inspect encrypted, compressed,
+  or unknown encodings. Repository-level GitHub secret scanning is an
+  independent defense and must remain enabled.
 - Creator review is exact for normalized/redacted text. Binary resource bytes
   are not rendered byte-for-byte in the terminal; binary resources are
   inventoried by media type, byte length, and SHA-256, and a suspected secret
@@ -119,3 +161,14 @@ a legacy-format link.
   eliminate distributed abuse across many source addresses.
 - Hashing source addresses minimizes stored quota data; it does not anonymize
   low-entropy IP addresses or hide them from Cloudflare.
+
+## Security Direction
+
+Broader host support must not be added merely because an agent can consume a
+prompt. Each recipient integration must prove the required isolation properties
+before being supported. New creator adapters must preserve explicit selection
+and review rather than crawl additional workspace data silently.
+
+The long-term goal is wider agent interoperability with the same narrow trust
+boundary: open context format, local review, local encryption, blind transport,
+local decryption, and a safely constrained recipient agent.

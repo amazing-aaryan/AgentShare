@@ -66,6 +66,6 @@ describe("trusted handoff worker", () => {
     );
     expect(html).not.toContain("fetch(original.origin");
     expect(html).not.toMatch(/fetch\([^)]*fragmentKey/u);
-    expect(html).toContain("agentshare-0.1.10.tgz");
+    expect(html).toContain("agentshare-0.1.11.tgz");
   });
 });

@@ -1,8 +1,12 @@
 import { bootstrapDocument, renderEnvironmentPage } from "@agentshare/web/v2";
-import legacyWorker, { RelayControl, ShareObject } from "./index.js";
+import legacyWorker, {
+  QueryObject,
+  RelayControl,
+  ShareObject,
+} from "./secure-worker.js";
 import { EnvironmentObject } from "./environment-object.js";
 
-export { EnvironmentObject, RelayControl, ShareObject };
+export { EnvironmentObject, QueryObject, RelayControl, ShareObject };
 
 const ACTOR_HEADER = "x-agentshare-actor-digest";
 
@@ -14,6 +18,7 @@ type Env = {
   ENVIRONMENTS: DurableObjectNamespace;
   SHARES: DurableObjectNamespace;
   CONTROL: DurableObjectNamespace;
+  QUERIES: DurableObjectNamespace;
   CREATE_RATE_LIMITER: RateLimiter;
   UPLOAD_RATE_LIMITER: RateLimiter;
 };

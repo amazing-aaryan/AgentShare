@@ -1,6 +1,6 @@
 import { bootstrapDocument, renderEnvironmentPage } from "@agentshare/web/v2";
 
-const PUBLIC_RELEASE = "0.1.10";
+const PUBLIC_RELEASE = "0.1.11";
 const PUBLIC_PACKAGE =
   `https://github.com/amazing-aaryan/AgentShare/releases/download/v${PUBLIC_RELEASE}/` +
   `agentshare-${PUBLIC_RELEASE}.tgz`;

@@ -9,11 +9,15 @@ import {
   type AuthoritativeMetadata,
   type CreateShareRequest,
   type RelayRecord,
+  queryCreateRequestSchema,
+  type QueryMetadata,
+  type QueryStatus,
 } from "@agentshare/contracts";
 import { renderSharePage } from "@agentshare/web";
 
 type Env = {
   SHARES: DurableObjectNamespace;
+  QUERIES: DurableObjectNamespace;
   CONTROL: DurableObjectNamespace;
   CREATE_RATE_LIMITER: RateLimiter;
   UPLOAD_RATE_LIMITER: RateLimiter;
@@ -45,6 +49,27 @@ export default {
     const url = new URL(request.url);
     if (request.method === "GET" && /^\/s\/[^/]+$/u.test(url.pathname)) {
       return sharePage();
+    }
+
+    let queryId: string | undefined;
+    if (request.method === "POST" && url.pathname === "/v1/queries") {
+      try {
+        queryId = queryCreateRequestSchema.parse(
+          await request.clone().json(),
+        ).endpointId;
+      } catch {
+        return cors(error("BAD_REQUEST", "Invalid request", 400));
+      }
+    } else {
+      const match =
+        /^\/v1\/queries\/([^/]+)(?:\/(?:question|answer|meta))?$/u.exec(
+          url.pathname,
+        );
+      if (match?.[1] !== undefined) queryId = decodeURIComponent(match[1]);
+    }
+    if (queryId !== undefined) {
+      const stub = env.QUERIES.get(env.QUERIES.idFromName(queryId));
+      return cors(await stub.fetch(request));
     }
 
     let shareId: string | undefined;
@@ -832,6 +857,161 @@ function cors(response: Response): Response {
     "GET, POST, PUT, DELETE, OPTIONS",
   );
   return new Response(response.body, { status: response.status, headers });
+}
+
+type EdgeQueryRecord = {
+  metadata: QueryMetadata;
+  expiresAtMs: number;
+  requestUploadTokenDigest: string;
+  requestReadTokenDigest: string;
+  responseUploadTokenDigest: string;
+  responseReadTokenDigest: string;
+  revokeTokenDigest: string;
+  status: QueryStatus;
+  question?: ArrayBuffer;
+  answer?: ArrayBuffer;
+};
+
+export class QueryObject {
+  constructor(private readonly state: DurableObjectState) {}
+
+  async fetch(request: Request): Promise<Response> {
+    try {
+      const url = new URL(request.url);
+      if (request.method === "POST" && url.pathname === "/v1/queries") {
+        const parsed = queryCreateRequestSchema.parse(await request.json());
+        const existing =
+          await this.state.storage.get<EdgeQueryRecord>("record");
+        if (existing) return error("CONFLICT", "Endpoint already exists", 409);
+        const now = new Date();
+        const expires = new Date(
+          now.getTime() + parsed.requestedTtlSeconds * 1000,
+        );
+        const record: EdgeQueryRecord = {
+          metadata: {
+            protocolVersion: "agentshare-query-v1",
+            endpointId: parsed.endpointId,
+            createdAt: now.toISOString(),
+            expiresAt: expires.toISOString(),
+          },
+          expiresAtMs: expires.getTime(),
+          ...parsed,
+          status: "awaiting-question",
+        };
+        await this.state.storage.put("record", record);
+        return json({ metadata: record.metadata, status: record.status }, 201);
+      }
+      const match =
+        /^\/v1\/queries\/([^/]+)(?:\/(question|answer|meta))?$/u.exec(
+          url.pathname,
+        );
+      if (!match?.[1]) return error("NOT_FOUND", "Route not found", 404);
+      const record = await this.state.storage.get<EdgeQueryRecord>("record");
+      if (record?.metadata.endpointId !== decodeURIComponent(match[1]))
+        return error("NOT_FOUND", "Endpoint not found", 404);
+      if (Date.now() >= record.expiresAtMs)
+        return error("EXPIRED", "Endpoint expired", 410);
+      const action = match[2];
+      if (request.method === "GET" && action === "meta") {
+        if (!this.authorize(record, request, "any"))
+          return error("UNAUTHORIZED", "Invalid capability", 401);
+        return json({ metadata: record.metadata, status: record.status });
+      }
+      if (request.method === "PUT" && action === "question") {
+        if (!this.authorize(record, request, "requestUpload"))
+          return error("UNAUTHORIZED", "Invalid capability", 401);
+        if (record.question)
+          return error("CONFLICT", "Question already submitted", 409);
+        const body = await request.arrayBuffer();
+        if (body.byteLength === 0 || body.byteLength > 256 * 1024)
+          return error(
+            "PAYLOAD_TOO_LARGE",
+            "Query message exceeds relay limit",
+            413,
+          );
+        record.question = body;
+        record.status = "question-available";
+        await this.state.storage.put("record", record);
+        return json({ ok: true });
+      }
+      if (request.method === "GET" && action === "question") {
+        if (!this.authorize(record, request, "requestRead") || !record.question)
+          return error("NOT_FOUND", "Question unavailable", 404);
+        return new Response(record.question, {
+          headers: {
+            "content-type": "application/octet-stream",
+            "cache-control": "no-store",
+          },
+        });
+      }
+      if (request.method === "PUT" && action === "answer") {
+        if (!this.authorize(record, request, "responseUpload"))
+          return error("UNAUTHORIZED", "Invalid capability", 401);
+        if (record.status !== "question-available")
+          return error("CONFLICT", "No pending question", 409);
+        const body = await request.arrayBuffer();
+        if (body.byteLength === 0 || body.byteLength > 256 * 1024)
+          return error(
+            "PAYLOAD_TOO_LARGE",
+            "Query message exceeds relay limit",
+            413,
+          );
+        record.answer = body;
+        record.status = "answer-available";
+        await this.state.storage.put("record", record);
+        return json({ ok: true });
+      }
+      if (request.method === "GET" && action === "answer") {
+        if (!this.authorize(record, request, "responseRead") || !record.answer)
+          return error("NOT_FOUND", "Answer unavailable", 404);
+        return new Response(record.answer, {
+          headers: {
+            "content-type": "application/octet-stream",
+            "cache-control": "no-store",
+          },
+        });
+      }
+      if (request.method === "DELETE" && action === undefined) {
+        if (!this.authorize(record, request, "revoke"))
+          return error("UNAUTHORIZED", "Invalid capability", 401);
+        await this.state.storage.delete("record");
+        return json({ ok: true });
+      }
+      return error("NOT_FOUND", "Route not found", 404);
+    } catch (caught) {
+      return isZodError(caught) || caught instanceof SyntaxError
+        ? error("BAD_REQUEST", "Invalid request", 400)
+        : error("INTERNAL", "Internal relay error", 500);
+    }
+  }
+
+  private authorize(
+    record: EdgeQueryRecord,
+    request: Request,
+    kind:
+      | "any"
+      | "requestUpload"
+      | "requestRead"
+      | "responseUpload"
+      | "responseRead"
+      | "revoke",
+  ): boolean {
+    const header = request.headers.get("authorization") ?? "";
+    const token = /^Bearer ([A-Za-z0-9_-]+)$/u.exec(header)?.[1];
+    if (!token) return false;
+    const digest = createHash("sha256").update(token, "utf8").digest("hex");
+    const values =
+      kind === "any"
+        ? [
+            record.requestUploadTokenDigest,
+            record.requestReadTokenDigest,
+            record.responseUploadTokenDigest,
+            record.responseReadTokenDigest,
+            record.revokeTokenDigest,
+          ]
+        : [record[`${kind}TokenDigest` as keyof EdgeQueryRecord] as string];
+    return values.includes(digest);
+  }
 }
 
 function sharePage(): Response {

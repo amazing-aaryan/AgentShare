@@ -174,3 +174,96 @@ require zero failed/skipped real-agent tests and forbid faking release success.
 **Impact:** Handoff deployment `385fd884-d162-4ccc-9934-9fe59d2f1646` is live;
 rerun strict gate and all downstream immutable artifact/publication checks after
 `claude auth login`.
+
+## [2026-08-21 17:10] Use staged stable release for v0.1.11
+
+**Decision:** Prepare v0.1.11 as a stable patch release in an isolated worktree,
+update only active release pins while preserving historical v0.1.10 evidence,
+review current Codex 0.149.0 and Claude Code 2.1.238 before allowlisting, then
+require exact-commit local, CI, live-agent, package, updater, and published
+smoke gates before announcement. **Why:** The delta since v0.1.10 is limited to
+CLI-managed updates, but an RC cannot validate the stable-only updater path and
+publishing before the handoff pin or compatibility review would create unsafe
+recipient failures. **Impact:** Release order is source consistency,
+compatibility review, local and six-job CI gates, handoff deployment, strict
+production gate, immutable package publication, public updater/upgrade smoke,
+live handoff/revoke smoke, and final evidence recording. Relay and Durable
+Object migrations remain unchanged unless a verified source diff requires
+otherwise.
+
+## [2026-08-21 17:20] Keep Codex 0.149 blocked and allow Claude 2.1.238
+
+**Decision:** Do not add Codex CLI 0.149.0 to the reviewed allowlist; add only
+Claude Code 2.1.238 and keep the v0.1.11 strict release gate on Codex 0.147.0.
+**Why:** Exact published 0.149.0 passed help-contract inspection but its Windows
+sandbox refused to start because it cannot enforce AgentShare's split filesystem
+read restrictions with an unelevated restricted token. Claude 2.1.238 denied
+filesystem/network attempts and passed grounded two-turn dialogue. **Impact:**
+Current Codex fails closed with an explicit unsupported-version path rather than
+weakening isolation. Compatibility docs must disclose the 0.149.0 failure, and
+future Codex releases require a fresh real isolation review.
+
+## [2026-08-21 17:29] Resolve package smoke install root through npm
+
+**Decision:** Query `npm root --global --prefix <isolated-prefix>` before
+invoking the packed CLI instead of assuming `<prefix>/node_modules`. **Why:**
+Windows uses `<prefix>/node_modules`, while macOS and Linux use
+`<prefix>/lib/node_modules`; exact-candidate CI exposed the platform mismatch.
+**Impact:** Clean-install package smoke now validates the same isolated global
+installation flow across all six CI jobs without hard-coded npm layout rules.
+
+## [2026-08-21 17:36] Integrate current master security hardening
+
+**Decision:** Merge `origin/master` security hardening into v0.1.11 and deploy
+both the hardened relay edge entrypoint and the already pinned handoff Worker.
+**Why:** Master advanced during release preparation with scanner coverage and a
+new `secure-worker.ts` production boundary; releasing the older candidate would
+exclude current security fixes and make the unchanged-relay evidence false.
+**Impact:** Candidate SHA, local gates, CI, strict production gate, and relay
+version evidence must all be regenerated. Durable Object classes and migrations
+remain unchanged, with relay rollback pinned to the pre-hardening deployment.
+
+## [2026-08-21 17:46] Restore deployed QueryObject v3 before relay hardening
+
+**Decision:** Restore the exact active `QueryObject` contract, class, `QUERIES`
+binding, and v3 migration from commit `636152e`, then route it through the new
+hardened Worker entrypoint with direct lifecycle regression coverage. **Why:**
+Cloudflare rejected the first hardened deployment because current master had
+dropped the published v3 migration. Active version `dea32c60...` confirms v3 is
+`QueryObject`; deploying v1/v2-only source could orphan a live namespace and
+break existing encrypted query clients. **Impact:** v0.1.11 cannot freeze until
+local gates and six-job CI pass again with all three migrations. Future
+deployments must preserve v1 ShareObject, v2 RelayControl, and v3 QueryObject
+even when no new migration is introduced.
+
+## [2026-08-21 17:55] Require trusted-origin CORS in production lifecycle test
+
+**Decision:** Updated the strict production lifecycle assertion to require the
+configured handoff origin instead of wildcard CORS. **Why:** The hardened relay
+intentionally limits browser metadata access to the trusted handoff Worker. The
+previous wildcard expectation was stale and weaker than the deployed security
+contract. **Impact:** Future production tests must reject CORS regressions that
+broaden relay metadata access beyond the configured handoff origin.
+
+## [2026-08-21 18:35] Publish v0.1.11 but hold broad announcement
+
+**Decision:** Published immutable v0.1.11 from exact commit
+`63ad80b0a4f2afad3bf66026fff2e4ef0e69df4d`, while holding broad public-beta
+announcement. **Why:** Exact source, six-job CI, production Workers, strict
+real-agent gate, digest, fresh install, upgrade, published creator approvals,
+handoff, and two grounded cited recipient turns passed. Windows PTY automation
+did not complete the final same-flow published CLI revoke observation before
+expiry. **Impact:** Release remains available and production stays deployed.
+Future work must manually or reliably automate published CLI revoke followed by
+relay 410 before broad announcement; do not misreport that observation as
+complete.
+
+## [2026-08-21 18:41] Clear v0.1.11 announcement hold
+
+**Decision:** Approved broad public-beta announcement after an uninterrupted
+published-package flow completed creator approvals, browser handoff, two
+grounded cited recipient turns, hidden-link revocation, and post-revoke 410.
+**Why:** Final acceptance blocker now has direct evidence from the immutable
+public artifact instead of exact-source or partial harness proxies. **Impact:**
+v0.1.11 release evidence is complete; no source or production rollback is
+indicated.

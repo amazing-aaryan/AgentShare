@@ -4,6 +4,12 @@
 - Date: 2026-08-08
 - Tested on: Windows 11, PowerShell
 
+> **Current direction:** this ADR records the original Codex/Claude host spike.
+> AgentShare is now explicitly defined by ADR 0005 and `docs/VISION.md` as an
+> open, free, agent-context transport. Codex and Claude Code remain current
+> adapters; the host-specific requirements below are historical evidence for
+> those adapters, not a limit on the long-term Agent Context Bundle protocol.
+
 ## Context
 
 AgentShare v0 requires all of the following before implementation may be
@@ -95,4 +101,8 @@ cross-agent v0 requirement.
 ## Consequences
 
 Option A is approved. Steps 2 through 15 may proceed against ADR 0003. The rest
-of the architecture remains unchanged.
+of the architecture remains unchanged for the historical v0 decision.
+
+Future host families should follow ADR 0005: integrate through the open context
+boundary and prove equivalent recipient isolation rather than weakening this
+security requirement.
