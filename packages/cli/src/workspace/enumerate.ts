@@ -24,7 +24,8 @@ export async function enumerateWorkspace(
     options.preferGit === false
       ? undefined
       : await listGitShareableFiles(canonicalRoot);
-  const fallback = gitFiles === undefined ? await recurse(canonicalRoot) : undefined;
+  const fallback =
+    gitFiles === undefined ? await recurse(canonicalRoot) : undefined;
   const candidates = gitFiles ?? fallback?.files ?? [];
   if (fallback !== undefined) excluded.push(...fallback.excluded);
   const files: string[] = [];
