@@ -17,7 +17,7 @@ Run this command using the shell tool:
 agentshare share --current --source codex
 \`\`\`
 
-AgentShare owns the terminal selection UI. Do not add \`--yes\`, invent file paths, inspect AgentShare state, or bypass its secret scanner. Return the resulting environment capability link exactly once. If AgentShare shows an existing environment, let the user choose update/copy/review/new/revoke through its selection UI.
+AgentShare requires an interactive terminal for creator selection and final review. If this shell cannot provide one, stop and ask the user to run \`agentshare share --current --source codex\` in a real interactive terminal. Do not emulate the selection, add \`--yes\`, invent file paths, inspect AgentShare state, or bypass its secret scanner. Return the resulting environment capability link exactly once. If AgentShare shows an existing environment, let the user choose update/copy/review/new/revoke through its selection UI.
 `;
 
 const CODEX_CREATOR_INTERFACE = `interface:
@@ -63,7 +63,7 @@ disable-model-invocation: true
 
 ${MARKER}
 
-Run \`agentshare share --current --source claude\`. AgentShare owns the selection UI. Do not add \`--yes\`, inspect AgentShare state, or bypass its scanner. Return the resulting environment capability link exactly once.
+Run \`agentshare share --current --source claude\`. AgentShare requires an interactive terminal for creator selection and final review. If this shell cannot provide one, stop and ask the user to run that command in a real interactive terminal. Do not emulate the selection, add \`--yes\`, inspect AgentShare state, or bypass its scanner. Return the resulting environment capability link exactly once.
 `;
 
 const CLAUDE_RECEIVER_SKILL = `---
