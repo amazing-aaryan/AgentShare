@@ -48,12 +48,14 @@ describe("sharedWorkspacePathSchema", () => {
 
   it.each([
     "../secret",
+    "a/../secret",
     "/etc/passwd",
     "C:/Users/a/.ssh/id_rsa",
     ".git/config",
     ".agentshare/state-v2.json",
     "a//b",
     "a/./b",
+    "a\\b",
   ])("rejects unsafe path %s", (path) =>
     expect(() => sharedWorkspacePathSchema.parse(path)).toThrow(),
   );
@@ -64,6 +66,16 @@ describe("environmentManifestSchema", () => {
     expect(
       environmentManifestSchema.parse(validManifest()).workspace.files,
     ).toHaveLength(1);
+  });
+
+  it("accepts an enabled proposal policy with a public key", () => {
+    const input = {
+      ...validManifest(),
+      proposalPolicy: { enabled: true, encryptionPublicKey: "k".repeat(43) },
+    };
+    expect(environmentManifestSchema.parse(input).proposalPolicy.enabled).toBe(
+      true,
+    );
   });
 
   it("requires a proposal public key when proposals are enabled", () => {
@@ -77,6 +89,28 @@ describe("environmentManifestSchema", () => {
   it("requires parentRevisionId to differ from revisionId", () => {
     const valid = validManifest();
     const input = { ...valid, parentRevisionId: valid.revisionId };
+    expect(() => environmentManifestSchema.parse(input)).toThrow();
+  });
+
+  it("rejects duplicate workspace paths", () => {
+    const input = validManifest();
+    input.workspace.files.push({
+      ...input.workspace.files[0]!,
+      resourceId: "res_22222222222222222222",
+      blobs: [
+        {
+          blobId: "blob_22222222222222222222",
+          byteOffset: 0,
+          byteLength: 12,
+        },
+      ],
+    });
+    expect(() => environmentManifestSchema.parse(input)).toThrow();
+  });
+
+  it("requires declared blob lengths to equal the file length", () => {
+    const input = validManifest();
+    input.workspace.files[0]!.blobs[0]!.byteLength = 11;
     expect(() => environmentManifestSchema.parse(input)).toThrow();
   });
 });
