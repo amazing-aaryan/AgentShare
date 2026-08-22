@@ -66,6 +66,35 @@ describe("v2 share command", () => {
     expect(result.environment.sharePolicy.proposalsEnabled).toBe(true);
   });
 
+  it("fails closed instead of choosing an unreviewed non-TTY default", async () => {
+    const root = await fixture();
+    const state = await statePath();
+    const handler = createRelayHandler(new InMemoryRelayStore());
+    const fetchImpl: typeof fetch = (input, init) =>
+      handler(new Request(input, init));
+    const client = new EnvironmentRelayClient(
+      "http://127.0.0.1:8787",
+      fetchImpl,
+    );
+
+    await expect(
+      shareCaptureV2(
+        {
+          sourceAgent: "codex",
+          title: "Codex: demo",
+          workspaceRoot: root,
+          conversation: [],
+        },
+        {
+          client,
+          handoffOrigin: "https://handoff.example",
+          statePath: state,
+          workspaceOptions: { preferGit: false },
+        },
+      ),
+    ).rejects.toThrow("Interactive creator approval requires a TTY");
+  });
+
   it("updates an existing environment and keeps the same capability URL", async () => {
     const root = await fixture();
     const state = await statePath();
