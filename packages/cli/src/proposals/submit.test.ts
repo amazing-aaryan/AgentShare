@@ -18,7 +18,7 @@ async function fixture(): Promise<string> {
 
 describe("encrypted proposal submission", () => {
   it("lets a recipient submit a whole-file replacement only the owner can decrypt", async () => {
-    const now = new Date("2026-08-19T00:00:00.000Z");
+    const now = new Date();
     const handler = createRelayHandler(new InMemoryRelayStore(), {
       now: () => now,
     });
