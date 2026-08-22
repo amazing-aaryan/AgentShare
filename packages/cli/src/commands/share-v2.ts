@@ -1,6 +1,7 @@
 import { buildEnvironmentUrl, keyFromFragment } from "@agentshare/acb";
 import { exportCurrentClaudeCapture } from "@agentshare/adapter-claude";
 import { exportCurrentCodexCapture } from "@agentshare/adapter-codex";
+import { MAX_TTL_SECONDS } from "@agentshare/contracts";
 import {
   createEnvironmentFromCapture,
   publishEnvironmentRevision,
@@ -33,6 +34,8 @@ export const DEFAULT_V2_HANDOFF_ORIGIN =
 export type ShareV2Options = {
   relayOrigin?: string;
   handoffOrigin?: string;
+  forceNew?: boolean;
+  ttlSeconds?: number;
   statePath?: string;
   client?: EnvironmentRelayClient;
   selection?: SelectedShareOptions;
@@ -55,21 +58,24 @@ export async function shareCaptureV2(
   capture: HostCapture,
   options: ShareV2Options = {},
 ): Promise<CreateEnvironmentResult> {
+  validateTtlSeconds(options.ttlSeconds);
   const client =
     options.client ??
     new EnvironmentRelayClient(
       options.relayOrigin ?? process.env.AGENTSHARE_RELAY ?? DEFAULT_RELAY,
     );
   const existing =
-    options.existingEnvironmentId === undefined
-      ? await findOwnedEnvironmentForWorkspace(
-          capture.workspaceRoot,
-          options.statePath,
-        )
-      : await findOwnedEnvironment(
-          options.existingEnvironmentId,
-          options.statePath,
-        );
+    options.forceNew === true
+      ? undefined
+      : options.existingEnvironmentId === undefined
+        ? await findOwnedEnvironmentForWorkspace(
+            capture.workspaceRoot,
+            options.statePath,
+          )
+        : await findOwnedEnvironment(
+            options.existingEnvironmentId,
+            options.statePath,
+          );
 
   if (
     existing !== undefined &&
@@ -109,7 +115,11 @@ export async function shareCaptureV2(
     return updateEnvironment(capture, existing, client, options);
   }
 
-  const selection = options.selection ?? (await interactiveSelection());
+  const selected = options.selection ?? (await interactiveSelection());
+  const selection =
+    options.ttlSeconds === undefined
+      ? selected
+      : { ...selected, ttlSeconds: options.ttlSeconds };
   await reviewBeforePublication(capture, selection, options.workspaceOptions);
   const created = await createEnvironmentFromCapture(capture, {
     client,
@@ -159,6 +169,17 @@ function assertInteractiveCreatorApproval(): void {
   }
 }
 
+function validateTtlSeconds(value: number | undefined): void {
+  if (
+    value !== undefined &&
+    (!Number.isInteger(value) || value < 1 || value > MAX_TTL_SECONDS)
+  ) {
+    throw new Error(
+      `ttlSeconds must be an integer between 1 and ${MAX_TTL_SECONDS} seconds`,
+    );
+  }
+}
+
 async function reviewBeforePublication(
   capture: HostCapture,
   selection: SelectedShareOptions,
@@ -182,7 +203,7 @@ async function reviewBeforePublication(
       `Excluded files: ${preview.summary.excludedFiles}`,
       `Secret redactions: ${preview.summary.redactions}`,
       `Access: ${selection.proposalsEnabled ? "Read + propose changes" : "Read only"}`,
-      `Expires in: ${selection.ttlSeconds / 3600} hour${selection.ttlSeconds === 3600 ? "" : "s"}`,
+      `Expires in: ${formatDuration(selection.ttlSeconds)}`,
     ].join("\n");
     const action = await chooseOption(
       summary,
@@ -225,6 +246,18 @@ async function reviewBeforePublication(
     }
     throw new Error("AgentShare cancelled");
   }
+}
+
+function formatDuration(ttlSeconds: number): string {
+  if (ttlSeconds % 3600 === 0) {
+    const hours = ttlSeconds / 3600;
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  if (ttlSeconds % 60 === 0) {
+    const minutes = ttlSeconds / 60;
+    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+  return `${ttlSeconds} second${ttlSeconds === 1 ? "" : "s"}`;
 }
 
 async function updateEnvironment(
