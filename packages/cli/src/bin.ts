@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { MAX_TTL_SECONDS } from "@agentshare/contracts";
 import { openCommand, revokeCommand, shareCommand } from "./commands.js";
 import {
   installIntegrations,
@@ -65,6 +66,7 @@ try {
       new Set([
         "--current",
         "--relay",
+        "--handoff",
         "--ttl",
         "--source",
         "--new",
@@ -73,26 +75,41 @@ try {
     );
     const current = args.includes("--current");
     const selectedSource = sourceAgent(option(args, "--source") ?? "generic");
+    const ttlSeconds = optionalTtlSeconds(args);
     if (
       current &&
       (selectedSource === "codex" || selectedSource === "claude") &&
       !args.includes("--legacy")
     ) {
-      const relayOrigin = option(args, "--relay");
+      const relayOrigin = option(args, "--relay") ?? process.env.AGENTSHARE_RELAY;
+      const handoffOrigin =
+        option(args, "--handoff") ??
+        process.env.AGENTSHARE_HANDOFF ??
+        TRUSTED_HANDOFF_ORIGIN;
       const result = await shareCurrentV2(selectedSource, {
         ...(relayOrigin === undefined ? {} : { relayOrigin }),
+        handoffOrigin,
+        forceNew: args.includes("--new"),
+        ...(ttlSeconds === undefined ? {} : { ttlSeconds }),
       });
       process.stdout.write(`${result.url}\n`);
     } else {
       const inputPath = current ? undefined : positional(args, 0);
       process.stdout.write(
-        `${await legacyShare(args, current, inputPath, selectedSource)}\n`,
+        `${await legacyShare(args, current, inputPath, selectedSource, ttlSeconds)}\n`,
       );
     }
   } else if (command === "share-v1") {
     assertKnownOptions(
       args,
-      new Set(["--current", "--relay", "--ttl", "--source", "--new"]),
+      new Set([
+        "--current",
+        "--relay",
+        "--handoff",
+        "--ttl",
+        "--source",
+        "--new",
+      ]),
     );
     const current = args.includes("--current");
     const inputPath = current ? undefined : positional(args, 0);
@@ -102,6 +119,7 @@ try {
         current,
         inputPath,
         sourceAgent(option(args, "--source") ?? "generic"),
+        optionalTtlSeconds(args),
       )}\n`,
     );
   } else if (command === "bootstrap" || command === "accept") {
@@ -230,6 +248,7 @@ async function legacyShare(
   current: boolean,
   inputPath: string | undefined,
   selectedSource: "codex" | "claude" | "generic",
+  ttlSeconds: number | undefined,
 ): Promise<string> {
   return shareCommand({
     ...(inputPath === undefined ? {} : { inputPath }),
@@ -238,11 +257,35 @@ async function legacyShare(
       option(args, "--relay") ??
       process.env.AGENTSHARE_RELAY ??
       DEFAULT_RELAY_ORIGIN,
-    handoffOrigin: TRUSTED_HANDOFF_ORIGIN,
-    ttlSeconds: Number(option(args, "--ttl") ?? "3600"),
+    handoffOrigin:
+      option(args, "--handoff") ??
+      process.env.AGENTSHARE_HANDOFF ??
+      TRUSTED_HANDOFF_ORIGIN,
+    ttlSeconds: ttlSeconds ?? 3600,
     sourceAgent: selectedSource,
     forceNew: args.includes("--new"),
   });
+}
+
+function optionalTtlSeconds(args: string[]): number | undefined {
+  const raw = option(args, "--ttl");
+  if (raw === undefined) return undefined;
+  if (!/^\d+$/u.test(raw)) {
+    throw new Error(
+      `--ttl must be an integer between 1 and ${MAX_TTL_SECONDS} seconds`,
+    );
+  }
+  const ttlSeconds = Number(raw);
+  if (
+    !Number.isSafeInteger(ttlSeconds) ||
+    ttlSeconds < 1 ||
+    ttlSeconds > MAX_TTL_SECONDS
+  ) {
+    throw new Error(
+      `--ttl must be an integer between 1 and ${MAX_TTL_SECONDS} seconds`,
+    );
+  }
+  return ttlSeconds;
 }
 
 function v2StorageOptions(args: string[]): {
@@ -306,7 +349,9 @@ function targetAgent(value: string): "codex" | "claude" {
 
 function usage(): void {
   process.stdout.write(`AgentShare\n\n`);
-  process.stdout.write(`  agentshare share --current --source codex|claude\n`);
+  process.stdout.write(
+    `  agentshare share --current --source codex|claude [--new] [--ttl SECONDS] [--relay URL] [--handoff URL]\n`,
+  );
   process.stdout.write(`  agentshare bootstrap < link-on-stdin\n`);
   process.stdout.write(
     `  agentshare ask [--environment ID] --target codex|claude --question TEXT\n`,
@@ -316,7 +361,9 @@ function usage(): void {
   );
   process.stdout.write(`  agentshare inbox --source codex|claude\n`);
   process.stdout.write(`  agentshare revoke-environment --environment ID\n`);
-  process.stdout.write(`  agentshare share-v1 <file>|--current ...\n`);
+  process.stdout.write(
+    `  agentshare share-v1 <file>|--current [--new] [--ttl SECONDS] [--relay URL] [--handoff URL]\n`,
+  );
   process.stdout.write(`  agentshare open --target codex|claude\n`);
   process.stdout.write(`  agentshare revoke\n`);
   process.stdout.write(`  agentshare update --check\n`);
