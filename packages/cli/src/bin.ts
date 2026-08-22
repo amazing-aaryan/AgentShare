@@ -81,7 +81,8 @@ try {
       (selectedSource === "codex" || selectedSource === "claude") &&
       !args.includes("--legacy")
     ) {
-      const relayOrigin = option(args, "--relay") ?? process.env.AGENTSHARE_RELAY;
+      const relayOrigin =
+        option(args, "--relay") ?? process.env.AGENTSHARE_RELAY;
       const handoffOrigin =
         option(args, "--handoff") ??
         process.env.AGENTSHARE_HANDOFF ??
@@ -96,7 +97,13 @@ try {
     } else {
       const inputPath = current ? undefined : positional(args, 0);
       process.stdout.write(
-        `${await legacyShare(args, current, inputPath, selectedSource, ttlSeconds)}\n`,
+        `${await legacyShare(
+          args,
+          current,
+          inputPath,
+          selectedSource,
+          ttlSeconds,
+        )}\n`,
       );
     }
   } else if (command === "share-v1") {
