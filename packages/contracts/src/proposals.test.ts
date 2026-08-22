@@ -33,11 +33,41 @@ describe("proposalSchema", () => {
     );
   });
 
+  it("accepts create and delete operations", () => {
+    const input = baseProposal();
+    input.operations = [
+      {
+        type: "create",
+        path: "packages/new.ts",
+        newSha256: hex,
+        mediaType: "text/typescript",
+        contentBase64: Buffer.from("export const value = 1;\n").toString(
+          "base64",
+        ),
+      } as (typeof input.operations)[number],
+      {
+        type: "delete",
+        path: "packages/old.ts",
+        baseSha256: hex,
+      } as (typeof input.operations)[number],
+    ];
+    expect(proposalSchema.parse(input).operations.map((op) => op.type)).toEqual([
+      "create",
+      "delete",
+    ]);
+  });
+
   it("rejects traversal paths", () => {
     const input = baseProposal();
     const operation = input.operations[0];
     if (operation === undefined) throw new Error("Missing proposal operation");
     operation.path = "../../outside";
+    expect(() => proposalSchema.parse(input)).toThrow();
+  });
+
+  it("rejects duplicate operation paths", () => {
+    const input = baseProposal();
+    input.operations.push({ ...input.operations[0]! });
     expect(() => proposalSchema.parse(input)).toThrow();
   });
 
