@@ -23,7 +23,7 @@ jobs:
       - run: npm ci
       - run: node scripts/check-repository-hygiene.mjs
       - name: Print v0.2 evidence formatter diff
-        if: matrix.os == 'ubuntu-latest' && matrix.node == 24
+        if: matrix.os == 'ubuntu-latest'
         run: |
           npx prettier --write docs/releases/v0.2.0-release-verification.md
           git diff -- docs/releases/v0.2.0-release-verification.md
