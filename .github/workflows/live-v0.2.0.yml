@@ -51,7 +51,7 @@ jobs:
           echo "RELEASE_ASSET_SHA256=${asset_sha256}"
           echo "RELEASE_ASSET_BYTES=${asset_bytes}"
           prefix="${RUNNER_TEMP}/agentshare-v0.2.0-live"
-          npm install --global --prefix "${prefix}" "release-download/${RELEASE_ASSET}"
+          npm install --global --prefix "${prefix}" "./release-download/${RELEASE_ASSET}"
           global_root="$(npm root --global --prefix "${prefix}")"
           installed_version="$(node "${global_root}/agentshare/dist/bin.js" --version)"
           test "${installed_version}" = "0.2.0"
