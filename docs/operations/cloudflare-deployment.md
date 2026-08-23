@@ -62,11 +62,11 @@ npm audit --audit-level=high
 The same commit must also pass the GitHub Actions matrix on Ubuntu, macOS, and
 Windows with Node.js 22 and 24.
 
-The v0.2.0 handoff Worker pins the immutable
-`agentshare-0.2.0.tgz` GitHub-release asset. Stage that exact asset before the
-handoff deployment so the browser command cannot point at a missing package.
-Keep the GitHub release marked as a prerelease until the strict live gate passes;
-the AgentShare updater ignores prereleases.
+The v0.2.0 handoff Worker pins the immutable `agentshare-0.2.0.tgz`
+GitHub-release asset. Stage that exact asset before the handoff deployment so
+the browser command cannot point at a missing package. Keep the GitHub release
+marked as a prerelease until the strict live gate passes; the AgentShare updater
+ignores prereleases.
 
 Record the staged asset byte size and SHA-256 before deployment. Do not replace
 or mutate the asset after the Worker has been verified against it.
@@ -118,8 +118,8 @@ ciphertext verification.
 
 ## Strict Live Release Gate
 
-After both Workers and the staged immutable package are live, run the strict gate
-from the release candidate with authenticated, reviewed Codex and Claude
+After both Workers and the staged immutable package are live, run the strict
+gate from the release candidate with authenticated, reviewed Codex and Claude
 installations:
 
 ```powershell
@@ -143,8 +143,8 @@ support is claimed.
 
 Only after the strict live gate succeeds should the staged v0.2.0 GitHub release
 be promoted from prerelease to stable. Verify an anonymous download against the
-recorded byte size and SHA-256 and perform a fresh isolated installation from the
-same immutable asset.
+recorded byte size and SHA-256 and perform a fresh isolated installation from
+the same immutable asset.
 
 The handoff page must display a command pinned to that exact asset. Verify one
 disposable v1 share and one disposable v2 environment through the real public
@@ -159,10 +159,11 @@ A rollback must preserve Durable Object storage and migration history. Do not
 delete or recreate the relay namespace to undo an application deployment.
 
 If a defect appears before v0.2.0 is promoted to stable, keep the release marked
-as a prerelease, roll back the affected Worker code, and leave the current stable
-package as the recommended version. If a defect appears after promotion, stop
-promoting the affected release, roll back the Worker code where safe, and direct
-users to the recorded safe package version while the incident is investigated.
+as a prerelease, roll back the affected Worker code, and leave the current
+stable package as the recommended version. If a defect appears after promotion,
+stop promoting the affected release, roll back the Worker code where safe, and
+direct users to the recorded safe package version while the incident is
+investigated.
 
 Existing v1 shares remain governed by their original protocol and capability
 semantics. Rollback changes must not silently reinterpret stored ciphertext or
@@ -185,8 +186,8 @@ AGENTSHARE_RELAY=https://relay.example
 AGENTSHARE_HANDOFF=https://handoff.example
 ```
 
-A compatible handoff deployment must preserve the fragment-secrecy boundary;
-the `relay=` query value is non-secret transport metadata, while read,
-proposal, and key material remain in the fragment.
+A compatible handoff deployment must preserve the fragment-secrecy boundary; the
+`relay=` query value is non-secret transport metadata, while read, proposal, and
+key material remain in the fragment.
 
 Self-hosting is an interoperability property, not an enterprise SKU.
