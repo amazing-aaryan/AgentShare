@@ -23,37 +23,36 @@ format.
 > passes through AgentShare; it does not become an AgentShare workspace,
 > account, company transcript database, or knowledge base.
 
-Read the [project vision](docs/VISION.md),
-[roadmap](docs/ROADMAP.md), and
+Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 [open-context transport ADR](docs/adr/0005-open-context-transport.md).
 
-> [!IMPORTANT]
-> AgentShare is a public beta. Do not share production credentials, regulated
-> data, or other high-risk material. Review the final normalized text, included
-> files, exclusions, and redactions before publication.
+> [!IMPORTANT] AgentShare is a public beta. Do not share production credentials,
+> regulated data, or other high-risk material. Review the final normalized text,
+> included files, exclusions, and redactions before publication.
 
-> [!NOTE]
-> This repository contains the v0.2 collaborative-environment candidate. It is
-> not a stable public v0.2.0 release until the immutable package, live Cloudflare
-> deployment, and authenticated Codex/Claude release gates in the
+> [!NOTE] This repository contains the v0.2 collaborative-environment candidate.
+> It is not a stable public v0.2.0 release until the immutable package, live
+> Cloudflare deployment, and authenticated Codex/Claude release gates in the
 > [deployment runbook](docs/operations/cloudflare-deployment.md) pass. Until
 > then, use the current stable GitHub release for production installation.
 
 ## Principles
 
-- **Free forever.** No paid tier is a project goal. Public infrastructure may use
-  transparent size, lifetime, rate, and capacity limits so it can remain free.
+- **Free forever.** No paid tier is a project goal. Public infrastructure may
+  use transparent size, lifetime, rate, and capacity limits so it can remain
+  free.
 - **Open source forever.** The protocol, client, relay/handoff implementation,
   conformance vectors, and self-hosting surface remain auditable and open.
 - **No AgentShare accounts.** Possession of the complete capability link is the
   base permission model. No shared company, Slack workspace, seat, or identity
   provider is required.
 - **Cross-boundary by default.** A deliberate link can cross coworkers,
-  cofounders, clients, open-source projects, companies, communities, or machines.
+  cofounders, clients, open-source projects, companies, communities, or
+  machines.
 - **Blind transport.** The normal relay does not need share plaintext or
   decryption keys to deliver the encrypted environment.
-- **Review before send.** Secret scanning is defense in depth; the creator is the
-  authority over what crosses the boundary.
+- **Review before send.** Secret scanning is defense in depth; the creator is
+  the authority over what crosses the boundary.
 - **Agent-agnostic direction.** Codex and Claude Code are current adapters, not
   the permanent definition of AgentShare.
 
@@ -160,9 +159,9 @@ a new encrypted revision.
 
 ### 5. Keep the same link or revoke it
 
-Rerunning `agentshare share --current` in the creator workspace shows actions for
-updating the existing environment, reviewing proposed changes, copying its link,
-or creating a separate environment. A normal update advances the approved
+Rerunning `agentshare share --current` in the creator workspace shows actions
+for updating the existing environment, reviewing proposed changes, copying its
+link, or creating a separate environment. A normal update advances the approved
 revision while keeping the same recipient capability URL.
 
 Force a completely separate environment with:
@@ -290,8 +289,8 @@ Run the ACB conformance vectors without any AgentShare relay or network access:
 npm run test:conformance
 ```
 
-Passing ACB conformance means agreeing on format encoding and integrity behavior,
-not depending on the official AgentShare service.
+Passing ACB conformance means agreeing on format encoding and integrity
+behavior, not depending on the official AgentShare service.
 
 ## V1 Compatibility
 
@@ -334,10 +333,11 @@ Self-hosting is an interoperability property, not an enterprise SKU.
 
 ## Public-service Limits
 
-The public service uses bounded resources so it can remain free. Current protocol
-and production limits include a maximum 72-hour TTL, a 50 MiB ciphertext bound,
-rate limits, active-object capacity controls, and creator-attributed retained
-ciphertext accounting. Exact deployment policy lives in the relay contracts and
+The public service uses bounded resources so it can remain free. Current
+protocol and production limits include a maximum 72-hour TTL, a 50 MiB
+ciphertext bound, rate limits, active-object capacity controls, and
+creator-attributed retained ciphertext accounting. Exact deployment policy lives
+in the relay contracts and
 [Cloudflare runbook](docs/operations/cloudflare-deployment.md).
 
 Compatible self-hosted implementations may choose different operational limits
@@ -383,9 +383,10 @@ npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
 npm audit --audit-level=high
 ```
 
-CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22 and
-24. A stable public release additionally requires live split-origin deployment
-verification and authenticated real Codex/Claude recipient-isolation tests:
+CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22
+and 24. A stable public release additionally requires live split-origin
+deployment verification and authenticated real Codex/Claude recipient-isolation
+tests:
 
 ```powershell
 $env:AGENTSHARE_E2E_RELAY="https://agentshare-relay.carnation-vermicelli.workers.dev"
