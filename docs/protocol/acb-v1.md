@@ -79,8 +79,8 @@ Secret scanning is defense in depth; it does not replace creator review.
 
 Transport-independent fixtures live under `tests/fixtures/acb-v1/`.
 `minimal.json` is a human-readable valid ACB v1 manifest and
-`minimal.canonical.txt` is the exact UTF-8 byte sequence a canonical encoder must
-emit. The canonical file intentionally has no trailing newline.
+`minimal.canonical.txt` is the exact UTF-8 byte sequence a canonical encoder
+must emit. The canonical file intentionally has no trailing newline.
 
 The fixture resource contains the six bytes `hello\n` with these fixed values:
 
@@ -102,8 +102,8 @@ re-encoding, the fixed logical fingerprint, and decode/re-encode stability. It
 requires no relay credentials or network access.
 
 Passing these vectors means an implementation agrees on ACB v1 encoding and
-integrity behavior. It does not imply compatibility with any particular relay.
-A future change that reinterprets existing ACB v1 fields requires an explicit
+integrity behavior. It does not imply compatibility with any particular relay. A
+future change that reinterprets existing ACB v1 fields requires an explicit
 backward-compatible extension or a new protocol version.
 
 ## Interoperability Rule
