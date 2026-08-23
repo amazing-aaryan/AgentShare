@@ -26,6 +26,7 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:coverage
+      - run: npm run test:conformance
       - run: npm run test:package
       - run: npm run test:edge-runtime
       - run:

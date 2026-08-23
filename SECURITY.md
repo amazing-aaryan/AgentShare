@@ -26,11 +26,11 @@ without a shared control plane, but it also means the complete link is a secret.
 Anyone who obtains it may be able to read the share until it expires or is
 revoked. Current revocation invalidates all readers of that link at once.
 
-The normal AgentShare relay is designed so it does not need conversation
-plaintext or the encryption key. This guarantee applies to AgentShare transport
-infrastructure, not to the recipient's chosen model provider: after local
-decryption, selected evidence excerpts are submitted through the recipient's
-Codex or Claude account when they ask the target agent a question.
+The normal AgentShare relay is designed so it does not need conversation or
+workspace plaintext or the encryption key. This guarantee applies to AgentShare
+transport infrastructure, not to the recipient's chosen model provider: after
+local decryption, selected evidence excerpts are submitted through the
+recipient's Codex or Claude account when they ask the target agent a question.
 
 No future account, workspace, analytics, or knowledge feature should silently
 weaken this trust boundary. A change that requires central plaintext processing
@@ -39,38 +39,46 @@ an ADR.
 
 ## Supported Versions
 
-Only the latest published `0.1.x` release receives security fixes.
+Only the latest published stable AgentShare release receives security fixes.
+Repository and release-candidate code is not a published security release until
+its documented release gates pass.
 
 Do not include secrets, capability URLs, decrypted bundles, or private source in
 reports. Include affected version, reproducible steps using synthetic data, and
 the expected impact.
 
-## New-format Link Invariants
+## Capability-link Invariants
 
-Security invariants for v0.1.10+ new-format links:
+Security invariants for current split-origin links:
 
 - Encryption and decryption happen on clients.
-- Newly created links use an AgentShare-controlled handoff origin that is
-  independent from the ciphertext relay. A custom relay does not serve the
-  JavaScript that reads the capability fragment.
-- The read capability and encryption key remain in the URL fragment. Browsers do
-  not transmit that fragment in the HTTP request to either the handoff server or
-  the relay. The trusted handoff page reads the fragment locally in browser
-  JavaScript and does not send the encryption key to the relay.
-- The selected relay origin is non-secret link metadata. The relay stores
-  ciphertext and capability digests, never conversation plaintext, decryption
-  keys, or raw upload/read/revoke capabilities.
-- Cross-origin browser access to the production relay is limited to metadata GET
-  requests from the exact trusted handoff origin. Create, upload, revoke, and
-  blob-download routes are not browser-CORS enabled.
-- The production edge rejects create JSON bodies above 8 KiB before parsing and
-  forwards only validated canonical create metadata to the share object.
-- Recipient plaintext, keys, and indexes remain memory-only.
-- Host launchers fail closed when query-only isolation cannot be established.
+- Newly created links use a trusted handoff origin that is independent from the
+  ciphertext relay. A custom relay does not serve the JavaScript that reads the
+  capability fragment.
+- The selected relay origin is non-secret `relay=` query metadata.
+- V1 `/s/` fragments contain the read capability and share encryption key.
+- V2 `/e/` fragments contain the read capability and environment master key and
+  may also contain a proposal capability for read-plus-propose access.
+- Browsers do not transmit URL fragments in HTTP requests. The trusted handoff
+  page reads fragment material locally and does not send encryption keys to the
+  relay.
+- Creator-only v2 update, inbox, revoke, and proposal-private-key material stays
+  in local creator state and is never placed in the recipient URL.
+- The relay stores ciphertext and capability digests, never conversation or
+  workspace plaintext, decryption keys, or raw bearer capabilities.
+- Cross-origin browser access to the production relay is deliberately narrow;
+  privileged create, upload, update, proposal-inbox, revoke, and ciphertext
+  routes are not exposed as a general browser API.
+- Recipient plaintext, keys, indexes, and decrypted workspace views remain local
+  to the recipient process/cache boundary rather than becoming relay plaintext.
+- Host launchers fail closed when the reviewed recipient-isolation contract
+  cannot be established.
+- Creator publication fails closed when interactive selection/review cannot be
+  obtained; host integrations must not invent a `--yes` bypass.
 - Untrusted terminal output is stripped of terminal and bidirectional control
   characters before display.
-- Public relay admission uses a pseudonymous source identity digest, per-source
-  active-share limits, and short provisional reservations.
+- Public relay admission uses pseudonymous source identity digests, bounded
+  capacity, and rate limits.
 
 Legacy links without an explicit `relay=` parameter are parsed for compatibility
 by treating the link origin as the relay origin. Those relay-origin links retain
@@ -88,7 +96,8 @@ protocol. The consequence is simple: capability secrecy is access control.
 - Do not paste complete links into issues, logs, analytics, shell history,
   screenshots, public chat, or bug reports.
 - Prefer shorter TTLs for sensitive or one-off handoffs.
-- Revoke a share if you suspect the link was copied to the wrong place.
+- Revoke a share or environment if you suspect the link was copied to the wrong
+  place.
 - Remember that forwarding the complete link forwards access.
 
 Adding identity-bound or per-recipient schemes in compatible third-party tools
@@ -126,8 +135,9 @@ does not remove that supply-chain risk. See ADR 0004 for the decision record.
 ## Local Residual Risks
 
 - The local relay is volatile, process-local, and not production hardened.
-- Creator state stores live links and revocation capabilities in a mode-0600
-  local file; Windows protection inherits the user's directory ACL.
+- Creator state stores live capability links and creator-only update, inbox, and
+  revocation material in local mode-0600 files where supported; Windows
+  protection inherits the user's directory ACL.
 - The update cache stores only a last-check timestamp and latest stable version
   in `~/.agentshare/update-check-v1.json`; malformed cache content is ignored
   and refreshed rather than trusted as executable data.
@@ -139,13 +149,14 @@ does not remove that supply-chain risk. See ADR 0004 for the decision record.
   unreviewed Codex or Claude versions.
 - Capability links can leak through clipboard managers, screenshots, browser
   extensions, screen recording, messaging systems, or compromised endpoints. The
-  handoff page immediately removes query and fragment data from visible history,
-  uses `no-referrer`, loads no third-party assets, and sends no analytics.
-- Compromise of the trusted AgentShare handoff origin could replace the browser
+  handoff page uses `no-referrer`, loads no third-party assets, sends no
+  analytics, and removes sensitive fragment material from visible history where
+  browser execution is required.
+- Compromise of the trusted AgentShare handoff origin could replace browser
   JavaScript and expose capability fragments. Separating the handoff origin from
-  custom ciphertext relays removes relay-controlled page code from the new-link
-  threat model; it does not eliminate compromise of the trusted handoff service
-  itself.
+  custom ciphertext relays removes relay-controlled page code from the
+  split-origin threat model; it does not eliminate compromise of the trusted
+  handoff service itself.
 - Secret scanning covers known credential formats in text plus ASCII, UTF-8,
   UTF-16LE, and UTF-16BE views of binary resources. It is heuristic and cannot
   guarantee detection of every provider token or inspect encrypted, compressed,

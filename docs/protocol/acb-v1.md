@@ -40,10 +40,11 @@ Objects use lexicographically sorted keys. Arrays retain declared order. Numbers
 use JSON representation. Strings use JSON escaping. No insignificant whitespace
 is emitted.
 
-Logical fingerprint input excludes `exportedAt`; it consists of all remaining
-canonical manifest fields plus ordered resource content hashes. This makes
-identical selected content stable across retries while preventing relay-side
-correlation because the fingerprint never leaves the creator device.
+Logical fingerprint input excludes `exportedAt` and the raw resource
+`contentBase64` bytes. It includes the remaining canonical manifest fields,
+including ordered resource identity and integrity metadata such as SHA-256. This
+makes identical selected content stable across retries while preventing
+relay-side correlation because the fingerprint never leaves the creator device.
 
 ## Events
 
@@ -73,6 +74,37 @@ rather than rendered byte-for-byte. Inventory-only approval for normalized text
 is invalid.
 
 Secret scanning is defense in depth; it does not replace creator review.
+
+## Conformance Vectors
+
+Transport-independent fixtures live under `tests/fixtures/acb-v1/`.
+`minimal.json` is a human-readable valid ACB v1 manifest and
+`minimal.canonical.txt` is the exact UTF-8 byte sequence a canonical encoder
+must emit. The canonical file intentionally has no trailing newline.
+
+The fixture resource contains the six bytes `hello\n` with these fixed values:
+
+```text
+byteLength=6
+sha256=5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
+contentBase64=aGVsbG8K
+logicalFingerprint=e593443d314d81fb178d69940eb59409559ba3828d88185a7d771b036194ac31
+```
+
+Run the relay-independent conformance gate with:
+
+```bash
+npm run test:conformance
+```
+
+The gate validates decoding, resource length and SHA-256, exact canonical
+re-encoding, the fixed logical fingerprint, and decode/re-encode stability. It
+requires no relay credentials or network access.
+
+Passing these vectors means an implementation agrees on ACB v1 encoding and
+integrity behavior. It does not imply compatibility with any particular relay. A
+future change that reinterprets existing ACB v1 fields requires an explicit
+backward-compatible extension or a new protocol version.
 
 ## Interoperability Rule
 

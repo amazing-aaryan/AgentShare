@@ -7,11 +7,12 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![License](https://img.shields.io/github/license/amazing-aaryan/AgentShare)](LICENSE)
 
-AgentShare turns selected AI working context into a capability link you can send
-to another person, machine, or agent. The sender reviews what will cross the
-boundary, AgentShare encrypts it locally, and the public relay stores ciphertext
-instead of conversation plaintext or decryption keys. A recipient with the
-complete link decrypts locally and continues with a supported agent.
+AgentShare turns reviewed AI working context into one encrypted capability link
+that can cross people, machines, companies, and agent vendors. The creator
+chooses what to share, reviews the exact boundary, and encrypts locally. The
+normal relay stores ciphertext rather than conversation/workspace plaintext or
+decryption keys. The recipient decrypts locally and continues with a supported
+agent under their own provider account.
 
 Today the first-class creator and recipient integrations are **Codex** and
 **Claude Code**. The long-term interoperability boundary is the open
@@ -20,116 +21,243 @@ format.
 
 > **AgentShare is for context transport, not context ownership.** Your context
 > passes through AgentShare; it does not become an AgentShare workspace,
-> account, or knowledge base.
+> account, company transcript database, or knowledge base.
 
-Read the [project vision](docs/VISION.md) and
+Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 [open-context transport ADR](docs/adr/0005-open-context-transport.md).
 
 > [!IMPORTANT] AgentShare is a public beta. Do not share production credentials,
-> regulated data, or other high-risk material. Review all displayed text and the
-> binary resource inventory before upload.
+> regulated data, or other high-risk material. Review the final normalized text,
+> included files, exclusions, and redactions before publication.
+
+> [!NOTE] This repository contains the v0.2 collaborative-environment candidate.
+> It is not a stable public v0.2.0 release until the immutable package, live
+> Cloudflare deployment, and authenticated Codex/Claude release gates in the
+> [deployment runbook](docs/operations/cloudflare-deployment.md) pass. Until
+> then, use the current stable GitHub release for production installation.
 
 ## Principles
 
-- **Free forever.** AgentShare is not a freemium product and has no paid tier as
-  a goal. The public service may enforce reasonable anti-abuse, size, lifetime,
-  and capacity limits so it can remain a free shared service.
+- **Free forever.** No paid tier is a project goal. Public infrastructure may
+  use transparent size, lifetime, rate, and capacity limits so it can remain
+  free.
 - **Open source forever.** The protocol, client, relay/handoff implementation,
-  and the pieces needed to interoperate or self-host stay auditable and open.
-- **No AgentShare accounts.** The complete link is the access capability. No
-  shared company, Slack workspace, team invite, seat, or identity provider is
-  required.
-- **Cross-boundary by default.** Send a handoff to a coworker, cofounder,
-  freelancer, client, open-source maintainer, friend, another machine, or anyone
-  else you deliberately give the link to.
-- **Blind transport.** The normal AgentShare relay does not need conversation
-  plaintext or the encryption key to deliver a share.
-- **Review before send.** Secret scanning helps, but the sender remains the
-  authority over what leaves the device.
+  conformance vectors, and self-hosting surface remain auditable and open.
+- **No AgentShare accounts.** Possession of the complete capability link is the
+  base permission model. No shared company, Slack workspace, seat, or identity
+  provider is required.
+- **Cross-boundary by default.** A deliberate link can cross coworkers,
+  cofounders, clients, open-source projects, companies, communities, or
+  machines.
+- **Blind transport.** The normal relay does not need share plaintext or
+  decryption keys to deliver the encrypted environment.
+- **Review before send.** Secret scanning is defense in depth; the creator is
+  the authority over what crosses the boundary.
 - **Agent-agnostic direction.** Codex and Claude Code are current adapters, not
   the permanent definition of AgentShare.
 
-## Quick Start
+## The Ordinary Flow
 
-### 1. Install
+The v2 product model is deliberately small:
 
-Requirements: Node.js 22 or newer, plus Codex CLI or Claude Code.
+**select context -> review -> send one link -> recipient chooses an agent ->
+continue**
 
-Ask your agent to install AgentShare by pasting:
+### 1. Install the stable CLI and integrations
 
-```text
-Install AgentShare v0.1.11 from its immutable GitHub release.
-
-1. Confirm Node.js 22 or newer is installed.
-2. Run:
-   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
-3. Run: agentshare init
-4. Run: agentshare
-5. Confirm the CLI usage appears, list the installed integration files, and
-   remind me to start a new agent session. Do not share context yet.
-```
-
-Manual install:
+Requirements: Node.js 22 or newer, plus a reviewed Codex CLI or Claude Code
+version. Install the current immutable package from
+[GitHub Releases](https://github.com/amazing-aaryan/AgentShare/releases), then
+run:
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
 agentshare init
 ```
 
-Start a new agent session so the host discovers the integration.
+Start a new Codex or Claude Code session so the host discovers the managed
+integration. Exact reviewed recipient versions are tracked in
+[recipient compatibility](docs/recipient-compatibility.md).
 
-### 2. Share
+### 2. Create a collaborative environment
 
-| Creator host | Command       |
+| Creator host | Host command  |
 | ------------ | ------------- |
 | Codex        | `$agentshare` |
 | Claude Code  | `/share`      |
-
-AgentShare shows the selected events, redactions, normalized text, fingerprint,
-relay expiry, size limits, and binary resource metadata. Text is displayed
-exactly after normalization and redaction. Binary bytes are not printed
-byte-for-byte; binary resources are identified by media type, byte length, and
-SHA-256 and scanned for suspected secrets in supported text views. Nothing
-uploads until you approve both review steps.
-
-Then send the resulting **complete capability link** to whoever should have
-access.
 
 Direct CLI equivalents:
 
 ```powershell
 agentshare share --current --source codex
 agentshare share --current --source claude
-agentshare share ./context.md --source generic
 ```
 
-### 3. Open
+For a new environment, AgentShare asks the creator to choose:
 
-The recipient does not need a global AgentShare installation or AgentShare
-account:
+- **scope:** conversation + project, conversation only, or project only;
+- **access:** read + propose changes or read only;
+- **expiry:** 1 hour, 24 hours, or 72 hours.
 
-1. Open the capability link in a browser.
-2. Choose Codex or Claude Code.
-3. Copy and run the pinned command shown on the page.
-4. Copy the secure link and paste it into the hidden terminal prompt.
-5. Ask questions at the `agentshare>` prompt; use `/exit` when finished.
+AgentShare then shows a publication summary with included files, exclusions,
+redactions, access mode, and expiry. Creator selection and final review require
+an interactive terminal. If a host shell cannot provide one, the managed skill
+asks the user to run the command in a real terminal. There is no public `--yes`
+approval bypass.
 
-Pinned Codex command:
+After approval, AgentShare prints one complete `/e/` capability link. Send that
+link only to intended recipients.
+
+### 3. Receive the link
+
+A recipient with AgentShare integrations installed can paste the complete `/e/`
+link directly into a supported Codex or Claude Code host. The receiver
+integration treats the link as a bearer secret, attaches it locally, and does
+not copy decrypted shared files into the recipient's current project.
+
+The explicit CLI path is:
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz -- agentshare open --target codex
+agentshare bootstrap
 ```
 
-Replace `codex` with `claude` to use Claude Code. If browser clipboard access is
-blocked, the page selects the secure link so it can be copied manually.
+Provide the capability link on stdin or through the command's interactive input,
+not as a shell argument.
 
-## The Use Case
+Ask questions against the latest approved revision with:
+
+```powershell
+agentshare ask --target codex --question "What remains unresolved?"
+agentshare ask --target claude --question "What remains unresolved?"
+```
+
+AgentShare refreshes the environment locally and starts an isolated reviewed
+child agent with only the local AgentShare evidence interface.
+
+### 4. Propose a change
+
+When the creator enabled proposal access, a recipient can explicitly request a
+change:
+
+```powershell
+agentshare propose --target codex --instruction "Update the parser tests"
+agentshare propose --target claude --instruction "Update the parser tests"
+```
+
+The recipient produces deterministic file operations against a specific base
+revision, encrypts the proposal locally, and uploads only ciphertext. It never
+writes the creator's workspace directly.
+
+The creator reviews proposals through the creator-only inbox:
+
+```powershell
+agentshare inbox --source codex
+agentshare inbox --source claude
+```
+
+Approved changes are applied against their reviewed base hashes and published as
+a new encrypted revision.
+
+### 5. Keep the same link or revoke it
+
+Rerunning `agentshare share --current` in the creator workspace shows actions
+for updating the existing environment, reviewing proposed changes, copying its
+link, or creating a separate environment. A normal update advances the approved
+revision while keeping the same recipient capability URL.
+
+Force a completely separate environment with:
+
+```powershell
+agentshare share --current --source codex --new
+```
+
+Override the expiry for a newly created environment with an integer from 1
+through 259200 seconds:
+
+```powershell
+agentshare share --current --source codex --new --ttl 3600
+```
+
+Use `--new` when a fresh expiry and fresh capability set are required; updating
+an existing environment does not silently rotate its link.
+
+Revoke a v2 environment with:
+
+```powershell
+agentshare revoke-environment --environment <environment-id>
+```
+
+Revocation invalidates that environment for every holder of the link.
+
+## How v2 Works
+
+```mermaid
+flowchart LR
+    subgraph Creator["Creator device"]
+        A["Conversation + selected project context"] --> B["Host adapter / ACB"]
+        B --> C["Scan, exclusions, exact review"]
+        C -->|"Creator approves"| D["Encrypt manifest + resources"]
+        K["Local master key + creator capabilities"] --> D
+    end
+
+    D -->|"Ciphertext + digests"| R["Blind ciphertext relay"]
+    K -->|"Read/key/proposal fragment"| L["One /e/ capability link"]
+    L --> H["Independent handoff origin"]
+    R -->|"Encrypted revisions"| E["Recipient AgentShare"]
+
+    subgraph Recipient["Recipient device"]
+        E --> F["Local decryption + refresh"]
+        F --> G["Local evidence interface"]
+        G --> I["Isolated Codex or Claude child"]
+        I -->|"Optional encrypted proposal"| R
+    end
+
+    R -->|"Encrypted proposal inbox"| C
+```
+
+A v2 capability link has this split-origin form:
+
+```text
+https://<handoff-origin>/e/<environment-id>?relay=https%3A%2F%2F<relay-origin>#r=<read-capability>&k=<environment-master-key>[&p=<proposal-capability>]
+```
+
+The `relay=` value is non-secret transport metadata. The read capability,
+environment master key, and optional proposal capability are bearer secrets in
+the URL fragment. Browsers do not send fragments as part of HTTP requests.
+Creator-only update, inbox, revoke, and proposal-private-key material never goes
+in the recipient URL.
+
+See the [Environment v2 Protocol](docs/protocol/environment-v2.md) and
+[Security Policy](SECURITY.md) for the complete trust boundary.
+
+## What the Relay Can See
+
+The official relay may store or observe ordinary transport metadata plus:
+
+- environment/share identifiers;
+- opaque ciphertext;
+- ciphertext hashes and byte lengths;
+- expiry/lifecycle state;
+- SHA-256 digests of bearer capabilities;
+- pseudonymous source/admission data used for free-service quotas.
+
+It is not designed to receive:
+
+- conversation or workspace plaintext;
+- environment master keys or share encryption keys;
+- raw creator update/inbox/revoke capabilities;
+- recipient decrypted evidence;
+- account, company, or organization membership data for the core flow.
+
+The recipient's chosen model provider is a separate trust boundary. After local
+decryption and retrieval, relevant evidence excerpts may be submitted through
+the recipient's own Codex or Claude account and terms.
+
+## Project Context Without a Shared Workspace
 
 AI work contains state that final files often do not: failed attempts,
 decisions, constraints, discoveries, unresolved questions, and why the current
-approach exists. AgentShare lets another person or agent inherit that working
-context without requiring both sides to use the same AI product or belong to the
-same organization.
+approach exists. AgentShare is meant to carry that working state without forcing
+both sides into the same chat product or company control plane.
 
 Typical handoffs include:
 
@@ -141,203 +269,113 @@ Typical handoffs include:
 - laptop to workstation;
 - one supported agent to another.
 
-The core primitive is intentionally small:
+AgentShare transfers reviewed context; it does not make that context true. Model
+answers remain limited by the shared evidence and the recipient model.
 
-**context -> review -> encrypted capability link -> recipient agent**
+## Open Interoperability Surface
 
-## How It Works
+AgentShare currently documents three related but separable boundaries:
 
-```mermaid
-flowchart LR
-    subgraph Creator["Creator device"]
-        A["Agent conversation or explicit context"] --> B["Host adapter / ACB"]
-        B --> C["Secret scan and exact payload review"]
-        C -->|"Creator approves"| D["AES-256-GCM encryption"]
-        K["Random key and capabilities"] --> D
-    end
+- [Agent Context Bundle v1](docs/protocol/acb-v1.md): canonical reviewed context
+  and resources, with relay-independent conformance vectors;
+- [Environment v2](docs/protocol/environment-v2.md): revisioned encrypted
+  environments and proposals;
+- [Blind Relay Protocol v1](docs/protocol/relay-v1.md): the original one-shot
+  capability transport retained for compatibility.
 
-    D -->|"Ciphertext + capability digests"| R["Blind ciphertext relay"]
-    K -->|"Capability URL fragment"| L["Shareable link"]
-    L --> W["Independent handoff page"]
-    R -->|"Ciphertext"| E["Recipient CLI"]
-    W -->|"Pinned command + copied link"| E
+Run the ACB conformance vectors without any AgentShare relay or network access:
 
-    subgraph Recipient["Recipient device"]
-        E --> F["Local decryption"]
-        F --> G["Local evidence retrieval"]
-        G --> H["Isolated supported agent"]
-        H --> I["Grounded continuation with event citations"]
-    end
+```powershell
+npm run test:conformance
 ```
 
-New-format links use an AgentShare-controlled handoff origin separate from the
-ciphertext relay. The selected relay origin is non-secret query metadata; the
-read capability and encryption key remain in the URL fragment:
+Passing ACB conformance means agreeing on format encoding and integrity
+behavior, not depending on the official AgentShare service.
+
+## V1 Compatibility
+
+The original one-shot `/s/` handoff remains available rather than being silently
+reinterpreted by v2:
+
+```powershell
+agentshare share-v1 --current --source codex
+agentshare share-v1 ./context.md --source generic
+agentshare open --target codex
+agentshare revoke
+```
+
+`agentshare share --legacy ...` also selects the v1 path. Existing v1 shares,
+state machines, and revoke semantics stay distinct from v2 environments.
+
+## Self-hosting
+
+The official public deployment is the easiest default, not a proprietary
+requirement. Configure compatible relay and handoff origins independently:
+
+```powershell
+agentshare share --current --source codex \
+  --relay https://relay.example \
+  --handoff https://handoff.example
+```
+
+Or set:
 
 ```text
-https://agentshare-handoff.carnation-vermicelli.workers.dev/s/<share-id>?relay=https%3A%2F%2Frelay.example#r=<read-capability>&k=<encryption-key>
+AGENTSHARE_RELAY=https://relay.example
+AGENTSHARE_HANDOFF=https://handoff.example
 ```
 
-Browsers do not send URL fragments as part of the HTTP request. The trusted
-handoff page reads the fragment locally in browser JavaScript, removes query and
-fragment data from visible browser history, loads no third-party assets, sends
-no analytics, and sends only the read capability to the selected relay for
-metadata checks. The encryption key is not sent to the relay.
+The handoff origin and ciphertext relay are intentionally separate so selecting
+a custom relay does not also grant that relay control of browser JavaScript that
+can read capability fragments.
 
-See [SECURITY.md](SECURITY.md) and the
-[Blind Relay Protocol](docs/protocol/relay-v1.md) for the exact trust boundary,
-including legacy-link behavior and residual risks.
+Self-hosting is an interoperability property, not an enterprise SKU.
 
-## Capability Links Are the Permission Model
+## Public-service Limits
 
-AgentShare does not require a central identity system for the core handoff.
-Everyone with the complete link has the same bearer read capability and key
-until the share expires or is revoked. A share can therefore cross teams,
-companies, communities, and machines without an AgentShare invite flow.
+The public service uses bounded resources so it can remain free. Current
+protocol and production limits include a maximum 72-hour TTL, a 50 MiB
+ciphertext bound, rate limits, active-object capacity controls, and
+creator-attributed retained ciphertext accounting. Exact deployment policy lives
+in the relay contracts and
+[Cloudflare runbook](docs/operations/cloudflare-deployment.md).
 
-That portability has a clear security consequence: **treat the complete link as
-a secret**. Anyone who obtains it may be able to read the share while it remains
-valid. Revocation invalidates all readers of that link at once.
-
-## Current Capabilities
-
-| Capability                                 | Current behavior                                                                                                                                |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Share current Codex or Claude conversation | Yes. Host adapters export user and assistant message text from the identified current session.                                                  |
-| Share an explicit text file                | Yes. Explicit path only, up to 5 MiB.                                                                                                           |
-| Read arbitrary creator workspace files     | No. `--current` reads the matching host transcript; it does not crawl the project.                                                              |
-| Transfer original files automatically      | No. File facts transfer only when their contents already appear in exported conversation text or an explicit supported resource is shared.      |
-| Multiple recipients                        | Yes. A link is reusable by concurrent readers until expiry or revocation.                                                                       |
-| Per-recipient identity or accounts         | No by design for the core flow. Everyone with the complete link uses the bearer capability.                                                     |
-| Follow-up conversation                     | Yes. AgentShare keeps the eight most recent question/answer turns in memory.                                                                    |
-| Citations                                  | Yes. Answers cite bundle source/event identifiers such as `[session#event-4]`; these prove bundle provenance, not external truth.               |
-| Recipient project file access              | No. Target agents run in a temporary workspace with tools disabled; Codex is read-only/network-disabled and Claude receives an empty tool list. |
-| Web search or external fact-checking       | No. Recipient agents answer only from retrieved bundle evidence.                                                                                |
-| Persistent recipient session               | No. Each target process is ephemeral; decrypted context, retrieval index, and chat history are memory-only.                                     |
-
-### Information quality
-
-AgentShare transfers context faithfully; it does not make that context true.
-Answers are only as reliable as the shared material. Local lexical retrieval
-selects up to eight matching events, capped at 4,000 characters each, for each
-question. Reword queries when a relevant fact uses different terminology.
-
-The recipient CLI decrypts the complete bundle locally. For each question, it
-sends the question, recent AgentShare conversation, and selected evidence
-excerpts through the recipient's authenticated Codex or Claude CLI. The chosen
-model provider therefore receives those excerpts under the recipient's account
-and terms; the AgentShare ciphertext relay does not.
-
-## Security Model
-
-Key properties:
-
-- AES-256-GCM encryption and decryption happen on client devices.
-- The relay receives ciphertext, SHA-256 capability digests, timestamps, sizes,
-  quota/admission data, and status rather than share plaintext or decryption
-  keys.
-- Raw upload, read, and revoke capabilities are not stored by the relay.
-- The encryption key remains in the URL fragment and is not sent to the relay.
-- Ciphertext integrity, authenticated metadata, resource length, and SHA-256 are
-  checked before recipient use.
-- Creator state retains live links and revocation capabilities locally in
-  `~/.agentshare/state-v1.json` with mode `0600` where supported.
-- Recipient launchers combine reviewed version profiles with runtime capability
-  checks and fail closed if the required isolation controls are unavailable.
-
-Reviewed recipient versions are tracked in
-[docs/recipient-compatibility.md](docs/recipient-compatibility.md). At the
-current v0.1.11 documentation state, reviewed support includes Codex CLI
-`0.145.0` through `0.147.0` and selected Claude Code releases through `2.1.238`;
-Codex `0.149.0` remains blocked because the required Windows isolation contract
-could not be enforced during review.
-
-Primary residual risks include capability-link forwarding or leakage,
-clipboard/history exposure, trusted-handoff-origin compromise, creator or
-recipient device compromise, plaintext in recipient process memory or OS swap,
-incomplete secret detection, and incorrect or malicious content already present
-in the shared context.
-
-## Open Protocol Surface
-
-AgentShare currently documents two core interoperable objects:
-
-- [Agent Context Bundle v1](docs/protocol/acb-v1.md): canonical representation
-  of reviewed agent context and resources.
-- [Blind Relay Protocol v1](docs/protocol/relay-v1.md): capability-based,
-  write-once encrypted share transport.
-
-Future host adapters should translate to/from these open boundaries rather than
-turn AgentShare into a vendor-specific session store.
-
-## Public Relay Limits
-
-| Limit                       |         Public relay |
-| --------------------------- | -------------------: |
-| Maximum lifetime            |             72 hours |
-| Default CLI lifetime        |               1 hour |
-| Maximum encrypted bundle    |               50 MiB |
-| Maximum explicit text input |                5 MiB |
-| Active shares               |                5,000 |
-| Active shares per source IP |                   25 |
-| Active ciphertext           |                 4 GB |
-| Unuploaded reservation      |           10 minutes |
-| Create rate                 | 10 per minute per IP |
-| Upload rate                 | 20 per minute per IP |
-
-Public relay:
-[`https://agentshare-relay.carnation-vermicelli.workers.dev`](https://agentshare-relay.carnation-vermicelli.workers.dev)
-
-Trusted handoff origin:
-[`https://agentshare-handoff.carnation-vermicelli.workers.dev`](https://agentshare-handoff.carnation-vermicelli.workers.dev)
-
-Creators can override the ciphertext relay with `--relay URL` or
-`AGENTSHARE_RELAY`. Self-hosting is part of the open protocol model, not a paid
-or enterprise-only feature.
-
-## Link Lifecycle
-
-- **Reuse:** Sharing unchanged context finds the newest unexpired matching link
-  and asks whether to reuse it. Declining creates a fresh link; `--new` skips
-  reuse lookup.
-- **Retry:** Interrupted uploads resume from encrypted local pending state.
-- **Revoke:** Run `agentshare revoke`, then paste the exact link at the hidden
-  prompt. Locally retained live links keep their own revocation credential.
-- **Expire:** Relay-enforced expiry deletes ciphertext and releases capacity.
+Compatible self-hosted implementations may choose different operational limits
+while preserving the capability and blind-content security boundary.
 
 ## Update or Remove
 
-Successful creator commands perform a best-effort release check at most once per
-24 hours. Update notices go to stderr and never install code silently. Set
-`AGENTSHARE_NO_UPDATE_CHECK=1` to disable passive checks.
+Stable installations can check for and explicitly install a newer stable release
+with:
 
 ```powershell
 agentshare update --check
 agentshare update
-
-# Manual recovery
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
-agentshare repair
-
-# Remove integrations and CLI
-agentshare remove
-npm uninstall --global agentshare
 ```
 
-The updater accepts only exact stable releases from the canonical AgentShare
-repository, derives the immutable tarball URL locally, verifies the installed
-CLI version, and then runs the new CLI's `repair`. AgentShare-managed
-integration files are refreshed; conflicting unmanaged skill files are left
-untouched.
+Successful creator commands perform a best-effort release check at most once per
+24 hours. They never install silently. Set `AGENTSHARE_NO_UPDATE_CHECK=1` to
+disable passive checks. Drafts and prereleases are ignored by the updater.
 
-## Development
+Refresh managed integrations or remove them with:
+
+```powershell
+agentshare repair
+agentshare remove
+```
+
+The updater and repair flow never overwrite conflicting unmanaged skill files.
+
+## Development and Release Gates
 
 ```powershell
 npm ci
+node scripts/check-repository-hygiene.mjs
 npm run format:check
 npm run lint
 npm run build
 npm run test:coverage
+npm run test:conformance
 npm run test:package
 npm run test:edge-runtime
 npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
@@ -345,7 +383,10 @@ npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
 npm audit --audit-level=high
 ```
 
-Strict live release gate:
+CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22
+and 24. A stable public release additionally requires live split-origin
+deployment verification and authenticated real Codex/Claude recipient-isolation
+tests:
 
 ```powershell
 $env:AGENTSHARE_E2E_RELAY="https://agentshare-relay.carnation-vermicelli.workers.dev"
@@ -353,30 +394,29 @@ $env:AGENTSHARE_E2E_HANDOFF="https://agentshare-handoff.carnation-vermicelli.wor
 npm run test:release
 ```
 
-The release gate requires distinct live HTTPS relay and handoff origins and
-exercises the real handoff page/security headers, relay semantics, and real
-Codex/Claude filesystem and network isolation. See the
-[Cloudflare deployment runbook](docs/operations/cloudflare-deployment.md).
-
-Local relay development:
-
-```powershell
-npm run start:relay
-agentshare share --current --source codex --relay http://127.0.0.1:8787
-```
-
-See also the [contribution guide](CONTRIBUTING.md),
-[security policy](SECURITY.md), [protocol docs](docs/protocol/), and historical
-[construction plans](plans/README.md).
+A new agent adapter is not considered supported merely because it can receive a
+prompt. It must prove creator extraction, capability handling, and recipient
+isolation on exact reviewed releases.
 
 ## What We Intentionally Are Not Building
 
-AgentShare's base project is not intended to become a paid SaaS workspace,
-company transcript archive, social network for AI sessions, enterprise
-seat-management system, employee-monitoring product, or proprietary agent
-runtime. Third parties are free to build other experiences on compatible open
-context and relay protocols.
+The base AgentShare project is not intended to become:
 
-## License
+- a paid SaaS workspace or freemium funnel;
+- an enterprise seat-management or mandatory SSO/SCIM system;
+- a Slack replacement;
+- a permanent company transcript or plaintext knowledge database;
+- employee/agent productivity analytics;
+- a social network for AI sessions;
+- a proprietary model or agent runtime.
 
-Apache-2.0. AgentShare is intended to remain free and open source.
+Third parties can build products on compatible open formats without changing the
+base project's cross-boundary, account-free primitive.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), the
+[protocol docs](docs/protocol/), and historical
+[construction plans](docs/superpowers/README.md).
+
+Apache-2.0.
