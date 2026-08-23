@@ -69,9 +69,8 @@ Security invariants for current split-origin links:
 - Cross-origin browser access to the production relay is deliberately narrow;
   privileged create, upload, update, proposal-inbox, revoke, and ciphertext
   routes are not exposed as a general browser API.
-- Recipient plaintext, keys, indexes, and decrypted workspace views remain
-  local to the recipient process/cache boundary rather than becoming relay
-  plaintext.
+- Recipient plaintext, keys, indexes, and decrypted workspace views remain local
+  to the recipient process/cache boundary rather than becoming relay plaintext.
 - Host launchers fail closed when the reviewed recipient-isolation contract
   cannot be established.
 - Creator publication fails closed when interactive selection/review cannot be
@@ -149,8 +148,8 @@ does not remove that supply-chain risk. See ADR 0004 for the decision record.
   tool surfaces before handing it untrusted context. Launchers fail closed on
   unreviewed Codex or Claude versions.
 - Capability links can leak through clipboard managers, screenshots, browser
-  extensions, screen recording, messaging systems, or compromised endpoints.
-  The handoff page uses `no-referrer`, loads no third-party assets, sends no
+  extensions, screen recording, messaging systems, or compromised endpoints. The
+  handoff page uses `no-referrer`, loads no third-party assets, sends no
   analytics, and removes sensitive fragment material from visible history where
   browser execution is required.
 - Compromise of the trusted AgentShare handoff origin could replace browser
