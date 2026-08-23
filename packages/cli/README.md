@@ -17,19 +17,19 @@ than through a proprietary server-side session store.
 
 Requires Node.js 22 or newer.
 
-> [!NOTE]
-> The repository contains the v0.2 collaborative-environment implementation.
-> Until v0.2.0 passes the documented live release gate and is promoted to a
-> stable GitHub release, use the current published stable package for production
-> installation and treat v0.2 commands as release-candidate behavior.
+> [!NOTE] The repository contains the v0.2 collaborative-environment
+> implementation. Until v0.2.0 passes the documented live release gate and is
+> promoted to a stable GitHub release, use the current published stable package
+> for production installation and treat v0.2 commands as release-candidate
+> behavior.
 
 ## Create an Environment
 
 After installing the CLI and running `agentshare init`, start a new Codex or
 Claude Code session so the host discovers the AgentShare integration.
 
-Use `$agentshare` in Codex or `/share` in Claude Code. The direct CLI equivalents
-are:
+Use `$agentshare` in Codex or `/share` in Claude Code. The direct CLI
+equivalents are:
 
 ```sh
 agentshare share --current --source codex
@@ -47,8 +47,8 @@ and expiry before publication. Creator selection and final review require an
 interactive terminal and fail closed when one is not available. There is no
 public `--yes` approval bypass.
 
-The output is one split-origin `/e/` capability link. Send the complete link only
-to intended recipients.
+The output is one split-origin `/e/` capability link. Send the complete link
+only to intended recipients.
 
 ### Creator controls
 
@@ -101,8 +101,8 @@ agentshare ask --target claude --question "What remains unresolved?"
 AgentShare refreshes approved revisions and starts an isolated supported child
 agent with only the local AgentShare evidence interface.
 
-If the environment includes proposal access, an explicit requested change can
-be submitted as encrypted proposal ciphertext:
+If the environment includes proposal access, an explicit requested change can be
+submitted as encrypted proposal ciphertext:
 
 ```sh
 agentshare propose --target codex --instruction "Update the parser tests"
@@ -162,9 +162,10 @@ silently. Set `AGENTSHARE_NO_UPDATE_CHECK=1` to disable passive checks; explicit
 update commands still work.
 
 The updater accepts only exact stable `vMAJOR.MINOR.PATCH` releases from
-`amazing-aaryan/AgentShare`. Drafts and prereleases are ignored. After an update,
-AgentShare verifies the new CLI version and runs `agentshare repair` so managed
-Codex and Claude skills are refreshed without overwriting unmanaged conflicts.
+`amazing-aaryan/AgentShare`. Drafts and prereleases are ignored. After an
+update, AgentShare verifies the new CLI version and runs `agentshare repair` so
+managed Codex and Claude skills are refreshed without overwriting unmanaged
+conflicts.
 
 ## Project Principles
 
@@ -178,8 +179,7 @@ AgentShare is intended to remain:
 - explicit about creator review;
 - portable across more agent vendors over time.
 
-See the [full guide](../../README.md),
-[project vision](../../docs/VISION.md), and
-[environment protocol](../../docs/protocol/environment-v2.md).
+See the [full guide](../../README.md), [project vision](../../docs/VISION.md),
+and [environment protocol](../../docs/protocol/environment-v2.md).
 
 Apache-2.0.
