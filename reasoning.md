@@ -270,12 +270,22 @@ indicated.
 
 ## [2026-08-26 19:21] Configure Cloudflare deployment credentials
 
-**Decision:** Create one-year Cloudflare Account API token `AgentShare GitHub Actions` scoped to Carnation Vermicelli account with Workers Scripts write and Account Settings read; save it as encrypted GitHub secret alongside account ID.
-**Why:** Current v0.2.0 prerelease CI is green but repository had no Cloudflare Actions credentials; least-privilege scope limits deployment access.
-**Impact:** GitHub secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` now exist; token value was not committed or printed. Desktop checkout fast-forwarded to `origin/master` commit `5744dbc`.
+**Decision:** Create one-year Cloudflare Account API token
+`AgentShare GitHub Actions` scoped to Carnation Vermicelli account with Workers
+Scripts write and Account Settings read; save it as encrypted GitHub secret
+alongside account ID. **Why:** Current v0.2.0 prerelease CI is green but
+repository had no Cloudflare Actions credentials; least-privilege scope limits
+deployment access. **Impact:** GitHub secrets `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` now exist; token value was not committed or printed.
+Desktop checkout fast-forwarded to `origin/master` commit `5744dbc`.
 
 ## [2026-08-26 19:35] Complete Cloudflare deployment; hold stable promotion on Claude auth
 
-**Decision:** Deploy v0.2.0 relay and handoff Workers through GitHub Actions, run strict live gate, and keep GitHub release prerelease because Claude real-agent tests cannot authenticate.
-**Why:** Cloudflare deployment succeeded and all v1/v2/Codex checks passed; Claude organization has disabled Claude Code subscription access and no `ANTHROPIC_API_KEY` is configured.
-**Impact:** Relay active version `ad67746a`, handoff active version `8b0e7909`; stable promotion requires Anthropic API-key auth or organization subscription enablement, then rerun `npm run test:release`.
+**Decision:** Deploy v0.2.0 relay and handoff Workers through GitHub Actions,
+run strict live gate, and keep GitHub release prerelease because Claude
+real-agent tests cannot authenticate. **Why:** Cloudflare deployment succeeded
+and all v1/v2/Codex checks passed; Claude organization has disabled Claude Code
+subscription access and no `ANTHROPIC_API_KEY` is configured. **Impact:** Relay
+active version `ad67746a`, handoff active version `8b0e7909`; stable promotion
+requires Anthropic API-key auth or organization subscription enablement, then
+rerun `npm run test:release`.
