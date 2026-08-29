@@ -70,26 +70,29 @@ afterEach(() => {
 });
 
 describe("target process lifecycle", () => {
-  it("allows Codex at or above the minimum while Claude stays exact-reviewed", () => {
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.144.0")).toBe(
-      false,
-    );
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.145.0")).toBe(
-      true,
-    );
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.150.0")).toBe(
-      true,
-    );
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 1.0.0")).toBe(
-      true,
-    );
-    expect(
-      supportsReviewedTargetVersion("claude", "2.1.238 (Claude Code)"),
-    ).toBe(true);
-    expect(
-      supportsReviewedTargetVersion("claude", "2.1.239 (Claude Code)"),
-    ).toBe(false);
-  });
+  it(
+    "allows Codex at or above the minimum while Claude stays exact-reviewed",
+    () => {
+      expect(supportsReviewedTargetVersion("codex", "codex-cli 0.144.0")).toBe(
+        false,
+      );
+      expect(supportsReviewedTargetVersion("codex", "codex-cli 0.145.0")).toBe(
+        true,
+      );
+      expect(supportsReviewedTargetVersion("codex", "codex-cli 0.150.0")).toBe(
+        true,
+      );
+      expect(supportsReviewedTargetVersion("codex", "codex-cli 1.0.0")).toBe(
+        true,
+      );
+      expect(
+        supportsReviewedTargetVersion("claude", "2.1.238 (Claude Code)"),
+      ).toBe(true);
+      expect(
+        supportsReviewedTargetVersion("claude", "2.1.239 (Claude Code)"),
+      ).toBe(false);
+    },
+  );
 
   it("waits for close so inherited stdout is fully drained", async () => {
     const child = new EventEmitter();
@@ -140,16 +143,19 @@ describe("target process lifecycle", () => {
     expect(spawnMock).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects Codex below the minimum without running its help command", async () => {
-    spawnMock.mockImplementationOnce(() =>
-      fakeProcess("codex-cli 0.144.0\n"),
-    );
+  it(
+    "rejects Codex below the minimum without running its help command",
+    async () => {
+      spawnMock.mockImplementationOnce(() =>
+        fakeProcess("codex-cli 0.144.0\n"),
+      );
 
-    await expect(runTarget("codex", "question")).rejects.toThrow(
-      "requires Codex CLI >= 0.145.0",
-    );
-    expect(spawnMock).toHaveBeenCalledTimes(1);
-  });
+      await expect(runTarget("codex", "question")).rejects.toThrow(
+        "requires Codex CLI >= 0.145.0",
+      );
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("rejects oversized probe output without waiting for close", async () => {
     const child = fakeHangingProcess();
