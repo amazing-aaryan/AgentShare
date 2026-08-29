@@ -16,6 +16,12 @@ type TargetChildLifecycle = {
   ): TargetChildLifecycle;
 };
 
+type VersionTuple = readonly [major: number, minor: number, patch: number];
+
+const MINIMUM_CODEX_VERSION: VersionTuple = [0, 145, 0];
+const CODEX_VERSION_PATTERN =
+  /^codex-cli\s+(\d+)\.(\d+)\.(\d+)(?:[-+][^\s]+)?\s*$/mu;
+
 const TARGET_CONTRACTS: Record<
   TargetAgent,
   { helpArgs: string[]; requiredHelpOptions: string[]; versionPattern: RegExp }
@@ -31,7 +37,7 @@ const TARGET_CONTRACTS: Record<
       "--cd",
       "--config",
     ],
-    versionPattern: /^codex-cli\s+\d+\.\d+\.\d+(?:[-+][^\s]+)?\s*$/mu,
+    versionPattern: CODEX_VERSION_PATTERN,
   },
   claude: {
     helpArgs: ["--help"],
@@ -50,11 +56,8 @@ const TARGET_CONTRACTS: Record<
   },
 };
 
-const REVIEWED_VERSIONS: Record<TargetAgent, RegExp> = {
-  codex: /^codex-cli 0\.(?:145|146|147)\.0\s*$/mu,
-  claude:
-    /^2\.1\.(?:210|211|212|213|214|215|216|217|218|219|220|221|222|223|224|225|226|227|228|229|231|238)\s+\(Claude Code\)\s*$/mu,
-};
+const REVIEWED_CLAUDE_VERSIONS =
+  /^2\.1\.(?:210|211|212|213|214|215|216|217|218|219|220|221|222|223|224|225|226|227|228|229|231|238)\s+\(Claude Code\)\s*$/mu;
 
 export function codexArgs(
   workspace: string,
@@ -237,7 +240,11 @@ export function supportsReviewedTargetVersion(
   target: TargetAgent,
   versionOutput: string,
 ): boolean {
-  return REVIEWED_VERSIONS[target].test(versionOutput.trim());
+  if (target === "claude") {
+    return REVIEWED_CLAUDE_VERSIONS.test(versionOutput.trim());
+  }
+  const version = parseCodexVersion(versionOutput);
+  return version !== undefined && compareVersions(version, MINIMUM_CODEX_VERSION) >= 0;
 }
 
 async function assertSupportedTarget(
@@ -260,6 +267,12 @@ async function inspectTargetVersion(
     throw new Error(unsupportedTargetVersionMessage(target, output));
   }
   if (!supportsReviewedTargetVersion(target, output)) {
+    if (target === "codex") {
+      throw new Error(
+        `codex ${displayTargetOutput(output)} requires Codex CLI >= 0.145.0. ` +
+          "Update Codex; AgentShare will not run against an older recipient sandbox.",
+      );
+    }
     throw new Error(
       `${target} ${displayTargetOutput(output)} has not passed AgentShare isolation review. ` +
         `Update AgentShare or install a reviewed ${target} version; sandbox controls will not be assumed safe.`,
@@ -275,6 +288,20 @@ async function inspectTargetVersion(
       unsupportedTargetCapabilitiesMessage(target, output, missing),
     );
   }
+}
+
+function parseCodexVersion(versionOutput: string): VersionTuple | undefined {
+  const match = CODEX_VERSION_PATTERN.exec(versionOutput.trim());
+  if (match === null) return undefined;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function compareVersions(left: VersionTuple, right: VersionTuple): number {
+  for (let index = 0; index < left.length; index += 1) {
+    const difference = left[index] - right[index];
+    if (difference !== 0) return difference;
+  }
+  return 0;
 }
 
 export async function captureProcess(
