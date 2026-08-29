@@ -244,7 +244,10 @@ export function supportsReviewedTargetVersion(
     return REVIEWED_CLAUDE_VERSIONS.test(versionOutput.trim());
   }
   const version = parseCodexVersion(versionOutput);
-  return version !== undefined && compareVersions(version, MINIMUM_CODEX_VERSION) >= 0;
+  return (
+    version !== undefined &&
+    compareVersions(version, MINIMUM_CODEX_VERSION) >= 0
+  );
 }
 
 async function assertSupportedTarget(
