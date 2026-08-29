@@ -299,12 +299,13 @@ function parseCodexVersion(versionOutput: string): VersionTuple | undefined {
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
-function compareVersions(left: VersionTuple, right: VersionTuple): number {
-  for (let index = 0; index < left.length; index += 1) {
-    const difference = left[index] - right[index];
-    if (difference !== 0) return difference;
-  }
-  return 0;
+function compareVersions(
+  [leftMajor, leftMinor, leftPatch]: VersionTuple,
+  [rightMajor, rightMinor, rightPatch]: VersionTuple,
+): number {
+  if (leftMajor !== rightMajor) return leftMajor - rightMajor;
+  if (leftMinor !== rightMinor) return leftMinor - rightMinor;
+  return leftPatch - rightPatch;
 }
 
 export async function captureProcess(
