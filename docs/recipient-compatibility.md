@@ -99,8 +99,8 @@ release with the identical launcher profile.
 | Claude Code | 2.1.229 | Pass       | Pass    | N/A               |
 | Claude Code | 2.1.231 | Pass       | Pass    | Pass              |
 
-Claude Code 2.1.230 was not published. Earlier release evidence for Codex 0.145.0
-and Claude 2.1.210 is also recorded in
+Claude Code 2.1.230 was not published. Earlier release evidence for Codex
+0.145.0 and Claude 2.1.210 is also recorded in
 [`releases/v0.1.8-release-verification.md`](releases/v0.1.8-release-verification.md).
 
 ## 2026-08-21 current-release review
@@ -116,19 +116,20 @@ both hosts before the real production launcher tests.
 
 Codex CLI 0.149.0 refused to start under AgentShare's required Windows sandbox:
 `windows unelevated restricted-token sandbox cannot enforce split filesystem read restrictions directly; refusing to run unsandboxed`.
-That is a safe platform/runtime refusal. Under the current minimum-plus-capability
-policy, the version number alone no longer blocks 0.149.0, but AgentShare still
-does not bypass a Codex refusal when the requested isolation cannot be enforced.
-Claude Code 2.1.238 denied filesystem/network attempts and preserved grounded
-two-turn answers, so that exact release remains in the Claude reviewed allowlist.
+That is a safe platform/runtime refusal. Under the current
+minimum-plus-capability policy, the version number alone no longer blocks
+0.149.0, but AgentShare still does not bypass a Codex refusal when the requested
+isolation cannot be enforced. Claude Code 2.1.238 denied filesystem/network
+attempts and preserved grounded two-turn answers, so that exact release remains
+in the Claude reviewed allowlist.
 
 ## 2026-08-29 Codex capability probe
 
-The current published Codex CLI `0.151.0` was installed on an Ubuntu 24.04 GitHub
-runner with Node.js 24. Its real `codex --version` output was recognized, and
-`codex exec --help` advertised every required AgentShare isolation option listed
-above. The probe therefore passed the same version/capability preflight used by
-AgentShare.
+The current published Codex CLI `0.151.0` was installed on an Ubuntu 24.04
+GitHub runner with Node.js 24. Its real `codex --version` output was recognized,
+and `codex exec --help` advertised every required AgentShare isolation option
+listed above. The probe therefore passed the same version/capability preflight
+used by AgentShare.
 
 This was a launcher-surface compatibility probe, not an authenticated model
 isolation test. Real filesystem/network behavior remains covered by historical
@@ -148,9 +149,9 @@ For Codex compatibility changes:
 6. Add an explicit blocked version/range only when evidence demonstrates a
    regression that cannot be detected by the existing capability/runtime gates.
 
-For Claude Code, continue the exact-release review before adding a version to the
-reviewed allowlist: run the capability preflight, real filesystem/network tests,
-and representative dialogue checks.
+For Claude Code, continue the exact-release review before adding a version to
+the reviewed allowlist: run the capability preflight, real filesystem/network
+tests, and representative dialogue checks.
 
 For a **new agent family**, review must additionally document how the adapter:
 
