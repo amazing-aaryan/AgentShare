@@ -1,0 +1,41 @@
+name: latest-codex-probe
+
+on:
+  push:
+    branches:
+      - agent/codex-min-version-compat
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - name: Install current Codex CLI
+        run: npm install --global @openai/codex@0.151.0
+      - name: Verify current Codex capability contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          codex --version
+          help="$(codex exec --help)"
+          printf '%s\n' "$help"
+          for option in \
+            --ephemeral \
+            --ignore-user-config \
+            --ignore-rules \
+            --strict-config \
+            --skip-git-repo-check \
+            --cd \
+            --config
+          do
+            if ! grep -F -- "$option" <<<"$help" >/dev/null; then
+              echo "Missing required AgentShare isolation option: $option" >&2
+              exit 1
+            fi
+          done
