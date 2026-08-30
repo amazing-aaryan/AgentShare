@@ -1,0 +1,137 @@
+name: promote-v0.2.1
+
+on:
+  push:
+    branches:
+      - release/v0.2.1-ops
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_SHA: de712f8891b35b46aface6831492dd074372b158
+  RELEASE_TAG: v0.2.1
+  RELEASE_VERSION: 0.2.1
+  RELEASE_ASSET: agentshare-0.2.1.tgz
+  RELEASE_ASSET_BYTES: "132089"
+  RELEASE_ASSET_SHA256: 168ed77d603edc0f5d01b175d87a2b86aa25707d78a31d195447bdbd6928769d
+  AGENTSHARE_E2E_RELAY: https://agentshare-relay.carnation-vermicelli.workers.dev
+  AGENTSHARE_E2E_HANDOFF: https://agentshare-handoff.carnation-vermicelli.workers.dev
+  AGENTSHARE_NO_UPDATE_CHECK: "1"
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - name: Verify prerelease metadata, bytes, install, and live bootstrap before promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          printf '%s\n' "$metadata" > before.json
+          release_id="$(jq -r '.id' before.json)"
+          target="$(jq -r '.target_commitish' before.json)"
+          prerelease="$(jq -r '.prerelease' before.json)"
+          draft="$(jq -r '.draft' before.json)"
+          asset_count="$(jq '.assets | length' before.json)"
+          asset_name="$(jq -r '.assets[0].name' before.json)"
+          test "$target" = "$RELEASE_SHA"
+          test "$prerelease" = "true"
+          test "$draft" = "false"
+          test "$asset_count" = "1"
+          test "$asset_name" = "$RELEASE_ASSET"
+
+          mkdir -p before-download
+          asset_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$RELEASE_ASSET"
+          curl --fail --location --silent --show-error "$asset_url" -o "before-download/$RELEASE_ASSET"
+          actual_bytes="$(stat -c%s "before-download/$RELEASE_ASSET")"
+          actual_sha="$(sha256sum "before-download/$RELEASE_ASSET" | awk '{print $1}')"
+          test "$actual_bytes" = "$RELEASE_ASSET_BYTES"
+          test "$actual_sha" = "$RELEASE_ASSET_SHA256"
+
+          prefix="${RUNNER_TEMP}/agentshare-v021-before-promotion"
+          npm install --prefix "$prefix" "$PWD/before-download/$RELEASE_ASSET" >/dev/null
+          installed_version="$("$prefix/node_modules/.bin/agentshare" --version)"
+          test "$installed_version" = "$RELEASE_VERSION"
+
+          relay_encoded="$(node -e 'process.stdout.write(encodeURIComponent(process.env.AGENTSHARE_E2E_RELAY))')"
+          bootstrap_url="${AGENTSHARE_E2E_HANDOFF}/e/env_releasegatev02100000000/bootstrap.json?relay=${relay_encoded}"
+          curl --fail --silent --show-error "$bootstrap_url" -o bootstrap-before.json
+          expected_package="https://github.com/${GITHUB_REPOSITORY}/releases/download/v0.2.1/agentshare-0.2.1.tgz"
+          test "$(jq -r '.release.version' bootstrap-before.json)" = "$RELEASE_VERSION"
+          test "$(jq -r '.release.packageUrl' bootstrap-before.json)" = "$expected_package"
+
+          echo "RELEASE_ID=$release_id" >> "$GITHUB_ENV"
+          echo "PRE_PROMOTION_ASSET_BYTES=$actual_bytes"
+          echo "PRE_PROMOTION_ASSET_SHA256=$actual_sha"
+          echo "PRE_PROMOTION_INSTALL_VERSION=$installed_version"
+          echo "PRE_PROMOTION_BOOTSTRAP_PACKAGE=$expected_package"
+      - name: Promote existing release metadata only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > promotion.json <<'JSON'
+          {
+            "name": "AgentShare v0.2.1",
+            "prerelease": false,
+            "make_latest": "true",
+            "body": "## AgentShare v0.2.1\n\nPatch release for Codex recipient compatibility.\n\n- Codex CLI 0.145.0 and newer can run when all required AgentShare isolation controls are present.\n- Newer Codex versions are no longer rejected solely because their version number changed.\n- AgentShare still fails closed when required isolation controls disappear or the Codex sandbox cannot be enforced.\n- The Claude Code adapter and its exact-reviewed compatibility policy are unchanged in this patch.\n- The blind relay protocol and storage schema are unchanged.\n\nThe release asset is the same immutable tarball staged and verified before live deployment."
+          }
+          JSON
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" --input promotion.json > promoted.json
+          test "$(jq -r '.prerelease' promoted.json)" = "false"
+          test "$(jq -r '.draft' promoted.json)" = "false"
+          test "$(jq -r '.target_commitish' promoted.json)" = "$RELEASE_SHA"
+          echo "PROMOTED_RELEASE_URL=$(jq -r '.html_url' promoted.json)"
+      - name: Verify stable metadata and exact same bytes after promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          printf '%s\n' "$metadata" > after.json
+          test "$(jq -r '.target_commitish' after.json)" = "$RELEASE_SHA"
+          test "$(jq -r '.prerelease' after.json)" = "false"
+          test "$(jq -r '.draft' after.json)" = "false"
+          test "$(jq '.assets | length' after.json)" = "1"
+          test "$(jq -r '.assets[0].name' after.json)" = "$RELEASE_ASSET"
+
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest")"
+          test "$(jq -r '.tag_name' <<<"$latest")" = "$RELEASE_TAG"
+
+          mkdir -p after-download
+          asset_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$RELEASE_ASSET"
+          curl --fail --location --silent --show-error "$asset_url" -o "after-download/$RELEASE_ASSET"
+          actual_bytes="$(stat -c%s "after-download/$RELEASE_ASSET")"
+          actual_sha="$(sha256sum "after-download/$RELEASE_ASSET" | awk '{print $1}')"
+          test "$actual_bytes" = "$RELEASE_ASSET_BYTES"
+          test "$actual_sha" = "$RELEASE_ASSET_SHA256"
+
+          prefix="${RUNNER_TEMP}/agentshare-v021-after-promotion"
+          npm install --prefix "$prefix" "$PWD/after-download/$RELEASE_ASSET" >/dev/null
+          installed_version="$("$prefix/node_modules/.bin/agentshare" --version)"
+          test "$installed_version" = "$RELEASE_VERSION"
+
+          relay_encoded="$(node -e 'process.stdout.write(encodeURIComponent(process.env.AGENTSHARE_E2E_RELAY))')"
+          bootstrap_url="${AGENTSHARE_E2E_HANDOFF}/e/env_releasegatev02100000000/bootstrap.json?relay=${relay_encoded}"
+          curl --fail --silent --show-error "$bootstrap_url" -o bootstrap-after.json
+          expected_package="https://github.com/${GITHUB_REPOSITORY}/releases/download/v0.2.1/agentshare-0.2.1.tgz"
+          test "$(jq -r '.release.version' bootstrap-after.json)" = "$RELEASE_VERSION"
+          test "$(jq -r '.release.packageUrl' bootstrap-after.json)" = "$expected_package"
+
+          echo "POST_PROMOTION_ASSET_BYTES=$actual_bytes"
+          echo "POST_PROMOTION_ASSET_SHA256=$actual_sha"
+          echo "POST_PROMOTION_INSTALL_VERSION=$installed_version"
+          echo "POST_PROMOTION_BOOTSTRAP_PACKAGE=$expected_package"
+          echo "STABLE_RELEASE_URL=$(jq -r '.html_url' after.json)"
