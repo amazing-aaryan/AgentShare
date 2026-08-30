@@ -70,15 +70,18 @@ afterEach(() => {
 });
 
 describe("target process lifecycle", () => {
-  it("allows reviewed hosts and fails closed for unreviewed newer releases", () => {
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.147.0")).toBe(
+  it("allows Codex at or above the minimum while Claude stays exact-reviewed", () => {
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.144.0")).toBe(
+      false,
+    );
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.145.0")).toBe(
       true,
     );
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.149.0")).toBe(
-      false,
-    );
     expect(supportsReviewedTargetVersion("codex", "codex-cli 0.150.0")).toBe(
-      false,
+      true,
+    );
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 1.0.0")).toBe(
+      true,
     );
     expect(
       supportsReviewedTargetVersion("claude", "2.1.238 (Claude Code)"),
@@ -128,7 +131,7 @@ describe("target process lifecycle", () => {
 
   it("fails closed before launch when a required isolation control is absent", async () => {
     spawnMock
-      .mockImplementationOnce(() => fakeProcess("codex-cli 0.147.0\n"))
+      .mockImplementationOnce(() => fakeProcess("codex-cli 0.150.0\n"))
       .mockImplementationOnce(() => fakeProcess(CODEX_INCOMPLETE_HELP));
 
     await expect(runTarget("codex", "question")).rejects.toThrow(
@@ -137,13 +140,11 @@ describe("target process lifecycle", () => {
     expect(spawnMock).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects an unreviewed version without running its help command", async () => {
-    spawnMock.mockImplementationOnce(() =>
-      fakeProcess("codex-cli 99.4.7-beta.1\n"),
-    );
+  it("rejects Codex below the minimum without running its help command", async () => {
+    spawnMock.mockImplementationOnce(() => fakeProcess("codex-cli 0.144.0\n"));
 
     await expect(runTarget("codex", "question")).rejects.toThrow(
-      "has not passed AgentShare isolation review",
+      "requires Codex CLI >= 0.145.0",
     );
     expect(spawnMock).toHaveBeenCalledTimes(1);
   });

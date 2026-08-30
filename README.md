@@ -65,8 +65,9 @@ continue**
 
 ### 1. Install the stable CLI and integrations
 
-Requirements: Node.js 22 or newer, plus a reviewed Codex CLI or Claude Code
-version. Install the current immutable package from
+Requirements: Node.js 22 or newer, plus Codex CLI 0.145.0 or newer with the
+required isolation controls, or an exact-reviewed Claude Code version. Install
+the current immutable package from
 [GitHub Releases](https://github.com/amazing-aaryan/AgentShare/releases), then
 run:
 
@@ -75,7 +76,8 @@ agentshare init
 ```
 
 Start a new Codex or Claude Code session so the host discovers the managed
-integration. Exact reviewed recipient versions are tracked in
+integration. Codex uses a minimum-version plus runtime-capability policy; Claude
+Code currently uses exact-reviewed versions. Both are documented in
 [recipient compatibility](docs/recipient-compatibility.md).
 
 ### 2. Create a collaborative environment
