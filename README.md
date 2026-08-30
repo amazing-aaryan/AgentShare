@@ -30,11 +30,14 @@ Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 > regulated data, or other high-risk material. Review the final normalized text,
 > included files, exclusions, and redactions before publication.
 
-> [!NOTE] This repository contains the v0.2 collaborative-environment candidate.
-> It is not a stable public v0.2.0 release until the immutable package, live
-> Cloudflare deployment, and authenticated Codex/Claude release gates in the
-> [deployment runbook](docs/operations/cloudflare-deployment.md) pass. Until
-> then, use the current stable GitHub release for production installation.
+> [!NOTE] This repository contains the v0.2 collaborative-environment line. The
+> current patch release candidate is v0.2.1, which ships the Codex
+> minimum-version plus runtime-capability compatibility policy. Stable
+> publication still requires immutable package staging, live split-origin
+> verification, and fresh evidence for every recipient security surface changed
+> by the release. See the
+> [deployment runbook](docs/operations/cloudflare-deployment.md). Until
+> promotion, use the current stable GitHub release for production installation.
 
 ## Principles
 
@@ -387,8 +390,14 @@ npm audit --audit-level=high
 
 CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22
 and 24. A stable public release additionally requires live split-origin
-deployment verification and authenticated real Codex/Claude recipient-isolation
-tests:
+deployment verification and fresh recipient compatibility/isolation evidence for
+every agent, launcher, or sandbox surface changed by that release. On a patch
+release, an unchanged adapter may carry forward its most recent recorded real-host
+isolation evidence, but the release record must identify the carried-forward
+surface explicitly.
+
+`npm run test:release` remains the strongest full two-agent diagnostic when both
+authenticated hosts are available:
 
 ```powershell
 $env:AGENTSHARE_E2E_RELAY="https://agentshare-relay.carnation-vermicelli.workers.dev"
@@ -397,8 +406,9 @@ npm run test:release
 ```
 
 A new agent adapter is not considered supported merely because it can receive a
-prompt. It must prove creator extraction, capability handling, and recipient
-isolation on exact reviewed releases.
+prompt. It must prove creator extraction, capability handling, and real recipient
+isolation before public support is claimed. Codex additionally fails closed on
+versions below its minimum or when required runtime isolation controls disappear.
 
 ## What We Intentionally Are Not Building
 
