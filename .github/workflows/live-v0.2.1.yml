@@ -1,4 +1,4 @@
-name: live-v0.2.1-release-gate
+name: verify-live-v0.2.1-after-deploy
 
 on:
   push:
@@ -21,11 +21,8 @@ env:
   AGENTSHARE_NO_UPDATE_CHECK: "1"
 
 jobs:
-  live-gate:
+  verify-live:
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -37,7 +34,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Re-verify immutable prerelease before any production write
+      - name: Re-verify immutable prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -75,26 +72,7 @@ jobs:
           echo "RELEASE_ASSET_BYTES_VERIFIED=$actual_bytes"
           echo "RELEASE_ASSET_SHA256_VERIFIED=$actual_sha"
           echo "ISOLATED_INSTALL_VERSION=$installed_version"
-      - name: Require Cloudflare deployment credentials before any write
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${CLOUDFLARE_API_TOKEN}" || -z "${CLOUDFLARE_ACCOUNT_ID}" ]]; then
-            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required."
-            exit 1
-          fi
-      - name: Deploy only the independent handoff Worker
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx wrangler deploy --config apps/handoff/wrangler.jsonc 2>&1 | tee handoff-deploy.log
-          version_id="$(sed -nE 's/.*Version ID:[[:space:]]*([A-Za-z0-9-]+).*/\1/p' handoff-deploy.log | tail -n1)"
-          if [[ -n "$version_id" ]]; then
-            echo "HANDOFF_VERSION_ID=$version_id"
-          else
-            echo "HANDOFF_VERSION_ID=not-parsed"
-          fi
-      - name: Verify split origins and trusted handoff surfaces
+      - name: Wait for handoff deployment propagation and verify surfaces
         shell: bash
         run: |
           set -euo pipefail
@@ -116,37 +94,55 @@ jobs:
           environment_id="env_releasegatev02100000000"
           environment_url="${AGENTSHARE_E2E_HANDOFF}/e/${environment_id}?relay=${relay_encoded}"
           bootstrap_url="${AGENTSHARE_E2E_HANDOFF}/e/${environment_id}/bootstrap.json?relay=${relay_encoded}"
+          expected_package="https://github.com/${GITHUB_REPOSITORY}/releases/download/v0.2.1/agentshare-0.2.1.tgz"
 
-          curl --fail --silent --show-error --dump-header share.headers --output share.html "$share_url"
-          curl --fail --silent --show-error --dump-header environment.headers --output environment.html "$environment_url"
-          curl --fail --silent --show-error --dump-header bootstrap.headers --output bootstrap.json "$bootstrap_url"
+          propagated=false
+          for attempt in $(seq 1 20); do
+            curl --fail --silent --show-error --dump-header share.headers --output share.html "$share_url"
+            curl --fail --silent --show-error --dump-header environment.headers --output environment.html "$environment_url"
+            curl --fail --silent --show-error --dump-header bootstrap.headers --output bootstrap.json "$bootstrap_url"
+            bootstrap_version="$(jq -r '.release.version // empty' bootstrap.json)"
+            bootstrap_package="$(jq -r '.release.packageUrl // empty' bootstrap.json)"
+            if grep -q 'agentshare-0.2.1.tgz' share.html && \
+               [[ "$bootstrap_version" = "0.2.1" ]] && \
+               [[ "$bootstrap_package" = "$expected_package" ]]; then
+              propagated=true
+              echo "HANDOFF_PROPAGATED_ON_ATTEMPT=$attempt"
+              break
+            fi
+            echo "Handoff still propagating (attempt $attempt/20): share/bootstrap pin not yet v0.2.1"
+            sleep 3
+          done
+          test "$propagated" = "true"
 
-          grep -qi '^cache-control: no-store' share.headers
-          grep -qi '^referrer-policy: no-referrer' share.headers
-          grep -qi '^x-frame-options: DENY' share.headers
-          grep -qi '^content-security-policy:.*default-src' share.headers
+          echo "--- share headers ---"
+          tr -d '\r' < share.headers
+          echo "--- environment headers ---"
+          tr -d '\r' < environment.headers
+          echo "--- bootstrap headers ---"
+          tr -d '\r' < bootstrap.headers
+
+          grep -Fqi 'cache-control: no-store' share.headers
+          grep -Fqi 'referrer-policy: no-referrer' share.headers
+          grep -Fqi 'x-frame-options: DENY' share.headers
+          grep -Fqi "content-security-policy: default-src 'none'" share.headers
           grep -q 'agentshare-0.2.1.tgz' share.html
 
-          grep -qi '^cache-control: no-store' environment.headers
-          grep -qi '^referrer-policy: no-referrer' environment.headers
-          grep -qi '^x-frame-options: DENY' environment.headers
-          grep -qi '^content-security-policy:.*default-src' environment.headers
+          grep -Fqi 'cache-control: no-store' environment.headers
+          grep -Fqi 'referrer-policy: no-referrer' environment.headers
+          grep -Fqi 'x-frame-options: DENY' environment.headers
+          grep -Fqi "content-security-policy: default-src 'none'" environment.headers
           grep -q 'Open this AgentShare environment with your agent' environment.html
 
-          grep -qi '^cache-control: public, max-age=300' bootstrap.headers
-          grep -qi '^referrer-policy: no-referrer' bootstrap.headers
-          grep -qi '^x-frame-options: DENY' bootstrap.headers
-          grep -qi '^content-security-policy: default-src .none.' bootstrap.headers
+          grep -Fqi 'cache-control: public, max-age=300' bootstrap.headers
+          grep -Fqi 'referrer-policy: no-referrer' bootstrap.headers
+          grep -Fqi 'x-frame-options: DENY' bootstrap.headers
+          grep -Fqi "content-security-policy: default-src 'none'" bootstrap.headers
 
-          node - <<'NODE'
-          const fs = require("node:fs");
-          const doc = JSON.parse(fs.readFileSync("bootstrap.json", "utf8"));
-          const expected = `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/v0.2.1/agentshare-0.2.1.tgz`;
-          if (doc.release?.version !== "0.2.1") throw new Error("bootstrap version mismatch");
-          if (doc.release?.packageUrl !== expected) throw new Error("bootstrap package URL mismatch");
-          if (doc.actions?.accept?.command !== "agentshare bootstrap") throw new Error("bootstrap command mismatch");
-          console.log(`BOOTSTRAP_PACKAGE_URL=${doc.release.packageUrl}`);
-          NODE
+          test "$(jq -r '.release.version' bootstrap.json)" = "0.2.1"
+          test "$(jq -r '.release.packageUrl' bootstrap.json)" = "$expected_package"
+          test "$(jq -r '.actions.accept.command' bootstrap.json)" = "agentshare bootstrap"
+          echo "BOOTSTRAP_PACKAGE_URL=$expected_package"
       - name: Run disposable public v1 and v2 lifecycle tests
         run: >-
           npx vitest run
