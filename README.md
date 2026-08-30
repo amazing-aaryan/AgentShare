@@ -30,14 +30,12 @@ Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 > regulated data, or other high-risk material. Review the final normalized text,
 > included files, exclusions, and redactions before publication.
 
-> [!NOTE] This repository contains the v0.2 collaborative-environment line. The
-> current patch release candidate is v0.2.1, which ships the Codex
-> minimum-version plus runtime-capability compatibility policy. Stable
-> publication still requires immutable package staging, live split-origin
-> verification, and fresh evidence for every recipient security surface changed
-> by the release. See the
-> [deployment runbook](docs/operations/cloudflare-deployment.md). Until
-> promotion, use the current stable GitHub release for production installation.
+> [!NOTE] The current stable release is **v0.2.1**. It ships the Codex
+> minimum-version plus runtime-capability compatibility policy and has completed
+> immutable package, live split-origin, public v1/v2 lifecycle, and
+> current-Codex release verification. See the
+> [v0.2.1 release verification](docs/releases/v0.2.1-release-verification.md)
+> and the [deployment runbook](docs/operations/cloudflare-deployment.md).
 
 ## Principles
 
