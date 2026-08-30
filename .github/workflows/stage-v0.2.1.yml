@@ -1,0 +1,116 @@
+name: stage-v0.2.1
+
+on:
+  push:
+    branches:
+      - release/v0.2.1-ops
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_SHA: de712f8891b35b46aface6831492dd074372b158
+  RELEASE_TAG: v0.2.1
+  RELEASE_VERSION: 0.2.1
+  ASSET_NAME: agentshare-0.2.1.tgz
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+      - name: Refuse an existing release or tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists; refusing to retarget it." >&2
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:package
+      - name: Pack immutable release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          npm pack ./packages/cli --pack-destination release >/tmp/npm-pack-name.txt
+          test -f "release/$ASSET_NAME"
+          local_size="$(stat -c%s "release/$ASSET_NAME")"
+          local_sha="$(sha256sum "release/$ASSET_NAME" | awk '{print $1}')"
+          echo "LOCAL_ASSET_SIZE=$local_size"
+          echo "LOCAL_ASSET_SHA256=$local_sha"
+          printf '%s' "$local_size" > /tmp/asset-size
+          printf '%s' "$local_sha" > /tmp/asset-sha
+      - name: Create immutable prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" "release/$ASSET_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
+            --prerelease \
+            --title "AgentShare v0.2.1" \
+            --notes "Patch release shipping capability-compatible Codex CLI support (>= 0.145.0 with fail-closed isolation capability checks). v0.2.0 remains immutable."
+      - name: Verify release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          printf '%s\n' "$metadata" > /tmp/release.json
+          target="$(jq -r '.target_commitish' /tmp/release.json)"
+          prerelease="$(jq -r '.prerelease' /tmp/release.json)"
+          draft="$(jq -r '.draft' /tmp/release.json)"
+          asset_count="$(jq '.assets | length' /tmp/release.json)"
+          asset_name="$(jq -r '.assets[0].name' /tmp/release.json)"
+          html_url="$(jq -r '.html_url' /tmp/release.json)"
+          test "$target" = "$RELEASE_SHA"
+          test "$prerelease" = "true"
+          test "$draft" = "false"
+          test "$asset_count" = "1"
+          test "$asset_name" = "$ASSET_NAME"
+          echo "RELEASE_URL=$html_url"
+          echo "RELEASE_TARGET=$target"
+          echo "RELEASE_PRERELEASE=$prerelease"
+          echo "RELEASE_ASSET_COUNT=$asset_count"
+      - name: Re-download asset anonymously and verify bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p downloaded
+          asset_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$ASSET_NAME"
+          curl --fail --location --silent --show-error "$asset_url" -o "downloaded/$ASSET_NAME"
+          expected_size="$(cat /tmp/asset-size)"
+          expected_sha="$(cat /tmp/asset-sha)"
+          remote_size="$(stat -c%s "downloaded/$ASSET_NAME")"
+          remote_sha="$(sha256sum "downloaded/$ASSET_NAME" | awk '{print $1}')"
+          test "$remote_size" = "$expected_size"
+          test "$remote_sha" = "$expected_sha"
+          echo "ASSET_SIZE=$remote_size"
+          echo "ASSET_SHA256=$remote_sha"
+      - name: Verify isolated installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="$(mktemp -d)"
+          npm install --prefix "$prefix" "$PWD/downloaded/$ASSET_NAME" >/dev/null
+          installed_version="$("$prefix/node_modules/.bin/agentshare" --version)"
+          test "$installed_version" = "$RELEASE_VERSION"
+          echo "ISOLATED_INSTALL_VERSION=$installed_version"
