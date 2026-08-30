@@ -1,0 +1,188 @@
+name: live-v0.2.1-release-gate
+
+on:
+  push:
+    branches:
+      - release/v0.2.1-ops
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_SHA: de712f8891b35b46aface6831492dd074372b158
+  RELEASE_TAG: v0.2.1
+  RELEASE_VERSION: 0.2.1
+  RELEASE_ASSET: agentshare-0.2.1.tgz
+  RELEASE_ASSET_BYTES: "132089"
+  RELEASE_ASSET_SHA256: 168ed77d603edc0f5d01b175d87a2b86aa25707d78a31d195447bdbd6928769d
+  CODEX_BASELINE_SHA: 4bf9dad62523414a030c3bb4ba29fa376bfb106b
+  AGENTSHARE_E2E_RELAY: https://agentshare-relay.carnation-vermicelli.workers.dev
+  AGENTSHARE_E2E_HANDOFF: https://agentshare-handoff.carnation-vermicelli.workers.dev
+  AGENTSHARE_NO_UPDATE_CHECK: "1"
+
+jobs:
+  live-gate:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Re-verify immutable prerelease before any production write
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          printf '%s\n' "$metadata" > release-metadata.json
+          target="$(jq -r '.target_commitish' release-metadata.json)"
+          prerelease="$(jq -r '.prerelease' release-metadata.json)"
+          draft="$(jq -r '.draft' release-metadata.json)"
+          asset_count="$(jq '.assets | length' release-metadata.json)"
+          asset_name="$(jq -r '.assets[0].name' release-metadata.json)"
+          test "$target" = "$RELEASE_SHA"
+          test "$prerelease" = "true"
+          test "$draft" = "false"
+          test "$asset_count" = "1"
+          test "$asset_name" = "$RELEASE_ASSET"
+
+          mkdir -p release-download
+          asset_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$RELEASE_ASSET"
+          curl --fail --location --silent --show-error "$asset_url" -o "release-download/$RELEASE_ASSET"
+          actual_bytes="$(stat -c%s "release-download/$RELEASE_ASSET")"
+          actual_sha="$(sha256sum "release-download/$RELEASE_ASSET" | awk '{print $1}')"
+          test "$actual_bytes" = "$RELEASE_ASSET_BYTES"
+          test "$actual_sha" = "$RELEASE_ASSET_SHA256"
+
+          prefix="${RUNNER_TEMP}/agentshare-v021-live"
+          npm install --prefix "$prefix" "$PWD/release-download/$RELEASE_ASSET" >/dev/null
+          installed_version="$("$prefix/node_modules/.bin/agentshare" --version)"
+          test "$installed_version" = "$RELEASE_VERSION"
+
+          echo "RELEASE_TARGET=$target"
+          echo "RELEASE_PRERELEASE=$prerelease"
+          echo "RELEASE_ASSET_COUNT=$asset_count"
+          echo "RELEASE_ASSET_BYTES_VERIFIED=$actual_bytes"
+          echo "RELEASE_ASSET_SHA256_VERIFIED=$actual_sha"
+          echo "ISOLATED_INSTALL_VERSION=$installed_version"
+      - name: Require Cloudflare deployment credentials before any write
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${CLOUDFLARE_API_TOKEN}" || -z "${CLOUDFLARE_ACCOUNT_ID}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required."
+            exit 1
+          fi
+      - name: Deploy only the independent handoff Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --config apps/handoff/wrangler.jsonc 2>&1 | tee handoff-deploy.log
+          version_id="$(sed -nE 's/.*Version ID:[[:space:]]*([A-Za-z0-9-]+).*/\1/p' handoff-deploy.log | tail -n1)"
+          if [[ -n "$version_id" ]]; then
+            echo "HANDOFF_VERSION_ID=$version_id"
+          else
+            echo "HANDOFF_VERSION_ID=not-parsed"
+          fi
+      - name: Verify split origins and trusted handoff surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const relay = new URL(process.env.AGENTSHARE_E2E_RELAY);
+          const handoff = new URL(process.env.AGENTSHARE_E2E_HANDOFF);
+          if (relay.protocol !== "https:" || handoff.protocol !== "https:") {
+            throw new Error("public release origins must use HTTPS");
+          }
+          if (relay.origin === handoff.origin) {
+            throw new Error("relay and handoff origins must be distinct");
+          }
+          console.log(`RELAY_ORIGIN=${relay.origin}`);
+          console.log(`HANDOFF_ORIGIN=${handoff.origin}`);
+          NODE
+
+          relay_encoded="$(node -e 'process.stdout.write(encodeURIComponent(process.env.AGENTSHARE_E2E_RELAY))')"
+          share_url="${AGENTSHARE_E2E_HANDOFF}/s/release-gate-v021?relay=${relay_encoded}"
+          environment_id="env_releasegatev02100000000"
+          environment_url="${AGENTSHARE_E2E_HANDOFF}/e/${environment_id}?relay=${relay_encoded}"
+          bootstrap_url="${AGENTSHARE_E2E_HANDOFF}/e/${environment_id}/bootstrap.json?relay=${relay_encoded}"
+
+          curl --fail --silent --show-error --dump-header share.headers --output share.html "$share_url"
+          curl --fail --silent --show-error --dump-header environment.headers --output environment.html "$environment_url"
+          curl --fail --silent --show-error --dump-header bootstrap.headers --output bootstrap.json "$bootstrap_url"
+
+          grep -qi '^cache-control: no-store' share.headers
+          grep -qi '^referrer-policy: no-referrer' share.headers
+          grep -qi '^x-frame-options: DENY' share.headers
+          grep -qi '^content-security-policy:.*default-src' share.headers
+          grep -q 'agentshare-0.2.1.tgz' share.html
+
+          grep -qi '^cache-control: no-store' environment.headers
+          grep -qi '^referrer-policy: no-referrer' environment.headers
+          grep -qi '^x-frame-options: DENY' environment.headers
+          grep -qi '^content-security-policy:.*default-src' environment.headers
+          grep -q 'Open this AgentShare environment with your agent' environment.html
+
+          grep -qi '^cache-control: public, max-age=300' bootstrap.headers
+          grep -qi '^referrer-policy: no-referrer' bootstrap.headers
+          grep -qi '^x-frame-options: DENY' bootstrap.headers
+          grep -qi '^content-security-policy: default-src .none.' bootstrap.headers
+
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const doc = JSON.parse(fs.readFileSync("bootstrap.json", "utf8"));
+          const expected = `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/v0.2.1/agentshare-0.2.1.tgz`;
+          if (doc.release?.version !== "0.2.1") throw new Error("bootstrap version mismatch");
+          if (doc.release?.packageUrl !== expected) throw new Error("bootstrap package URL mismatch");
+          if (doc.actions?.accept?.command !== "agentshare bootstrap") throw new Error("bootstrap command mismatch");
+          console.log(`BOOTSTRAP_PACKAGE_URL=${doc.release.packageUrl}`);
+          NODE
+      - name: Run disposable public v1 and v2 lifecycle tests
+        run: >-
+          npx vitest run
+          packages/cli/src/public-handoff.e2e.test.ts
+          packages/cli/src/environment/public-environment.e2e.test.ts
+          --reporter=verbose
+      - name: Verify current published Codex compatibility surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_codex="$(npm view @openai/codex version)"
+          npm install --global "@openai/codex@${current_codex}" >/dev/null
+          version_output="$(codex --version)"
+          help="$(codex exec --help)"
+          printf '%s\n' "$version_output"
+          for option in \
+            --ephemeral \
+            --ignore-user-config \
+            --ignore-rules \
+            --strict-config \
+            --skip-git-repo-check \
+            --cd \
+            --config
+          do
+            if ! grep -F -- "$option" <<<"$help" >/dev/null; then
+              echo "Missing required AgentShare isolation option: $option" >&2
+              exit 1
+            fi
+          done
+          echo "CURRENT_CODEX_NPM_VERSION=$current_codex"
+          echo "CURRENT_CODEX_VERSION_OUTPUT=$version_output"
+          echo "CODEX_REQUIRED_CONTROLS=7/7"
+      - name: Prove Codex launcher authority is unchanged by v0.2.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$CODEX_BASELINE_SHA"
+          git diff --exit-code "$CODEX_BASELINE_SHA" "$RELEASE_SHA" -- packages/cli/src/launchers.ts
+          echo "CODEX_LAUNCHER_PROFILE_UNCHANGED=true"
