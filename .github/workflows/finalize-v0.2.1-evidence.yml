@@ -1,0 +1,60 @@
+name: finalize-v0.2.1-evidence
+
+on:
+  push:
+    branches:
+      - release/v0.2.1-evidence
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: release/v0.2.1-evidence
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Mark v0.2.1 stable in README
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("README.md")
+          text = path.read_text()
+          old = '''> [!NOTE] This repository contains the v0.2 collaborative-environment line. The
+          > current patch release candidate is v0.2.1, which ships the Codex
+          > minimum-version plus runtime-capability compatibility policy. Stable
+          > publication still requires immutable package staging, live split-origin
+          > verification, and fresh evidence for every recipient security surface changed
+          > by the release. See the
+          > [deployment runbook](docs/operations/cloudflare-deployment.md). Until
+          > promotion, use the current stable GitHub release for production installation.'''
+          new = '''> [!NOTE] The current stable release is **v0.2.1**. It ships the Codex
+          > minimum-version plus runtime-capability compatibility policy and has completed
+          > immutable package, live split-origin, public v1/v2 lifecycle, and current-Codex
+          > release verification. See the
+          > [v0.2.1 release verification](docs/releases/v0.2.1-release-verification.md)
+          > and the [deployment runbook](docs/operations/cloudflare-deployment.md).'''
+          if old not in text:
+              raise SystemExit("README candidate note anchor not found")
+          path.write_text(text.replace(old, new))
+          PY
+      - run: npx prettier README.md docs/releases/v0.2.1-release-verification.md --write
+      - name: Commit final evidence formatting
+        shell: bash
+        run: |
+          if git diff --quiet -- README.md docs/releases/v0.2.1-release-verification.md; then
+            echo "Evidence already finalized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md docs/releases/v0.2.1-release-verification.md
+          git commit -m "docs: mark v0.2.1 stable"
+          git push origin HEAD:release/v0.2.1-evidence
