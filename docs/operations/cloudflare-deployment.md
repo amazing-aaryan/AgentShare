@@ -63,9 +63,9 @@ The same commit must also pass the GitHub Actions matrix on Ubuntu, macOS, and
 Windows with Node.js 22 and 24.
 
 The handoff Worker for a release must pin that release's exact immutable
-`agentshare-<version>.tgz` GitHub asset. Stage the exact asset before deploying a
-handoff change so the browser bootstrap cannot point at a missing package. Keep
-the GitHub release marked as a prerelease until the applicable live release
+`agentshare-<version>.tgz` GitHub asset. Stage the exact asset before deploying
+a handoff change so the browser bootstrap cannot point at a missing package.
+Keep the GitHub release marked as a prerelease until the applicable live release
 evidence passes; the AgentShare updater ignores prereleases.
 
 Record the staged asset byte size and SHA-256 before deployment. Do not replace
@@ -74,8 +74,8 @@ or mutate the asset after the Worker has been verified against it.
 ## Deployment Order
 
 Deploy only the production services changed by the release. If relay code,
-bindings, or storage behavior changed, authenticate Wrangler and deploy the relay
-with the complete published Durable Object migration history intact:
+bindings, or storage behavior changed, authenticate Wrangler and deploy the
+relay with the complete published Durable Object migration history intact:
 
 ```powershell
 npx wrangler login
@@ -94,7 +94,8 @@ The required migration sequence is:
 
 Never remove, rename, reuse, or renumber a published migration tag.
 
-Deploy the independent handoff Worker whenever its page or bootstrap pin changed:
+Deploy the independent handoff Worker whenever its page or bootstrap pin
+changed:
 
 ```powershell
 npx wrangler deploy --config apps/handoff/wrangler.jsonc
@@ -123,10 +124,10 @@ ciphertext verification.
 ## Live Release Evidence
 
 After the staged immutable package and all changed Workers are live, verify the
-exact release candidate against the public origins. The release gate fails unless
-relay and handoff are distinct HTTPS origins. Every release must exercise the real
-handoff surfaces, security headers, relay lifecycle semantics, bootstrap pin, and
-disposable v1/v2 flows.
+exact release candidate against the public origins. The release gate fails
+unless relay and handoff are distinct HTTPS origins. Every release must exercise
+the real handoff surfaces, security headers, relay lifecycle semantics,
+bootstrap pin, and disposable v1/v2 flows.
 
 Recipient isolation evidence follows the surface changed by the release:
 
@@ -149,24 +150,24 @@ npm run test:release
 ```
 
 `npm run test:release` intentionally still requires both agents. A patch release
-that carries forward an unchanged adapter must not claim that this full diagnostic
-passed; its release record instead identifies the exact fresh and carried-forward
-evidence.
+that carries forward an unchanged adapter must not claim that this full
+diagnostic passed; its release record instead identifies the exact fresh and
+carried-forward evidence.
 
 AgentShare's agent-agnostic direction does not weaken the fail-closed boundary.
 Each newly supported target still requires equivalent real isolation review.
 
 ## Promote the Release
 
-Only after the applicable live evidence succeeds should the staged GitHub release
-be promoted from prerelease to stable. Promotion changes release metadata only; it
-must not replace the verified tarball. Re-download the asset, verify its recorded
-byte size and SHA-256, and perform a fresh isolated installation from the same
-immutable bytes.
+Only after the applicable live evidence succeeds should the staged GitHub
+release be promoted from prerelease to stable. Promotion changes release
+metadata only; it must not replace the verified tarball. Re-download the asset,
+verify its recorded byte size and SHA-256, and perform a fresh isolated
+installation from the same immutable bytes.
 
-The handoff page/bootstrap must still pin that exact asset. Verify one disposable
-v1 share and one disposable v2 environment through the real public origins before
-announcing the stable release.
+The handoff page/bootstrap must still pin that exact asset. Verify one
+disposable v1 share and one disposable v2 environment through the real public
+origins before announcing the stable release.
 
 Record the exact commit, package digest, changed Worker deployment identifiers,
 fresh recipient evidence, and any explicitly carried-forward adapter evidence
@@ -178,11 +179,11 @@ A rollback must preserve Durable Object storage and migration history. Do not
 delete or recreate the relay namespace to undo an application deployment.
 
 If a defect appears before a candidate is promoted to stable, keep the release
-marked as a prerelease, roll back the affected Worker code, and leave the current
-stable package as the recommended version. If a defect appears after promotion,
-stop promoting the affected release, roll back the Worker code where safe, and
-direct users to the recorded safe package version while the incident is
-investigated.
+marked as a prerelease, roll back the affected Worker code, and leave the
+current stable package as the recommended version. If a defect appears after
+promotion, stop promoting the affected release, roll back the Worker code where
+safe, and direct users to the recorded safe package version while the incident
+is investigated.
 
 Existing v1 shares remain governed by their original protocol and capability
 semantics. Rollback changes must not silently reinterpret stored ciphertext or

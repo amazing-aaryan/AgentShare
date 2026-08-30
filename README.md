@@ -392,9 +392,9 @@ CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22
 and 24. A stable public release additionally requires live split-origin
 deployment verification and fresh recipient compatibility/isolation evidence for
 every agent, launcher, or sandbox surface changed by that release. On a patch
-release, an unchanged adapter may carry forward its most recent recorded real-host
-isolation evidence, but the release record must identify the carried-forward
-surface explicitly.
+release, an unchanged adapter may carry forward its most recent recorded
+real-host isolation evidence, but the release record must identify the
+carried-forward surface explicitly.
 
 `npm run test:release` remains the strongest full two-agent diagnostic when both
 authenticated hosts are available:
@@ -406,9 +406,10 @@ npm run test:release
 ```
 
 A new agent adapter is not considered supported merely because it can receive a
-prompt. It must prove creator extraction, capability handling, and real recipient
-isolation before public support is claimed. Codex additionally fails closed on
-versions below its minimum or when required runtime isolation controls disappear.
+prompt. It must prove creator extraction, capability handling, and real
+recipient isolation before public support is claimed. Codex additionally fails
+closed on versions below its minimum or when required runtime isolation controls
+disappear.
 
 ## What We Intentionally Are Not Building
 
