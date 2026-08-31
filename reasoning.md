@@ -526,3 +526,14 @@ Built-in fs interception remains runtime-specific on hosted macOS; deterministic
 seams preserve coverage of both rollback outcomes. **Impact:** Both rollback
 cases pass locally; prior production code restored unchanged. CI must rerun on
 this test-only fix.
+
+## [2026-08-31 10:31] Published v0.3.0 Codex-only public beta
+
+**Decision:** Publish immutable GitHub prerelease `v0.3.0` after green CI and
+live Codex-only production checks; exclude Claude live tests. **Why:** User
+requested public release work without Claude testing. Beta status and native
+consent limitation must remain explicit. **Impact:** Release URL is public,
+artifact SHA-256 is
+`7f701516ca92adb71fb2b1f36522a27084d00b36a7f44c74766e44a0574353d1`, and live
+bootstrap serves `0.3.0`. Stable-release sign-off remains blocked on native
+creator consent/public-share evidence and future Claude validation.
