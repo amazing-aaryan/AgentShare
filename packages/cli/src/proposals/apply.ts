@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
+import * as fsPromises from "node:fs/promises";
 import {
   chmod,
   link,
@@ -9,7 +10,6 @@ import {
   open,
   readFile,
   realpath,
-  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -507,7 +507,7 @@ async function applyEntry(
     await chmod(temporary, mode).catch(() => undefined);
     await assertCurrentBefore(root, entry, limit);
     if (operation.type === "create") await link(temporary, target);
-    else await rename(temporary, target);
+    else await fsPromises.rename(temporary, target);
   } finally {
     await rm(temporary, { force: true });
   }
@@ -603,7 +603,7 @@ async function rollbackJournal(
               throw new Error(
                 `Rollback preserved concurrent edit: ${sanitizeResourcePath(name)}`,
               );
-            await rename(temporary, target);
+            await fsPromises.rename(temporary, target);
           }
         } finally {
           await rm(temporary, { force: true });
@@ -631,7 +631,7 @@ async function writeJournal(
   const temporary = `${path}.${randomUUID()}.tmp`;
   await writeFile(temporary, encrypted.envelope, { flag: "wx", mode: 0o600 });
   try {
-    await rename(temporary, path);
+    await fsPromises.rename(temporary, path);
   } finally {
     await rm(temporary, { force: true });
   }

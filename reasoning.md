@@ -501,3 +501,11 @@ Commit returned cancellation before publication; status remains prepared. Do not
 retry consent automatically. Ask whether the user saw and declined the native
 dialog or whether cancellation occurred without a visible prompt. No public
 share exists from this attempt; positive native consent is unverified.
+
+## [2026-08-31 10:05] Fixed cross-platform rollback fault-injection test
+
+**Decision:** Resolve proposal-apply renames through the shared fs/promises
+module namespace. **Why:** macOS CI did not observe the test's rename spy on a
+directly imported binding; Windows passed by runtime behavior. Production
+semantics remain unchanged. **Impact:** Local proposal suite passes 16/16. CI
+candidate needs rerun before any public package/release publication.
