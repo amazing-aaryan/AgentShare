@@ -98,9 +98,9 @@ describe("target process lifecycle", () => {
     expect(supportsReviewedTargetVersion("codex", "codex-cli 0.149.0")).toBe(
       true,
     );
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 99.4.7-beta.1")).toBe(
-      true,
-    );
+    expect(
+      supportsReviewedTargetVersion("codex", "codex-cli 99.4.7-beta.1"),
+    ).toBe(true);
     expect(supportsReviewedTargetVersion("codex", "codex-cli 0.144.9")).toBe(
       false,
     );
