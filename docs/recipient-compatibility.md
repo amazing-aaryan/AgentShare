@@ -2,7 +2,7 @@
 
 AgentShare's long-term goal is agent-agnostic context transport, but **agent
 agnostic does not mean every agent is trusted today**. A recipient target is
-supported only when its exact launcher profile has passed the isolation contract
+supported only when its launcher profile can preserve the isolation contract
 required to consume untrusted shared context safely.
 
 The open interoperability boundary is the Agent Context Bundle; current
@@ -10,10 +10,50 @@ first-class recipient adapters are Codex and Claude Code. New target adapters
 should expand portability without weakening the fail-closed recipient boundary.
 See [`VISION.md`](VISION.md) and [ADR 0005](adr/0005-open-context-transport.md).
 
-AgentShare v0.1.10+ supports only host CLI releases whose exact launcher profile
-passed real isolation checks. Runtime `--version` and `--help` checks are
-additional fail-closed drift detection, not proof that an unknown version is
-safe.
+## Current compatibility policy
+
+Codex and Claude Code use different compatibility policies because their current
+launcher surfaces have different stability characteristics.
+
+### Codex
+
+AgentShare accepts a recognizable **Codex CLI 0.145.0 or newer** instead of
+requiring every future Codex release to be added to an exact-version allowlist.
+The minimum version is only the first gate. Before every recipient launch,
+AgentShare also requires `codex exec --help` to advertise the isolation controls
+its production launcher depends on:
+
+- `--ephemeral`;
+- `--ignore-user-config`;
+- `--ignore-rules`;
+- `--strict-config`;
+- `--skip-git-repo-check`;
+- `--cd`;
+- `--config`.
+
+If the version is older than 0.145.0, the version output is unrecognized, or any
+required control disappears, AgentShare fails closed before launching the
+recipient agent. The production launcher still forces its restrictive config,
+and Codex itself may additionally refuse startup when the host platform cannot
+enforce the requested sandbox. AgentShare does not weaken that refusal to make a
+newer version run.
+
+This policy avoids making routine Codex upgrades unusable merely because their
+version number changed. It is not a claim that a version number alone proves
+future sandbox semantics. Historical real-host isolation evidence remains the
+baseline, capability drift is checked at runtime, and known regressions can be
+blocked explicitly if evidence requires it.
+
+The v2 collaboration MCP runtime is narrower: its native approval path is
+currently reviewed only against Codex CLI `0.147.0`, so that specific runtime
+continues to fail closed on other Codex versions until equivalent native MCP
+approval evidence is recorded.
+
+### Claude Code
+
+Claude Code remains on the exact-reviewed release policy for now. An unreviewed
+Claude Code version is rejected even if its help output resembles a reviewed
+release.
 
 ## Why recipient isolation matters
 
@@ -24,8 +64,8 @@ project filesystem, shell, network, plugin, or user-customization capabilities
 just because the link is valid.
 
 This security requirement is a core part of cross-boundary sharing. Supporting a
-popular agent without proving isolation would make the open protocol easier to
-integrate but less safe to use.
+popular agent without preserving isolation would make the open protocol easier
+to integrate but less safe to use.
 
 ## 2026-08-13 review matrix
 
@@ -64,9 +104,8 @@ release with the identical launcher profile.
 | Claude Code | 2.1.229 | Pass       | Pass    | N/A               |
 | Claude Code | 2.1.231 | Pass       | Pass    | Pass              |
 
-Claude Code 2.1.230 was not published. Prereleases and releases outside this
-matrix remain blocked until reviewed. Earlier release evidence for Codex 0.145.0
-and Claude 2.1.210 is also recorded in
+Claude Code 2.1.230 was not published. Earlier release evidence for Codex
+0.145.0 and Claude 2.1.210 is also recorded in
 [`releases/v0.1.8-release-verification.md`](releases/v0.1.8-release-verification.md).
 
 ## 2026-08-21 current-release review
@@ -75,29 +114,49 @@ Environment: Windows NT 10.0.26200.0, Node.js 24.14.0. Exact published binaries
 were installed into isolated npm prefixes. Capability help checks passed for
 both hosts before the real production launcher tests.
 
-| Host        | Release | Filesystem           | Network              | Two-turn dialogue | Allowlisted |
-| ----------- | ------- | -------------------- | -------------------- | ----------------- | ----------- |
-| Codex CLI   | 0.149.0 | Safe startup refusal | Safe startup refusal | Fail              | No          |
-| Claude Code | 2.1.238 | Pass                 | Pass                 | Pass              | Yes         |
+| Host        | Release | Filesystem           | Network              | Two-turn dialogue | Result                 |
+| ----------- | ------- | -------------------- | -------------------- | ----------------- | ---------------------- |
+| Codex CLI   | 0.149.0 | Safe startup refusal | Safe startup refusal | Fail              | Platform refusal, safe |
+| Claude Code | 2.1.238 | Pass                 | Pass                 | Pass              | Exact-reviewed         |
 
 Codex CLI 0.149.0 refused to start under AgentShare's required Windows sandbox:
 `windows unelevated restricted-token sandbox cannot enforce split filesystem read restrictions directly; refusing to run unsandboxed`.
-This is a safe failure, but the recipient workflow cannot operate, so 0.149.0
-remains blocked. Claude Code 2.1.238 denied filesystem/network attempts and
-preserved grounded two-turn answers, so that exact release was added to the
-reviewed allowlist. Newer releases remain blocked until the same review passes.
+That is a safe platform/runtime refusal. Under the current
+minimum-plus-capability policy, the version number alone no longer blocks
+0.149.0, but AgentShare still does not bypass a Codex refusal when the requested
+isolation cannot be enforced. Claude Code 2.1.238 denied filesystem/network
+attempts and preserved grounded two-turn answers, so that exact release remains
+in the Claude reviewed allowlist.
+
+## 2026-08-29 Codex capability probe
+
+The current published Codex CLI `0.151.0` was installed on an Ubuntu 24.04
+GitHub runner with Node.js 24. Its real `codex --version` output was recognized,
+and `codex exec --help` advertised every required AgentShare isolation option
+listed above. The probe therefore passed the same version/capability preflight
+used by AgentShare.
+
+This was a launcher-surface compatibility probe, not an authenticated model
+isolation test. Real filesystem/network behavior remains covered by historical
+review evidence and by authenticated release/security checks when those are run.
 
 ## Review procedure
 
-For each candidate:
+For Codex compatibility changes:
 
-1. Install that exact published release and confirm the binary's own version.
-2. Run the launcher capability preflight.
-3. Execute filesystem and controlled-network attempts through `runTarget`.
-4. Confirm no marker, no listener request, and no hidden capability link in
-   process arguments.
-5. Verify the shared evidence remains grounded across a representative dialogue.
-6. Add the exact version to `REVIEWED_VERSIONS` only after pass.
+1. Confirm the minimum known-safe baseline remains justified.
+2. Install a current published release and confirm the binary's own version.
+3. Run the launcher capability preflight and fail closed on missing controls.
+4. When sandbox behavior changes or a regression is suspected, execute the real
+   filesystem and controlled-network attempts through `runTarget`.
+5. Confirm capability URLs and keys remain absent from process arguments and
+   inherited environment.
+6. Add an explicit blocked version/range only when evidence demonstrates a
+   regression that cannot be detected by the existing capability/runtime gates.
+
+For Claude Code, continue the exact-release review before adding a version to
+the reviewed allowlist: run the capability preflight, real filesystem/network
+tests, and representative dialogue checks.
 
 For a **new agent family**, review must additionally document how the adapter:
 
@@ -111,14 +170,15 @@ For a **new agent family**, review must additionally document how the adapter:
 
 CI continues to cover argument construction, pre-link rejection, required flag
 drift, terminal sanitization, and bounded hostile compatibility probes. Real
-host isolation remains a release gate because it requires authenticated CLIs.
+host isolation still requires authenticated CLIs when a release or security
+review calls for it.
 
 ## v0.3.0 evidence scope: `codex-only-v1`
 
 This is an explicit, narrow release evidence profile, not an expansion of the
-launcher allowlist or a claim that v0.3.0 has passed. Its exact runtime is
-Windows build 26200 (`win32`, `10.0.26200`), Node.js `24.14.0`, Codex CLI
-`0.147.0`. Claude, other operating systems, other builds, and other
+general Codex compatibility policy or a claim that v0.3.0 has passed. Its exact
+runtime is Windows build 26200 (`win32`, `10.0.26200`), Node.js `24.14.0`, Codex
+CLI `0.147.0`. Claude, other operating systems, other builds, and other
 agent/runtime versions are outside this profile. Historical isolation rows above
 do not prove the published v2 collaboration workflow.
 
