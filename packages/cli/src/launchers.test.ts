@@ -71,7 +71,7 @@ afterEach(() => {
 });
 
 describe("target process lifecycle", () => {
-  it("pins v2 Codex MCP to 0.147.0 without changing historical legacy support", () => {
+  it("pins v2 Codex MCP to 0.147.0 without changing general Codex support", () => {
     for (const version of ["0.145.0", "0.146.0"]) {
       expect(
         supportsReviewedTargetVersion("codex", `codex-cli ${version}`),
@@ -90,14 +90,18 @@ describe("target process lifecycle", () => {
       supportsReviewedEnvironmentTargetVersion("codex", "codex-cli 0.148.0"),
     ).toBe(false);
   });
-  it("allows reviewed hosts and fails closed for unreviewed newer releases", () => {
+
+  it("allows capability-compatible Codex releases while keeping Claude reviewed", () => {
     expect(supportsReviewedTargetVersion("codex", "codex-cli 0.147.0")).toBe(
       true,
     );
     expect(supportsReviewedTargetVersion("codex", "codex-cli 0.149.0")).toBe(
-      false,
+      true,
     );
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.150.0")).toBe(
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 99.4.7-beta.1")).toBe(
+      true,
+    );
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.144.9")).toBe(
       false,
     );
     expect(
@@ -157,13 +161,13 @@ describe("target process lifecycle", () => {
     expect(spawnMock).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects an unreviewed version without running its help command", async () => {
+  it("rejects a too-old Codex version without running its help command", async () => {
     spawnMock.mockImplementationOnce(() =>
-      fakeProcess("codex-cli 99.4.7-beta.1\n"),
+      fakeProcess("codex-cli 0.144.9\n"),
     );
 
     await expect(runTarget("codex", "question")).rejects.toThrow(
-      "has not passed AgentShare isolation review",
+      "requires Codex CLI >= 0.145.0",
     );
     expect(spawnMock).toHaveBeenCalledTimes(1);
   });
