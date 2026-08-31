@@ -1,0 +1,109 @@
+name: live-v0.2.0-release-gate
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  live-gate:
+    if: github.head_ref == 'release/v0.2.0-live' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_SHA: 4a570062806048057fdefd5c5aa27d26923b684a
+      RELEASE_TAG: v0.2.0
+      RELEASE_ASSET: agentshare-0.2.0.tgz
+      AGENTSHARE_E2E_RELAY: https://agentshare-relay.carnation-vermicelli.workers.dev
+      AGENTSHARE_E2E_HANDOFF: https://agentshare-handoff.carnation-vermicelli.workers.dev
+      AGENTSHARE_NO_UPDATE_CHECK: "1"
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Re-verify staged prerelease and immutable asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          metadata="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json tagName,isPrerelease,targetCommitish,url)"
+          echo "RELEASE_METADATA=${metadata}"
+          node -e '
+            const metadata = JSON.parse(process.argv[1]);
+            if (metadata.tagName !== "v0.2.0") throw new Error("wrong release tag");
+            if (metadata.isPrerelease !== true) throw new Error("release is not a prerelease");
+            if (metadata.targetCommitish !== process.env.RELEASE_SHA) throw new Error("release target mismatch");
+          ' "${metadata}"
+          mkdir -p release-download
+          gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "${RELEASE_ASSET}" --dir release-download
+          asset_sha256="$(sha256sum "release-download/${RELEASE_ASSET}" | awk '{print $1}')"
+          asset_bytes="$(stat -c '%s' "release-download/${RELEASE_ASSET}")"
+          echo "RELEASE_ASSET_SHA256=${asset_sha256}"
+          echo "RELEASE_ASSET_BYTES=${asset_bytes}"
+          prefix="${RUNNER_TEMP}/agentshare-v0.2.0-live"
+          npm install --global --prefix "${prefix}" "./release-download/${RELEASE_ASSET}"
+          global_root="$(npm root --global --prefix "${prefix}")"
+          installed_version="$(node "${global_root}/agentshare/dist/bin.js" --version)"
+          test "${installed_version}" = "0.2.0"
+          echo "ISOLATED_INSTALL_VERSION=${installed_version}"
+      - name: Require Cloudflare deployment credentials before any write
+        shell: bash
+        run: |
+          if [[ -z "${CLOUDFLARE_API_TOKEN}" || -z "${CLOUDFLARE_ACCOUNT_ID}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets are required for the live release gate."
+            exit 1
+          fi
+      - name: Deploy ciphertext relay
+        shell: bash
+        run: |
+          npx wrangler deploy --config apps/edge-relay/wrangler.jsonc 2>&1 | tee relay-deploy.log
+          echo "--- relay deployment output ---"
+          cat relay-deploy.log
+      - name: Deploy independent handoff worker
+        shell: bash
+        run: |
+          npx wrangler deploy --config apps/handoff/wrangler.jsonc 2>&1 | tee handoff-deploy.log
+          echo "--- handoff deployment output ---"
+          cat handoff-deploy.log
+      - name: Verify trusted handoff surfaces and bootstrap pin
+        shell: bash
+        run: |
+          relay_encoded="$(node -e 'process.stdout.write(encodeURIComponent(process.env.AGENTSHARE_E2E_RELAY))')"
+          share_url="${AGENTSHARE_E2E_HANDOFF}/s/release-gate-v020?relay=${relay_encoded}"
+          environment_id="env_releasegatev02000000000"
+          environment_url="${AGENTSHARE_E2E_HANDOFF}/e/${environment_id}?relay=${relay_encoded}"
+          bootstrap_url="${AGENTSHARE_E2E_HANDOFF}/e/${environment_id}/bootstrap.json?relay=${relay_encoded}"
+          curl --fail --silent --show-error --dump-header share.headers --output share.html "${share_url}"
+          curl --fail --silent --show-error --dump-header environment.headers --output environment.html "${environment_url}"
+          curl --fail --silent --show-error --dump-header bootstrap.headers --output bootstrap.json "${bootstrap_url}"
+          grep -qi '^cache-control: no-store' share.headers
+          grep -qi '^referrer-policy: no-referrer' share.headers
+          grep -qi '^x-frame-options: DENY' share.headers
+          grep -qi '^cache-control: no-store' environment.headers
+          grep -qi '^referrer-policy: no-referrer' environment.headers
+          grep -qi '^x-frame-options: DENY' environment.headers
+          grep -q 'agentshare-0.2.0.tgz' share.html
+          node -e '
+            const fs = require("node:fs");
+            const doc = JSON.parse(fs.readFileSync("bootstrap.json", "utf8"));
+            const expected = `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/v0.2.0/agentshare-0.2.0.tgz`;
+            if (doc.release?.version !== "0.2.0") throw new Error("bootstrap version mismatch");
+            if (doc.release?.packageUrl !== expected) throw new Error("bootstrap package URL mismatch");
+            if (doc.actions?.accept?.command !== "agentshare bootstrap") throw new Error("bootstrap command mismatch");
+          '
+      - name: Run disposable public v1 and v2 lifecycle tests
+        run: >-
+          npx vitest run
+          packages/cli/src/public-handoff.e2e.test.ts
+          packages/cli/src/environment/public-environment.e2e.test.ts
+          --reporter=verbose
