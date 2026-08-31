@@ -384,13 +384,13 @@ npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
 npm audit --audit-level=high
 ```
 
-CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22 and
-24. Stable promotion additionally requires the release-specific live evidence
-recorded in the deployment runbook. For the v0.3 collaboration line, that is the
-authenticated Codex `codex-only-v1` profile: live split-origin deployment,
-published-artifact bootstrap, terminal and native Codex creation, actual MCP
-read/proposal/inbox/approval/refresh behavior, isolation, revocation, and
-cleanup. Claude live execution is not part of that v0.3 promotion profile.
+CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22
+and 24. Stable promotion additionally requires the release-specific live
+evidence recorded in the deployment runbook. For the v0.3 collaboration line,
+that is the authenticated Codex `codex-only-v1` profile: live split-origin
+deployment, published-artifact bootstrap, terminal and native Codex creation,
+actual MCP read/proposal/inbox/approval/refresh behavior, isolation, revocation,
+and cleanup. Claude live execution is not part of that v0.3 promotion profile.
 
 The broader two-agent diagnostic remains available when both authenticated
 reviewed hosts are present:

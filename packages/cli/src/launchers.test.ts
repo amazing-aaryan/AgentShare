@@ -162,9 +162,7 @@ describe("target process lifecycle", () => {
   });
 
   it("rejects a too-old Codex version without running its help command", async () => {
-    spawnMock.mockImplementationOnce(() =>
-      fakeProcess("codex-cli 0.144.9\n"),
-    );
+    spawnMock.mockImplementationOnce(() => fakeProcess("codex-cli 0.144.9\n"));
 
     await expect(runTarget("codex", "question")).rejects.toThrow(
       "requires Codex CLI >= 0.145.0",
