@@ -174,3 +174,14 @@ require zero failed/skipped real-agent tests and forbid faking release success.
 **Impact:** Handoff deployment `385fd884-d162-4ccc-9934-9fe59d2f1646` is live;
 rerun strict gate and all downstream immutable artifact/publication checks after
 `claude auth login`.
+
+## [2026-08-30 22:15] Beta readiness rechecked against live production gate
+
+**Decision:** Keep AgentShare in limited public-beta status; do not certify the
+current build as fully ready. **Why:** Local tests, lint, build, package smoke,
+and edge-runtime checks pass, but the live six-case gate failed three cases:
+production metadata CORS returned the handoff origin instead of the required
+wildcard, and both Claude real-agent checks failed because the organization
+disabled Claude subscription access. **Impact:** Investigate/redeploy or correct
+the CORS behavior, restore an authorized Claude test path, then rerun
+`npm run test:release` and require 6/6 passes before changing readiness status.

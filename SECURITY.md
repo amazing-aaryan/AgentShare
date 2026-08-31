@@ -13,7 +13,7 @@ Do not include secrets, capability URLs, decrypted bundles, or private source in
 reports. Include affected version, reproducible steps using synthetic data, and
 the expected impact.
 
-Security invariants for v0.1.10 new-format links:
+Security invariants for v0.1.11 new-format links:
 
 - Encryption and decryption happen on clients.
 - Newly created links use an AgentShare-controlled handoff origin that is

@@ -26,11 +26,11 @@ Requirements: Node.js 22 or newer, plus Codex CLI or Claude Code.
 Ask your agent to install AgentShare by pasting this prompt:
 
 ```text
-Install AgentShare v0.1.10 from its immutable GitHub release.
+Install AgentShare v0.1.11 from its immutable GitHub release.
 
 1. Confirm Node.js 22 or newer is installed.
 2. Run:
-   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
+   npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
 3. Run: agentshare init
 4. Run: agentshare
 5. Confirm the CLI usage appears, list the installed integration files, and
@@ -40,7 +40,7 @@ Install AgentShare v0.1.10 from its immutable GitHub release.
 Manual install:
 
 ```powershell
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
 agentshare init
 ```
 
@@ -82,7 +82,7 @@ The recipient does not need a global installation:
 Pinned Codex command:
 
 ```powershell
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz -- agentshare open --target codex
+npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz -- agentshare open --target codex
 ```
 
 Replace `codex` with `claude` to use Claude Code. If browser clipboard access is
@@ -113,7 +113,7 @@ flowchart LR
     end
 ```
 
-New v0.1.10 links use an AgentShare-controlled handoff origin that is separate
+New v0.1.11 links use an AgentShare-controlled handoff origin that is separate
 from the ciphertext relay. The relay origin is non-secret query metadata; the
 read capability and encryption key remain in the URL fragment:
 
@@ -129,7 +129,7 @@ checks. The encryption key is not sent to the relay. Because new links are
 opened on the independent handoff origin, a custom ciphertext relay does not
 control the page JavaScript that can read the fragment.
 
-Legacy links without `relay=` remain readable by v0.1.10. They treat the link
+Legacy links without `relay=` remain readable by v0.1.11. They treat the link
 origin as the relay origin and retain the older v0.1.9 browser trust assumption;
 do not use an untrusted custom relay with legacy-format links.
 
@@ -182,7 +182,7 @@ ciphertext.
 ## Security Model
 
 - AES-256-GCM encryption and decryption happen on client devices.
-- New v0.1.10 links use the independent trusted AgentShare handoff origin; the
+- New v0.1.11 links use the independent trusted AgentShare handoff origin; the
   selected ciphertext relay is carried as non-secret link metadata.
 - The relay receives ciphertext, SHA-256 digests, timestamps, sizes, and status.
 - Raw upload, read, and revoke capabilities are not stored by the relay.
@@ -279,7 +279,7 @@ agentshare update --check
 agentshare update
 
 # Manual recovery: reinstall a known immutable release, then repair integrations
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.10/agentshare-0.1.10.tgz
+npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
 agentshare repair
 
 # Remove integrations and CLI
@@ -323,7 +323,7 @@ create/upload/open/revoke/expiry semantics, and real Codex and Claude
 filesystem/network isolation. A one-agent diagnostic is available through
 `npm run test:live:diagnostic`, but is not a release pass.
 
-For v0.1.10, deploy and verify the independent handoff Worker before publishing
+For v0.1.11, deploy and verify the independent handoff Worker before publishing
 the creator package. That ordering prevents a newly published CLI from creating
 links whose browser endpoint is not live yet. After publication, verify the
 immutable package SHA and perform a fresh isolated recipient install before

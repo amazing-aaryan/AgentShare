@@ -630,4 +630,29 @@ describe("production edge relay lifecycle", () => {
     );
     expect(response.status).toBe(429);
   });
+
+  it("sets wildcard CORS on browser metadata responses", async () => {
+    const shareId = randomCapability(18);
+    const response = await worker.fetch(
+      new Request(`https://relay.test/v1/shares/${shareId}/meta`, {
+        headers: { authorization: `Bearer ${randomCapability()}` },
+      }),
+      {
+        CREATE_RATE_LIMITER: {
+          limit: () => Promise.resolve({ success: true }),
+        },
+        UPLOAD_RATE_LIMITER: {
+          limit: () => Promise.resolve({ success: true }),
+        },
+        SHARES: {
+          idFromName: () => ({ name: shareId }),
+          get: () => ({
+            fetch: () => Promise.resolve(new Response("{}")),
+          }),
+        },
+      } as unknown as Parameters<typeof worker.fetch>[1],
+    );
+
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+  });
 });
