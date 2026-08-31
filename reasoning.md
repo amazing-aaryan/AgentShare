@@ -509,3 +509,11 @@ module namespace. **Why:** macOS CI did not observe the test's rename spy on a
 directly imported binding; Windows passed by runtime behavior. Production
 semantics remain unchanged. **Impact:** Local proposal suite passes 16/16. CI
 candidate needs rerun before any public package/release publication.
+
+## [2026-08-31 10:11] Hardened macOS test portability
+
+**Decision:** Mock the shared rename function directly and compare relocated
+roots after realpath normalization. **Why:** macOS ESM mocking did not replace a
+namespace property reliably, and `/var` resolves to `/private/var` on hosted
+runners. **Impact:** Proposal and Codex adapter suites pass 20/20 locally. Push
+fix for full CI matrix.

@@ -1,4 +1,11 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -75,6 +82,7 @@ describe("Codex adapter", () => {
         mkdir(original),
         mkdir(relocated),
       ]);
+      const relocatedReal = await realpath(relocated);
       const content = input.replace(
         "C:/synthetic/repo",
         original.replaceAll("\\", "\\\\"),
@@ -91,7 +99,7 @@ describe("Codex adapter", () => {
         projectRoot: relocated,
       });
       expect(moved.recordedRoot).toBe(original);
-      expect(moved.workspaceRoot).toBe(relocated);
+      expect(moved.workspaceRoot).toBe(relocatedReal);
       expect(moved.conversation).toEqual(recorded.conversation);
       expect(await readFile(path, "utf8")).toBe(content);
       await rm(original, { recursive: true });
@@ -102,7 +110,7 @@ describe("Codex adapter", () => {
       expect(
         (await exportCurrentCodexCapture({ projectRoot: relocated }))
           .workspaceRoot,
-      ).toBe(relocated);
+      ).toBe(relocatedReal);
       await writeFile(join(sessions, "duplicate-synthetic-id.jsonl"), content);
       await expect(exportCurrentCodexCapture()).rejects.toThrow("found 2");
       await rm(join(sessions, "duplicate-synthetic-id.jsonl"));

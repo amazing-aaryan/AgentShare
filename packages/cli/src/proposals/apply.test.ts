@@ -555,7 +555,7 @@ describe("scoped proposal application", () => {
           "node:fs/promises",
         );
       let injected = false;
-      vi.spyOn(fs, "rename").mockImplementation(async (from, to) => {
+      vi.mocked(fs.rename).mockImplementation(async (from, to) => {
         await actual.rename(from, to);
         if (!injected && String(to) === join(setup.root, "src/value.ts")) {
           injected = true;
