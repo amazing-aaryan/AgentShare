@@ -517,3 +517,12 @@ roots after realpath normalization. **Why:** macOS ESM mocking did not replace a
 namespace property reliably, and `/var` resolves to `/private/var` on hosted
 runners. **Impact:** Proposal and Codex adapter suites pass 20/20 locally. Push
 fix for full CI matrix.
+
+## [2026-08-31 10:25] Made rollback tests deterministic across runners
+
+**Decision:** Exercise clean rollback with a pre-existing create target and
+concurrent-edit preservation with a post-apply journal failure. **Why:**
+Built-in fs interception remains runtime-specific on hosted macOS; deterministic
+seams preserve coverage of both rollback outcomes. **Impact:** Both rollback
+cases pass locally; prior production code restored unchanged. CI must rerun on
+this test-only fix.

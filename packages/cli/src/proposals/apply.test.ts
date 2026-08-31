@@ -550,26 +550,29 @@ describe("scoped proposal application", () => {
         setup.operation,
         createOperation("arriving.txt"),
       ]);
-      const actual =
-        await vi.importActual<typeof import("node:fs/promises")>(
-          "node:fs/promises",
+      if (!concurrentEdit) {
+        await writeFile(join(setup.root, "arriving.txt"), "concurrent create");
+      } else {
+        const originalSaveTransaction = environmentState.saveTransaction;
+        let saves = 0;
+        vi.spyOn(environmentState, "saveTransaction").mockImplementation(
+          async (...args) => {
+            saves += 1;
+            if (saves === 2) {
+              await writeFile(
+                join(setup.root, "arriving.txt"),
+                "concurrent create",
+              );
+              await writeFile(
+                join(setup.root, "src/value.ts"),
+                "concurrent edit",
+              );
+              throw new Error("injected post-apply failure");
+            }
+            return originalSaveTransaction(...args);
+          },
         );
-      let injected = false;
-      vi.mocked(fs.rename).mockImplementation(async (from, to) => {
-        await actual.rename(from, to);
-        if (!injected && String(to) === join(setup.root, "src/value.ts")) {
-          injected = true;
-          await writeFile(
-            join(setup.root, "arriving.txt"),
-            "concurrent create",
-          );
-          if (concurrentEdit)
-            await writeFile(
-              join(setup.root, "src/value.ts"),
-              "concurrent edit",
-            );
-        }
-      });
+      }
       await expect(
         approveOwnedProposal(
           proposal.environmentId,
@@ -577,7 +580,7 @@ describe("scoped proposal application", () => {
           undefined,
           setup.options,
         ),
-      ).rejects.toThrow(/conflict|rollback/u);
+      ).rejects.toThrow(/conflict|rollback|post-apply/u);
       expect(await readFile(join(setup.root, "arriving.txt"), "utf8")).toBe(
         "concurrent create",
       );
