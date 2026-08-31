@@ -13,6 +13,11 @@ import {
   type SharedFile,
 } from "@agentshare/contracts";
 import {
+  classifyResourceContent,
+  isTextMediaType,
+  sanitizeResourcePath,
+} from "@agentshare/scanner";
+import {
   buildSearchIndex,
   searchIndex,
   type EnvironmentSearchHit,
@@ -214,15 +219,17 @@ export async function readAttachedFile(
   const file = manifest.workspace.files.find(
     (candidate) => candidate.path === path,
   );
-  if (file === undefined) throw new Error(`Shared file not found: ${path}`);
-  const bytes = await readSharedFileBytes(attached, root, file);
-  if (
-    !file.mediaType.startsWith("text/") &&
-    file.mediaType !== "application/json"
-  ) {
-    throw new Error(`Shared file is not text-readable: ${path}`);
+  if (file === undefined) {
+    throw new Error(`Shared file not found: ${sanitizeResourcePath(path)}`);
   }
-  return Buffer.from(bytes).toString("utf8");
+  const bytes = await readSharedFileBytes(attached, root, file);
+  const content = classifyResourceContent(file.mediaType, bytes);
+  if (content.kind === "binary") {
+    throw new Error(
+      `Shared file is not text-readable: ${sanitizeResourcePath(path)}`,
+    );
+  }
+  return content.text;
 }
 
 export async function readAttachedManifest(
@@ -261,17 +268,16 @@ async function buildIndexFromManifest(
     title: manifest.title,
   };
   for (const file of manifest.workspace.files) {
-    if (
-      !file.mediaType.startsWith("text/") &&
-      file.mediaType !== "application/json"
-    ) {
+    if (!isTextMediaType(file.mediaType)) {
       continue;
     }
     const bytes = await readSharedFileBytes(attached, root, file);
+    const content = classifyResourceContent(file.mediaType, bytes);
+    if (content.kind === "binary") continue;
     inputs.push({
       kind: "file",
       source: file.path,
-      text: Buffer.from(bytes).toString("utf8"),
+      text: content.text,
     });
   }
   return buildSearchIndex(inputs);
@@ -327,7 +333,9 @@ async function readSharedFileBytes(
     combined.byteLength !== file.byteLength ||
     sha256Hex(combined) !== file.sha256
   ) {
-    throw new Error(`Shared file integrity mismatch: ${file.path}`);
+    throw new Error(
+      `Shared file integrity mismatch: ${sanitizeResourcePath(file.path)}`,
+    );
   }
   return combined;
 }

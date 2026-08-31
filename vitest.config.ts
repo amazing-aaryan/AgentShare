@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // Windows owner-only ACL enforcement launches the native security helper.
+    testTimeout: process.platform === "win32" ? 30_000 : 5_000,
     coverage: {
       enabled: false,
       provider: "v8",

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { AcbManifest } from "@agentshare/contracts";
 import { scanAndRedact, type SecretFinding } from "@agentshare/scanner";
 import {
@@ -13,6 +14,31 @@ export type EnvironmentPublicationPreview = {
   findings: SecretFinding[];
 };
 
+export type PreparedCapture = EnvironmentPublicationPreview & {
+  version: 1;
+  scannerVersion: "strict-utf8-v1";
+  capture: HostCapture;
+  snapshot: WorkspaceSnapshot;
+  digest: string;
+};
+
+export function verifyPreparedCapture(
+  value: unknown,
+): asserts value is PreparedCapture {
+  if (value === null || typeof value !== "object")
+    throw new Error("Invalid prepared capture");
+  const prepared = value as Partial<PreparedCapture>;
+  const { digest, ...payload } = prepared;
+  if (
+    prepared.version !== 1 ||
+    prepared.scannerVersion !== "strict-utf8-v1" ||
+    digest !==
+      createHash("sha256").update(JSON.stringify(payload)).digest("hex")
+  ) {
+    throw new Error("Prepared capture changed; prepare and review again");
+  }
+}
+
 export async function previewEnvironmentCapture(
   capture: HostCapture,
   options: {
@@ -21,7 +47,7 @@ export async function previewEnvironmentCapture(
     proposalsEnabled: boolean;
     workspaceOptions?: { preferGit?: boolean; maxFileBytes?: number };
   },
-): Promise<EnvironmentPublicationPreview> {
+): Promise<PreparedCapture> {
   if (!options.includeConversation && !options.includeWorkspace) {
     throw new Error(
       "AgentShare environment must include conversation, workspace, or both",
@@ -33,21 +59,72 @@ export async function previewEnvironmentCapture(
         options.workspaceOptions,
       )
     : emptySnapshot(capture.workspaceRoot);
+  return prepareCapturedSnapshot(capture, snapshot, options);
+}
+
+export function prepareCapturedSnapshot(
+  capture: HostCapture,
+  snapshot: WorkspaceSnapshot,
+  options: { includeConversation: boolean; proposalsEnabled: boolean },
+): PreparedCapture {
   const scanned = scanAndRedact(
     snapshotToAcb(capture, snapshot, options.includeConversation),
   );
-  return {
+  const metadata = scanAndRedact({
+    version: "acb-v1",
+    sourceAgent: capture.sourceAgent,
+    title: snapshot.rootName,
+    exportedAt: new Date(0).toISOString(),
+    events: [],
+    resources: [],
+  });
+  const retained: WorkspaceSnapshot = {
+    ...snapshot,
+    rootName: metadata.manifest.title,
+    files: snapshot.files.map((file, index) => {
+      const resource = scanned.manifest.resources[index];
+      if (resource?.sourcePath !== file.path) {
+        throw new Error("Scanned workspace paths changed; cannot publish");
+      }
+      return {
+        ...file,
+        mediaType: resource.mediaType,
+        byteLength: resource.byteLength,
+        sha256: resource.sha256,
+        contentBase64: resource.contentBase64,
+      };
+    }),
+    totalBytes: scanned.manifest.resources.reduce(
+      (sum, file) => sum + file.byteLength,
+      0,
+    ),
+  };
+  const payload = {
+    version: 1 as const,
+    scannerVersion: "strict-utf8-v1" as const,
+    capture: {
+      ...capture,
+      title: scanned.manifest.title,
+      conversation: scanned.manifest.events,
+    },
+    snapshot: retained,
     summary: {
       files: scanned.manifest.resources.length,
       conversationEvents: scanned.manifest.events.length,
-      totalWorkspaceBytes: snapshot.totalBytes,
+      totalWorkspaceBytes: retained.totalBytes,
       excludedFiles: snapshot.excluded.length,
-      redactions: scanned.findings.length,
+      redactions: scanned.findings.length + metadata.findings.length,
       proposalsEnabled: options.proposalsEnabled,
     },
     includedPaths: snapshot.files.map((file) => file.path),
     excluded: snapshot.excluded,
-    findings: scanned.findings,
+    findings: [...scanned.findings, ...metadata.findings],
+  };
+  // Detach from the caller's mutable conversation and file objects.
+  const detached = structuredClone(payload);
+  return {
+    ...detached,
+    digest: createHash("sha256").update(JSON.stringify(detached)).digest("hex"),
   };
 }
 

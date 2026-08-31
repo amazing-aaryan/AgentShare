@@ -3,6 +3,7 @@ import { posix } from "node:path";
 const ALWAYS_EXCLUDED_DIRS = new Set([
   ".git",
   ".agentshare",
+  ".agentshare-private",
   "node_modules",
   "vendor",
   ".next",

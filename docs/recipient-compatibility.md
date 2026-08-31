@@ -112,3 +112,29 @@ For a **new agent family**, review must additionally document how the adapter:
 CI continues to cover argument construction, pre-link rejection, required flag
 drift, terminal sanitization, and bounded hostile compatibility probes. Real
 host isolation remains a release gate because it requires authenticated CLIs.
+
+## v0.3.0 evidence scope: `codex-only-v1`
+
+This is an explicit, narrow release evidence profile, not an expansion of the
+launcher allowlist or a claim that v0.3.0 has passed. Its exact runtime is
+Windows build 26200 (`win32`, `10.0.26200`), Node.js `24.14.0`, Codex CLI
+`0.147.0`. Claude, other operating systems, other builds, and other
+agent/runtime versions are outside this profile. Historical isolation rows above
+do not prove the published v2 collaboration workflow.
+
+The frozen inventory requires **both terminal and chat** creation paths, each
+continuing through published-artifact bootstrap, actual MCP read, actual MCP
+proposal/inbox delivery, explicit owner approval, refreshed revision retrieval,
+revocation, isolation, and complete cleanup. Preloaded context or a successful
+launcher exit cannot substitute for successful MCP calls. Any missing, skipped,
+cancelled, failed, or incomplete check fails this profile.
+
+`npm run test:release` without arguments retains the existing both-agent gate.
+Those legacy source/launcher suites, including partial live diagnostics, are
+**not promotable as full v2 evidence**. The explicit profile instead requires a
+versioned report, independent candidate manifest, original published archive,
+and local hashed evidence attachments. It performs offline validation only.
+
+See [v0.3.0 release evidence contract](release-v0.3.0.md) for the frozen
+inventory, exact report fields, commands, and outstanding real-flow integration.
+A passing contract fixture is not a recipient compatibility result.

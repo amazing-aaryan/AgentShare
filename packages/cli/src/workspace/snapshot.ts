@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { MAX_RESOURCE_BYTES } from "@agentshare/contracts";
+import {
+  assertSafeResourcePath,
+  classifyResourceContent,
+} from "@agentshare/scanner";
 import { discoverWorkspaceRoot } from "./discover.js";
 import { enumerateWorkspace } from "./enumerate.js";
 
@@ -38,6 +42,7 @@ export async function buildWorkspaceSnapshot(
   let totalBytes = 0;
 
   for (const path of enumeration.files) {
+    assertSafeResourcePath(path);
     const absolute = join(root, ...path.split("/"));
     const metadata = await lstat(absolute);
     if (!metadata.isFile() || metadata.isSymbolicLink()) {
@@ -105,8 +110,8 @@ function mediaTypeFor(path: string, content: Buffer): string {
     cpp: "text/x-c++",
     sh: "text/x-shellscript",
   };
-  const recognized = known[extension];
-  if (recognized !== undefined) return recognized;
-  const sample = content.subarray(0, Math.min(content.byteLength, 8_192));
-  return sample.includes(0) ? "application/octet-stream" : "text/plain";
+  const mediaType = known[extension] ?? "text/plain";
+  return classifyResourceContent(mediaType, content).kind === "text"
+    ? mediaType
+    : "application/octet-stream";
 }

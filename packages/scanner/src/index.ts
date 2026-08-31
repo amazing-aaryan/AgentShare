@@ -1,6 +1,14 @@
 import { createHash } from "node:crypto";
 import { assertResourceIntegrity } from "@agentshare/acb";
 import { acbManifestSchema, type AcbManifest } from "@agentshare/contracts";
+import { classifyResourceContent } from "./content.js";
+
+export {
+  classifyResourceContent,
+  isTextMediaType,
+  normalizeMediaType,
+  type ResourceContent,
+} from "./content.js";
 
 export type SecretFinding = {
   kind: string;
@@ -13,7 +21,11 @@ export type ScanResult = {
   findings: SecretFinding[];
 };
 
-const PATTERNS: ReadonlyArray<{ kind: string; pattern: RegExp }> = [
+const PATTERNS: ReadonlyArray<{
+  kind: string;
+  pattern: RegExp;
+  preservePrefix?: boolean;
+}> = [
   {
     kind: "private-key",
     pattern:
@@ -51,13 +63,15 @@ const PATTERNS: ReadonlyArray<{ kind: string; pattern: RegExp }> = [
   },
   {
     kind: "cloudflare-api-token",
+    preservePrefix: true,
     pattern:
-      /\b(?:CLOUDFLARE_API_TOKEN|CF_API_TOKEN)\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}["']?/gu,
+      /(\b(?:CLOUDFLARE_API_TOKEN|CF_API_TOKEN)["']?\s*[:=]\s*["']?)[A-Za-z0-9_-]{20,}/gu,
   },
   {
     kind: "generic-secret",
+    preservePrefix: true,
     pattern:
-      /\b(?:api[_-]?key|secret|token|password)\s*[:=]\s*["']?[A-Za-z0-9_./+=-]{12,}["']?/giu,
+      /(\b(?:api[_-]?key|secret|token|password)["']?\s*[:=]\s*["']?)[A-Za-z0-9_./+=-]{12,}/giu,
   },
   {
     kind: "bearer-token",
@@ -70,7 +84,14 @@ const CAPABILITY_TOKEN_CHARACTER = /^[A-Za-z0-9_-]$/u;
 
 export function scanAndRedact(input: AcbManifest): ScanResult {
   const manifest = structuredClone(acbManifestSchema.parse(input));
-  assertResourceIntegrity(manifest);
+  // Integrity errors must identify the resource without echoing a secret ID.
+  assertResourceIntegrity({
+    ...manifest,
+    resources: manifest.resources.map((resource) => ({
+      ...resource,
+      id: sanitizeResourcePath(resource.sourcePath ?? resource.id),
+    })),
+  });
   const findings: SecretFinding[] = [];
 
   manifest.title = redact(manifest.title, "title", findings);
@@ -84,39 +105,36 @@ export function scanAndRedact(input: AcbManifest): ScanResult {
     ),
   }));
   manifest.resources = manifest.resources.map((resource, index) => {
+    assertSafeResourcePath(resource.id);
+    if (resource.sourcePath !== undefined) {
+      assertSafeResourcePath(resource.sourcePath);
+    }
     const scannedMetadata = {
       ...resource,
-      id: redact(resource.id, `resources[${index}].id`, findings),
-      ...(resource.sourcePath === undefined
-        ? {}
-        : {
-            sourcePath: redact(
-              resource.sourcePath,
-              `resources[${index}].sourcePath`,
-              findings,
-            ),
-          }),
+      mediaType: redact(
+        resource.mediaType,
+        `resources[${index}].mediaType`,
+        findings,
+      ),
     };
-    if (
-      !resource.mediaType.startsWith("text/") &&
-      resource.mediaType !== "application/json"
-    ) {
-      const bytes = Buffer.from(resource.contentBase64, "base64");
+    const originalBytes = Buffer.from(resource.contentBase64, "base64");
+    const content = classifyResourceContent(resource.mediaType, originalBytes);
+    if (content.kind === "binary") {
+      const bytes = originalBytes;
       for (const view of binaryTextViews(bytes)) {
         const binaryFindings: SecretFinding[] = [];
         redact(view, `resources[${index}].content`, binaryFindings);
         if (binaryFindings.length > 0) {
           throw new Error(
-            `Binary resource ${resource.id} contains a suspected secret and cannot be shared`,
+            `Binary resource ${sanitizeResourcePath(resource.sourcePath ?? resource.id)} contains a suspected secret and cannot be shared`,
           );
         }
       }
       return scannedMetadata;
     }
-    const original = Buffer.from(resource.contentBase64, "base64").toString(
-      "utf8",
-    );
+    const original = content.text;
     const redacted = redact(original, `resources[${index}].content`, findings);
+    if (redacted === original) return scannedMetadata;
     const bytes = Buffer.from(redacted, "utf8");
     return {
       ...scannedMetadata,
@@ -143,6 +161,31 @@ function* binaryTextViews(bytes: Buffer): Generator<string> {
   }
 }
 
+/** Scan descriptive metadata; callers must use the returned text. */
+export function scanText(
+  text: string,
+  location = "text",
+): { text: string; findings: SecretFinding[] } {
+  const findings: SecretFinding[] = [];
+  return { text: redact(text, location, findings), findings };
+}
+
+/** Paths and IDs are operational: reject secrets instead of silently renaming. */
+export function assertSafeResourcePath(path: string): void {
+  if (scanText(path).findings.length > 0) {
+    throw new Error(
+      `Resource path ${sanitizeResourcePath(path)} contains a suspected secret and cannot be shared`,
+    );
+  }
+}
+
+/** Safe diagnostic label: redact credentials and omit URL query/fragment data. */
+export function sanitizeResourcePath(path: string): string {
+  return redact(path, "path", [])
+    .replace(/[?#][\s\S]*$/u, "[REDACTED:url-suffix]")
+    .replace(/\p{Cc}/gu, "?");
+}
+
 function redact(
   text: string,
   location: string,
@@ -158,14 +201,14 @@ function redact(
     });
     return `[REDACTED:agentshare-capability-url]${capability.trailing}`;
   });
-  for (const { kind, pattern } of PATTERNS) {
-    result = result.replace(pattern, (match) => {
+  for (const { kind, pattern, preservePrefix } of PATTERNS) {
+    result = result.replace(pattern, (_match, prefix: string) => {
       findings.push({
         kind,
         location,
-        redactedPreview: `${match.slice(0, 4)}...[REDACTED]`,
+        redactedPreview: `[REDACTED:${kind}]`,
       });
-      return `[REDACTED:${kind}]`;
+      return `${preservePrefix ? prefix : ""}[REDACTED:${kind}]`;
     });
   }
   return result;
@@ -175,15 +218,15 @@ function capabilityUrlWithTrailingText(
   candidate: string,
 ): { trailing: string } | undefined {
   let end = candidate.length;
-  while (end > 0) {
-    if (isAgentShareCapabilityUrl(candidate.slice(0, end))) {
-      return { trailing: candidate.slice(end) };
-    }
-    const last = candidate[end - 1];
-    if (last === undefined || CAPABILITY_TOKEN_CHARACTER.test(last)) return;
+  while (
+    end > 0 &&
+    !CAPABILITY_TOKEN_CHARACTER.test(candidate.charAt(end - 1))
+  ) {
     end -= 1;
   }
-  return undefined;
+  return isAgentShareCapabilityUrl(candidate.slice(0, end))
+    ? { trailing: candidate.slice(end) }
+    : undefined;
 }
 
 function isAgentShareCapabilityUrl(candidate: string): boolean {
@@ -191,7 +234,7 @@ function isAgentShareCapabilityUrl(candidate: string): boolean {
     const url = new URL(candidate);
     const fragment = new URLSearchParams(url.hash.slice(1));
     return (
-      /^\/s\/[A-Za-z0-9_-]{20,100}$/u.test(url.pathname) &&
+      /^\/(?:s|e)\/[A-Za-z0-9_-]{20,100}$/u.test(url.pathname) &&
       /^[A-Za-z0-9_-]{20,}$/u.test(
         fragment.get("r") ?? url.searchParams.get("r") ?? "",
       ) &&
@@ -222,20 +265,25 @@ export function reviewInventory(manifest: AcbManifest): string[] {
 export function reviewPayload(manifest: AcbManifest): string {
   const inspectable = {
     ...manifest,
-    resources: manifest.resources.map((resource) => ({
-      id: resource.id,
-      mediaType: resource.mediaType,
-      byteLength: resource.byteLength,
-      sha256: resource.sha256,
-      ...(resource.sourcePath === undefined
-        ? {}
-        : { sourcePath: resource.sourcePath }),
-      content:
-        resource.mediaType.startsWith("text/") ||
-        resource.mediaType === "application/json"
-          ? Buffer.from(resource.contentBase64, "base64").toString("utf8")
-          : `<${resource.byteLength} bytes; base64 omitted from terminal display>`,
-    })),
+    resources: manifest.resources.map((resource) => {
+      const content = classifyResourceContent(
+        resource.mediaType,
+        Buffer.from(resource.contentBase64, "base64"),
+      );
+      return {
+        id: resource.id,
+        mediaType: resource.mediaType,
+        byteLength: resource.byteLength,
+        sha256: resource.sha256,
+        ...(resource.sourcePath === undefined
+          ? {}
+          : { sourcePath: resource.sourcePath }),
+        content:
+          content.kind === "text"
+            ? content.text
+            : `<${resource.byteLength} bytes; base64 omitted from terminal display>`,
+      };
+    }),
   };
   return JSON.stringify(inspectable, null, 2);
 }

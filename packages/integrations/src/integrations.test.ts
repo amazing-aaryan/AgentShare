@@ -2,7 +2,11 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { installIntegrations, removeIntegrations } from "./index.js";
+import {
+  installCreatorMcpConfiguration,
+  installIntegrations,
+  removeIntegrations,
+} from "./index.js";
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -14,6 +18,27 @@ afterEach(async () => {
 });
 
 describe("host integrations", () => {
+  it("preserves unrelated MCP configuration and refuses unmanaged collisions", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-mcp-config-"));
+    directories.push(root);
+    const path = join(root, "config.toml");
+    const original = '[mcp_servers.other]\ncommand = "other-tool"\n';
+    await writeFile(path, original);
+    await installCreatorMcpConfiguration(path, "node", "C:/AgentShare/bin.js");
+    const installed = await readFile(path, "utf8");
+    expect(installed).toContain(original);
+    expect(installed).toContain('"creator-mcp"');
+    await installCreatorMcpConfiguration(path, "node", "C:/AgentShare/bin.js");
+    expect(await readFile(path, "utf8")).toBe(installed);
+    expect(await readFile(`${path}.agentshare-backup`, "utf8")).toBe(original);
+    await writeFile(
+      path,
+      '[mcp_servers.agentshare_creator]\ncommand="custom"\n',
+    );
+    await expect(installCreatorMcpConfiguration(path)).rejects.toThrow(
+      "unmanaged",
+    );
+  });
   it("installs explicit creator skills and automatic direct-paste receiver skills idempotently", async () => {
     const root = await mkdtemp(join(tmpdir(), "agentshare-integration-"));
     directories.push(root);
@@ -45,7 +70,8 @@ describe("host integrations", () => {
     );
     expect(claudeCreator).toContain("disable-model-invocation: true");
     expect(claudeCreator).toContain("interactive terminal");
-    expect(codexCreatorSkill).toContain("interactive terminal");
+    expect(codexCreatorSkill).toContain("native human confirmation");
+    expect(codexCreatorSkill).toContain("agentshare session-context");
     expect(claudeReceiver).toContain("/e/");
     expect(claudeReceiver).toContain("agentshare ask");
     expect(codexCreator).toContain("allow_implicit_invocation: false");

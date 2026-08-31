@@ -17,13 +17,19 @@ import {
   type ReserveRevisionRequest,
   type SessionEvent,
 } from "@agentshare/contracts";
-import { scanAndRedact } from "@agentshare/scanner";
+import type { WorkspaceSnapshot } from "../workspace/index.js";
 import {
-  buildWorkspaceSnapshot,
-  type WorkspaceSnapshot,
-} from "../workspace/index.js";
+  previewEnvironmentCapture,
+  verifyPreparedCapture,
+  type PreparedCapture,
+} from "./preview.js";
 import { EnvironmentRelayClient } from "./relay-client.js";
-import { saveOwnedEnvironment, type OwnedEnvironment } from "./state.js";
+import {
+  findOwnedEnvironment,
+  saveOwnedEnvironment,
+  withEnvironmentLock,
+  type OwnedEnvironment,
+} from "./state.js";
 
 export type HostCapture = {
   sourceAgent: "codex" | "claude";
@@ -33,6 +39,11 @@ export type HostCapture = {
 };
 
 export type CreateEnvironmentOptions = {
+  onPreparedEnvironment?: (
+    environmentId: string,
+    revisionId: string,
+  ) => Promise<void>;
+  preparedCapture?: PreparedCapture;
   client: EnvironmentRelayClient;
   statePath?: string;
   ttlSeconds: number;
@@ -59,6 +70,7 @@ export type CreateEnvironmentResult = {
 };
 
 type PreparedRevision = {
+  workspaceRoot: string;
   reservation: ReserveRevisionRequest;
   manifestBytes: Uint8Array;
   newBlobs: Array<{ blobId: string; bytes: Uint8Array }>;
@@ -75,6 +87,10 @@ export async function createEnvironmentFromCapture(
     );
   }
   const now = options.now ?? (() => new Date());
+  const retained =
+    options.preparedCapture ??
+    (await previewEnvironmentCapture(capture, options));
+  verifyPreparedCapture(retained);
   const environmentId = `env_${randomCapability(18)}`;
   const masterKey = randomEnvironmentMasterKey();
   const readCapability = randomCapability();
@@ -86,7 +102,7 @@ export async function createEnvironmentFromCapture(
     : undefined;
   const proposalKeys = generateProposalKeyPair();
 
-  const created = await options.client.create({
+  const creationRequest = {
     environmentId,
     requestedTtlSeconds: options.ttlSeconds,
     readTokenDigest: capabilityDigest(readCapability),
@@ -96,7 +112,7 @@ export async function createEnvironmentFromCapture(
       : { proposalTokenDigest: capabilityDigest(proposalCapability) }),
     inboxTokenDigest: capabilityDigest(inboxCapability),
     revokeTokenDigest: capabilityDigest(revokeCapability),
-  });
+  };
 
   let environment: OwnedEnvironment = {
     environmentId,
@@ -111,7 +127,10 @@ export async function createEnvironmentFromCapture(
     proposalPublicKey: proposalKeys.publicKey,
     proposalPrivateKey: proposalKeys.privateKey,
     currentRevisionId: null,
-    expiresAt: created.expiresAt,
+    expiresAt: new Date(
+      now().getTime() + options.ttlSeconds * 1000,
+    ).toISOString(),
+    creationRequest,
     sharePolicy: {
       includeConversation: options.includeConversation,
       includeWorkspace: options.includeWorkspace,
@@ -119,9 +138,8 @@ export async function createEnvironmentFromCapture(
     },
     knownBlobs: {},
   };
-  await saveOwnedEnvironment(environment, options.statePath);
-
   const prepared = await prepareRevision(capture, environment, {
+    preparedCapture: retained,
     includeConversation: options.includeConversation,
     includeWorkspace: options.includeWorkspace,
     proposalsEnabled: options.proposalsEnabled,
@@ -130,11 +148,18 @@ export async function createEnvironmentFromCapture(
       ? {}
       : { workspaceOptions: options.workspaceOptions }),
   });
-  environment = await publishPreparedRevision(
-    environment,
-    prepared,
-    options.client,
+  environment = await withEnvironmentLock(
+    environmentId,
     options.statePath,
+    () =>
+      publishPreparedRevision(
+        environment,
+        prepared,
+        options.client,
+        options.statePath,
+        undefined,
+        options.onPreparedEnvironment,
+      ),
   );
 
   return {
@@ -157,92 +182,203 @@ export async function publishEnvironmentRevision(
   environment: OwnedEnvironment,
   client: EnvironmentRelayClient,
   options: {
+    preparedCapture?: PreparedCapture;
+    onPreparedRevision?: (
+      environmentId: string,
+      revisionId: string,
+    ) => Promise<void>;
+    approvedWorkspaceRoot?: string;
     statePath?: string;
     now?: Date;
     proposalId?: string;
     workspaceOptions?: { preferGit?: boolean; maxFileBytes?: number };
   } = {},
 ): Promise<{ environment: OwnedEnvironment; summary: PublicationSummary }> {
-  const prepared = await prepareRevision(capture, environment, {
-    includeConversation: environment.sharePolicy.includeConversation,
-    includeWorkspace: environment.sharePolicy.includeWorkspace,
-    proposalsEnabled: environment.sharePolicy.proposalsEnabled,
-    now: options.now ?? new Date(),
-    ...(options.workspaceOptions === undefined
-      ? {}
-      : { workspaceOptions: options.workspaceOptions }),
-  });
-  const published = await publishPreparedRevision(
-    environment,
-    prepared,
-    client,
+  return withEnvironmentLock(
+    environment.environmentId,
     options.statePath,
-    options.proposalId,
+    async () => {
+      const latest = await findOwnedEnvironment(
+        environment.environmentId,
+        options.statePath,
+      );
+      if (
+        latest?.currentRevisionId !== environment.currentRevisionId ||
+        (latest.generation ?? 0) !== (environment.generation ?? 0)
+      )
+        throw new Error("Environment changed; review again");
+      if (latest.pendingRevision !== undefined)
+        throw new Error(
+          "Environment publication pending; recover before updating",
+        );
+      if (client.origin !== environment.relayOrigin)
+        throw new Error("Update relay does not match owned environment");
+      if (
+        capture.workspaceRoot !== environment.workspaceRoot &&
+        options.approvedWorkspaceRoot !== capture.workspaceRoot
+      ) {
+        throw new Error(
+          "Update project differs from owned workspace; explicit relocation review required",
+        );
+      }
+      const prepared = await prepareRevision(capture, environment, {
+        ...(options.preparedCapture === undefined
+          ? {}
+          : { preparedCapture: options.preparedCapture }),
+        includeConversation: environment.sharePolicy.includeConversation,
+        includeWorkspace: environment.sharePolicy.includeWorkspace,
+        proposalsEnabled: environment.sharePolicy.proposalsEnabled,
+        now: options.now ?? new Date(),
+        ...(options.workspaceOptions === undefined
+          ? {}
+          : { workspaceOptions: options.workspaceOptions }),
+      });
+      const published = await publishPreparedRevision(
+        environment,
+        prepared,
+        client,
+        options.statePath,
+        options.proposalId,
+        options.onPreparedRevision,
+      );
+      return { environment: published, summary: prepared.summary };
+    },
   );
-  return { environment: published, summary: prepared.summary };
 }
 
 export async function resumePendingRevision(
   environment: OwnedEnvironment,
   client: EnvironmentRelayClient,
   statePath?: string,
+  expectedRevisionId?: string,
 ): Promise<OwnedEnvironment> {
-  const pending = environment.pendingRevision;
-  if (pending === undefined) return environment;
-  await client.reserveRevision(
-    environment.environmentId,
-    environment.updateCapability,
-    pending.reservation,
-  );
-  await client.uploadManifest(
-    environment.environmentId,
-    pending.reservation.revisionId,
-    environment.updateCapability,
-    Buffer.from(pending.manifestBase64, "base64"),
-  );
-  for (const blob of pending.blobs) {
-    await client.uploadBlob(
+  return withEnvironmentLock(environment.environmentId, statePath, async () => {
+    const latest = await findOwnedEnvironment(
       environment.environmentId,
-      blob.blobId,
-      environment.updateCapability,
-      Buffer.from(blob.ciphertextBase64, "base64"),
+      statePath,
     );
-  }
-  const committed = await client.commitRevision(
-    environment.environmentId,
-    pending.reservation.revisionId,
-    environment.updateCapability,
-  );
-  if (pending.proposalId !== undefined) {
-    await client.setProposalStatus(
+    if (latest === undefined)
+      throw new Error("Owned environment was removed; recovery refused");
+    environment = latest;
+    const pending = environment.pendingRevision;
+    if (
+      expectedRevisionId !== undefined &&
+      (pending?.reservation.revisionId ?? environment.currentRevisionId) !==
+        expectedRevisionId
+    ) {
+      throw new Error(
+        "Pending publication identity changed; refusing recovery",
+      );
+    }
+    if (pending === undefined) return environment;
+    if (client.origin !== environment.relayOrigin)
+      throw new Error("Recovery relay does not match owned environment");
+    if (environment.creationRequest !== undefined) {
+      let metadata;
+      try {
+        metadata = await client.metadata(
+          environment.environmentId,
+          environment.readCapability,
+        );
+      } catch (error) {
+        if (!(
+          error instanceof Error &&
+          "status" in error &&
+          error.status === 404
+        ))
+          throw error;
+        metadata = await client.create(environment.creationRequest);
+      }
+      environment.expiresAt = metadata.expiresAt;
+      delete environment.creationRequest;
+      await saveOwnedEnvironment(environment, statePath);
+    }
+    const metadata = await client.metadata(
       environment.environmentId,
-      pending.proposalId,
-      environment.inboxCapability,
-      "accepted",
+      environment.readCapability,
     );
-  }
-  const next: OwnedEnvironment = {
-    ...environment,
-    currentRevisionId: committed.currentRevisionId,
-    knownBlobs: {
-      ...(environment.knownBlobs ?? {}),
-      ...Object.fromEntries(
-        pending.reservation.blobs.map((blob) => [
+    let committed = metadata;
+    if (metadata.currentRevisionId !== pending.reservation.revisionId) {
+      if (
+        metadata.currentRevisionId !==
+        (pending.reservation.parentRevisionId ?? null)
+      ) {
+        throw new Error(
+          "Pending revision base changed; recovery requires review",
+        );
+      }
+      await client.reserveRevision(
+        environment.environmentId,
+        environment.updateCapability,
+        pending.reservation,
+      );
+      await client.uploadManifest(
+        environment.environmentId,
+        pending.reservation.revisionId,
+        environment.updateCapability,
+        Buffer.from(pending.manifestBase64, "base64"),
+      );
+      for (const blob of pending.blobs) {
+        await client.uploadBlob(
+          environment.environmentId,
           blob.blobId,
-          descriptorOnly(blob),
-        ]),
-      ),
-    },
-  };
-  delete next.pendingRevision;
-  await saveOwnedEnvironment(next, statePath);
-  return next;
+          environment.updateCapability,
+          Buffer.from(blob.ciphertextBase64, "base64"),
+        );
+      }
+      committed = await client.commitRevision(
+        environment.environmentId,
+        pending.reservation.revisionId,
+        environment.updateCapability,
+      );
+    }
+    const committedManifest = committed.currentRevision?.manifest;
+    if (
+      committed.environmentId !== environment.environmentId ||
+      committed.currentRevisionId !== pending.reservation.revisionId ||
+      committedManifest?.ciphertextSha256 !==
+        pending.reservation.manifest.ciphertextSha256 ||
+      committedManifest.ciphertextBytes !==
+        pending.reservation.manifest.ciphertextBytes
+    ) {
+      throw new Error(
+        "Relay commit receipt does not match pending revision; recovery required",
+      );
+    }
+    if (pending.proposalId !== undefined) {
+      await client.setProposalStatus(
+        environment.environmentId,
+        pending.proposalId,
+        environment.inboxCapability,
+        "accepted",
+      );
+    }
+    const next: OwnedEnvironment = {
+      ...environment,
+      currentRevisionId: committed.currentRevisionId,
+      workspaceRoot: pending.workspaceRoot ?? environment.workspaceRoot,
+      committedManifestBase64: pending.manifestBase64,
+      knownBlobs: {
+        ...(environment.knownBlobs ?? {}),
+        ...Object.fromEntries(
+          pending.reservation.blobs.map((blob) => [
+            blob.blobId,
+            descriptorOnly(blob),
+          ]),
+        ),
+      },
+    };
+    delete next.pendingRevision;
+    await saveOwnedEnvironment(next, statePath);
+    return next;
+  });
 }
 
 async function prepareRevision(
   capture: HostCapture,
   environment: OwnedEnvironment,
   options: {
+    preparedCapture?: PreparedCapture;
     includeConversation: boolean;
     includeWorkspace: boolean;
     proposalsEnabled: boolean;
@@ -252,15 +388,27 @@ async function prepareRevision(
 ): Promise<PreparedRevision> {
   const masterKey = keyFromFragment(environment.environmentMasterKey);
   const revisionId = `rev_${randomCapability(18)}`;
-  const snapshot = options.includeWorkspace
-    ? await buildWorkspaceSnapshot(
-        capture.workspaceRoot,
-        options.workspaceOptions,
-      )
-    : emptySnapshot(capture.workspaceRoot);
-  const redacted = scanAndRedact(
-    workspaceToAcb(capture, snapshot, options.includeConversation),
-  );
+  const retained =
+    options.preparedCapture ??
+    (await previewEnvironmentCapture(capture, options));
+  verifyPreparedCapture(retained);
+  if (
+    retained.capture.workspaceRoot !== capture.workspaceRoot ||
+    retained.summary.proposalsEnabled !== options.proposalsEnabled ||
+    (!options.includeWorkspace && retained.snapshot.files.length !== 0) ||
+    (!options.includeConversation && retained.capture.conversation.length !== 0)
+  ) {
+    throw new Error("Prepared capture policy mismatch; review again");
+  }
+  const snapshot = retained.snapshot;
+  const redacted = {
+    manifest: workspaceToAcb(
+      retained.capture,
+      snapshot,
+      options.includeConversation,
+    ),
+    findings: retained.findings,
+  };
 
   const newBlobs = new Map<string, Uint8Array>();
   const declaredBlobs = new Map<string, CiphertextDescriptor>();
@@ -319,8 +467,8 @@ async function prepareRevision(
       ? {}
       : { parentRevisionId: environment.currentRevisionId }),
     createdAt: options.now.toISOString(),
-    title: capture.title,
-    sourceAgent: capture.sourceAgent,
+    title: retained.capture.title,
+    sourceAgent: retained.capture.sourceAgent,
     conversation: {
       events: options.includeConversation ? redacted.manifest.events : [],
     },
@@ -361,6 +509,7 @@ async function prepareRevision(
   };
 
   return {
+    workspaceRoot: retained.capture.workspaceRoot,
     reservation,
     manifestBytes: encryptedManifest.envelope,
     newBlobs: [...newBlobs.entries()].map(([blobId, bytes]) => ({
@@ -384,10 +533,15 @@ async function publishPreparedRevision(
   client: EnvironmentRelayClient,
   statePath?: string,
   proposalId?: string,
+  onPreparedEnvironment?: (
+    environmentId: string,
+    revisionId: string,
+  ) => Promise<void>,
 ): Promise<OwnedEnvironment> {
   const pending: OwnedEnvironment = {
     ...environment,
     pendingRevision: {
+      workspaceRoot: prepared.workspaceRoot,
       reservation: prepared.reservation,
       manifestBase64: Buffer.from(prepared.manifestBytes).toString("base64"),
       ...(proposalId === undefined ? {} : { proposalId }),
@@ -398,6 +552,10 @@ async function publishPreparedRevision(
     },
   };
   await saveOwnedEnvironment(pending, statePath);
+  await onPreparedEnvironment?.(
+    pending.environmentId,
+    prepared.reservation.revisionId,
+  );
   return resumePendingRevision(pending, client, statePath);
 }
 
@@ -420,17 +578,6 @@ function workspaceToAcb(
       contentBase64: file.contentBase64,
       sourcePath: file.path,
     })),
-  };
-}
-
-function emptySnapshot(root: string): WorkspaceSnapshot {
-  const rootName = root.replace(/\\/gu, "/").split("/").filter(Boolean).at(-1);
-  return {
-    root,
-    rootName: rootName ?? "workspace",
-    files: [],
-    excluded: [],
-    totalBytes: 0,
   };
 }
 

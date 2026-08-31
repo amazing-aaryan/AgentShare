@@ -28,6 +28,62 @@ describe("public CLI arguments", () => {
     expect(result.stdout).toContain("--ttl SECONDS");
     expect(result.stdout).toContain("--relay URL");
     expect(result.stdout).toContain("--handoff URL");
+    expect(result.stdout).toContain("--session-id ID");
+    expect(result.stdout).toContain("--project-root PATH");
+    expect(result.stdout).toContain(
+      "agentshare review --draft ID --digest SHA256",
+    );
+    expect(result.stdout).toContain("agentshare creator-mcp");
+    expect(result.stdout).toContain("agentshare session-context");
+  });
+
+  it("exposes only exact current thread and cwd through the read-only session helper", () => {
+    const result = runCliWithEnv(
+      { CODEX_THREAD_ID: "test-current-thread" },
+      "session-context",
+    );
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({
+      threadId: "test-current-thread",
+      cwd: process.cwd(),
+    });
+    const missing = runCliWithEnv({ CODEX_THREAD_ID: "" }, "session-context");
+    expect(missing.status).toBe(1);
+    expect(missing.stdout).toBe("");
+    expect(missing.stderr).toContain("SESSION_REQUIRED");
+  });
+
+  it("routes doctor to creator diagnostics without claiming native approval was tested", () => {
+    const result = runCli("doctor");
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      nativeApproval: "requires-host-verification",
+    });
+  });
+
+  it("rejects missing/duplicate identity values and non-TTY draft approval", () => {
+    for (const args of [
+      ["--session-id"],
+      ["--project-root", "--new"],
+      ["--state-path", "one", "--state-path", "two"],
+    ]) {
+      const result = runCli("share", "--current", "--source", "codex", ...args);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/Missing value|Duplicate option/);
+    }
+    const review = runCli(
+      "review",
+      "--draft",
+      "draft_fake",
+      "--digest",
+      "digest",
+    );
+    expect(review.status).toBe(1);
+    expect(review.stderr).toContain("requires a TTY");
+    expect(runCli("review", "--yes").stderr).toContain("Unknown option: --yes");
+    expect(runCli("copy-environment").stderr).toContain(
+      "Missing --environment",
+    );
   });
 
   it("rejects unknown update options before any network request", () => {
@@ -62,6 +118,10 @@ describe("public CLI arguments", () => {
 });
 
 function runCli(...args: string[]) {
+  return runCliWithEnv({}, ...args);
+}
+
+function runCliWithEnv(env: Record<string, string>, ...args: string[]) {
   return spawnSync(
     process.execPath,
     [
@@ -71,7 +131,7 @@ function runCli(...args: string[]) {
     ],
     {
       encoding: "utf8",
-      env: { ...process.env, AGENTSHARE_NO_UPDATE_CHECK: "1" },
+      env: { ...process.env, ...env, AGENTSHARE_NO_UPDATE_CHECK: "1" },
     },
   );
 }

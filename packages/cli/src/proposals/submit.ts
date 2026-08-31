@@ -12,8 +12,10 @@ import {
 } from "../environment/accept.js";
 import { EnvironmentRelayClient } from "../environment/relay-client.js";
 import { findAttachedEnvironment } from "../environment/state.js";
+import { scanAndRedact } from "@agentshare/scanner";
 
 export type SubmitProposalOptions = EnvironmentReadOptions & {
+  baseRevisionId?: string;
   client?: EnvironmentRelayClient;
   now?: () => Date;
 };
@@ -44,7 +46,10 @@ export async function submitFileReplacement(
         contentBase64: Buffer.from(content, "utf8").toString("base64"),
       },
     ],
-    options,
+    {
+      ...options,
+      baseRevisionId: options.baseRevisionId ?? manifest.revisionId,
+    },
   );
 }
 
@@ -68,6 +73,13 @@ export async function submitProposalOperations(
     throw new Error("This AgentShare environment is read-only");
   }
   const manifest = await readAttachedManifest(environmentId, options);
+  const baseRevisionId = options.baseRevisionId ?? attached.currentRevisionId;
+  if (
+    attached.currentRevisionId !== baseRevisionId ||
+    manifest.revisionId !== baseRevisionId
+  ) {
+    throw new Error("Proposal base revision changed; restage and review again");
+  }
   if (!manifest.proposalPolicy.enabled) {
     throw new Error("This AgentShare environment does not accept proposals");
   }
@@ -75,11 +87,35 @@ export async function submitProposalOperations(
     version: "agentshare-proposal-v1",
     proposalId: `prop_${randomCapability(18)}`,
     environmentId,
-    baseRevisionId: attached.currentRevisionId,
+    baseRevisionId,
     createdAt: (options.now ?? (() => new Date()))().toISOString(),
     summary,
     operations,
   });
+  const scanned = scanAndRedact({
+    version: "acb-v1",
+    title: proposal.summary,
+    sourceAgent: "generic",
+    exportedAt: proposal.createdAt,
+    events: [],
+    resources: proposal.operations
+      .filter((op) => op.type !== "delete")
+      .map((op, index) => {
+        const content = Buffer.from(op.contentBase64, "base64");
+        if (sha256(content) !== op.newSha256)
+          throw new Error("Proposal content hash mismatch");
+        return {
+          id: `proposal-${index}`,
+          sourcePath: op.path,
+          mediaType: op.mediaType,
+          byteLength: content.length,
+          sha256: op.newSha256,
+          contentBase64: op.contentBase64,
+        };
+      }),
+  });
+  if (scanned.findings.length !== 0)
+    throw new Error("Proposal contains suspected secrets; edit and restage");
   const encrypted = encryptProposalForOwner(
     Buffer.from(JSON.stringify(proposal), "utf8"),
     manifest.proposalPolicy.encryptionPublicKey,

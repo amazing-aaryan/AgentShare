@@ -9,6 +9,7 @@ export default tseslint.config(
       "**/.wrangler/**",
       "**/*.d.ts",
       "scripts/**/*.mjs",
+      "artifacts/**/*.mjs",
       "eslint.config.js",
       "vitest.config.ts",
     ],

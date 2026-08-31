@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,34 +9,55 @@ import {
   codexArgs,
   discoverUserSkills,
   resolveAgentExecutable,
+  supportsReviewedEnvironmentTargetVersion,
   verifyTarget,
   waitForTargetClose,
   type TargetAgent,
   type TargetResult,
 } from "../launchers.js";
 import { sanitizeTerminalText } from "../terminal.js";
+import { ensurePrivateDirectory } from "../environment/private-store.js";
+import {
+  environmentToolNames,
+  hasRequiredCompletion,
+  readMcpCompletions,
+  type EnvironmentMode,
+  type McpCompletionReceipt,
+  type ReceiptChannel,
+} from "./completion.js";
 
-const MCP_TOOLS = [
-  "environment_info",
-  "list_files",
-  "search",
-  "read_file",
-  "read_conversation",
-  "proposal_stage_replace",
-  "proposal_stage_create",
-  "proposal_stage_delete",
-  "proposal_diff",
-  "proposal_submit",
-] as const;
+export type EnvironmentRuntimeOptions = {
+  statePath?: string;
+  cacheRoot?: string;
+  mode?: EnvironmentMode;
+  receiptChannel?: ReceiptChannel;
+};
+export type EnvironmentTargetResult = TargetResult & {
+  receipts?: McpCompletionReceipt[];
+};
 
 export async function runEnvironmentTarget(
   target: TargetAgent,
   environmentId: string,
   prompt: string,
-  options: { statePath?: string; cacheRoot?: string } = {},
-): Promise<TargetResult> {
+  options: EnvironmentRuntimeOptions = {},
+): Promise<EnvironmentTargetResult> {
   const workspace = await mkdtemp(join(tmpdir(), "agentshare-environment-"));
+  // A sibling directory is outside the denied recipient workspace. Only the
+  // trusted MCP subprocess receives this channel, not the agent environment.
+  const receiptDirectory = await mkdtemp(
+    join(tmpdir(), "agentshare-receipts-"),
+  );
+  const mode = options.mode ?? "ask";
+  const receiptChannel: ReceiptChannel = {
+    path: join(receiptDirectory, "completed.jsonl"),
+    runId: randomUUID(),
+    environmentId,
+    mode,
+  };
+  const runtimeOptions = { ...options, mode, receiptChannel };
   try {
+    await ensurePrivateDirectory(receiptDirectory);
     await verifyTarget(target);
     const executable = resolveAgentExecutable(target);
     await verifyEnvironmentMcpSupport(target, executable);
@@ -49,14 +71,14 @@ export async function runEnvironmentTarget(
             environmentId,
             process.execPath,
             cliPath,
-            options,
+            runtimeOptions,
             await discoverUserSkills(),
           )
         : claudeEnvironmentArgs(
             environmentId,
             process.execPath,
             cliPath,
-            options,
+            runtimeOptions,
           );
     const child = spawn(
       executable.command,
@@ -69,6 +91,7 @@ export async function runEnvironmentTarget(
       },
     );
     let output = "";
+    const workerStatus = { cancelledTool: false };
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
@@ -77,15 +100,28 @@ export async function runEnvironmentTarget(
       process.stdout.write(value);
     });
     child.stderr.on("data", (chunk: string) => {
+      if (/user cancelled MCP tool call/iu.test(chunk))
+        workerStatus.cancelledTool = true;
       process.stderr.write(sanitizeTerminalText(chunk));
     });
     child.stdin.end(prompt);
+    const processExitCode = await waitForTargetClose(child);
+    const receipts = await readMcpCompletions(receiptChannel);
+    const completed =
+      !workerStatus.cancelledTool &&
+      hasRequiredCompletion(receipts, mode, environmentId);
+    if (!completed)
+      process.stderr.write(
+        `AgentShare ${mode} failed: no required completed MCP receipt.\n`,
+      );
     return {
-      exitCode: await waitForTargetClose(child),
+      exitCode: processExitCode !== 0 ? processExitCode : completed ? 0 : 1,
       output: output.trim(),
+      receipts,
     };
   } finally {
     await rm(workspace, { recursive: true, force: true });
+    await rm(receiptDirectory, { recursive: true, force: true });
   }
 }
 
@@ -94,7 +130,7 @@ export function codexEnvironmentArgs(
   environmentId: string,
   nodeCommand: string,
   cliPath: string,
-  options: { statePath?: string; cacheRoot?: string } = {},
+  options: EnvironmentRuntimeOptions = {},
   disabledSkills: string[] = [],
 ): string[] {
   const base = codexArgs(workspace, disabledSkills);
@@ -110,6 +146,22 @@ export function codexEnvironmentArgs(
       .join(",")}]`,
     "--config",
     "mcp_servers.agentshare.startup_timeout_sec=15",
+    "--config",
+    "mcp_servers.agentshare.required=true",
+    "--config",
+    `mcp_servers.agentshare.enabled_tools=${JSON.stringify(environmentToolNames(options.mode ?? "ask"))}`,
+    // Schema verified against openai/codex rust-v0.147.0. Do not change the
+    // global approval policy or server-wide default to make these calls work.
+    ...environmentToolNames(options.mode ?? "ask").flatMap((name) => [
+      "--config",
+      `mcp_servers.agentshare.tools.${name}.approval_mode="approve"`,
+    ]),
+    ...Object.entries(internalMcpEnvironment(options)).flatMap(
+      ([key, value]) => [
+        "--config",
+        `mcp_servers.agentshare.env.${key}=${tomlString(value)}`,
+      ],
+    ),
     "-",
   ];
 }
@@ -118,7 +170,7 @@ export function claudeEnvironmentArgs(
   environmentId: string,
   nodeCommand: string,
   cliPath: string,
-  options: { statePath?: string; cacheRoot?: string } = {},
+  options: EnvironmentRuntimeOptions = {},
 ): string[] {
   const args = [...claudeArgs()];
   const configIndex = args.indexOf("--mcp-config");
@@ -132,12 +184,15 @@ export function claudeEnvironmentArgs(
       agentshare: {
         command: nodeCommand,
         args: [cliPath, ...internalMcpArgs(environmentId, options)],
+        env: internalMcpEnvironment(options),
       },
     },
   });
   args.push(
     "--allowedTools",
-    MCP_TOOLS.map((name) => `mcp__agentshare__${name}`).join(","),
+    environmentToolNames(options.mode ?? "ask")
+      .map((name) => `mcp__agentshare__${name}`)
+      .join(","),
   );
   return args;
 }
@@ -146,6 +201,15 @@ async function verifyEnvironmentMcpSupport(
   target: TargetAgent,
   executable: { command: string; prefixArgs: string[] },
 ): Promise<void> {
+  const version = await captureProcess(executable.command, [
+    ...executable.prefixArgs,
+    "--version",
+  ]);
+  if (!supportsReviewedEnvironmentTargetVersion(target, version)) {
+    throw new Error(
+      `${target} has not passed AgentShare v2 MCP review; Codex v2 requires 0.147.0. Legacy query compatibility does not establish v2 compatibility.`,
+    );
+  }
   if (target === "claude") {
     const help = await captureProcess(executable.command, [
       ...executable.prefixArgs,
@@ -191,6 +255,20 @@ function internalMcpArgs(
 
 function tomlString(value: string): string {
   return JSON.stringify(value);
+}
+
+function internalMcpEnvironment(
+  options: EnvironmentRuntimeOptions,
+): Record<string, string> {
+  return {
+    AGENTSHARE_MCP_MODE: options.mode ?? "ask",
+    ...(options.receiptChannel === undefined
+      ? {}
+      : {
+          AGENTSHARE_MCP_RECEIPT_PATH: options.receiptChannel.path,
+          AGENTSHARE_MCP_RUN_ID: options.receiptChannel.runId,
+        }),
+  };
 }
 
 function safeEnvironment(): NodeJS.ProcessEnv {

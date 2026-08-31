@@ -9,8 +9,14 @@ import {
 import { refreshAttachedEnvironment } from "../environment/refresh.js";
 import { findAttachedEnvironment } from "../environment/state.js";
 import { submitProposalOperations } from "../proposals/submit.js";
+import {
+  recordMcpCompletion,
+  recordMcpFailure,
+  type EnvironmentMode,
+} from "./completion.js";
 
 export type McpRuntime = {
+  currentRevision?: () => string | undefined;
   canPropose: boolean;
   environmentInfo: () => Promise<unknown>;
   listFiles: () => Promise<unknown>;
@@ -112,6 +118,7 @@ const PROPOSAL_TOOLS = [
 export async function handleMcpRequest(
   request: JsonRpcRequest,
   runtime: McpRuntime,
+  onCompleted?: (tool: string, value: unknown) => Promise<void>,
 ): Promise<JsonRpcResponse | undefined> {
   if (request.jsonrpc !== "2.0" || typeof request.method !== "string") {
     return responseError(request.id, -32600, "Invalid JSON-RPC request");
@@ -194,8 +201,10 @@ export async function handleMcpRequest(
           `Unknown AgentShare tool: ${name}`,
         );
     }
+    const text = stringify(value);
+    await onCompleted?.(name, value);
     return responseResult(request.id, {
-      content: [{ type: "text", text: stringify(value) }],
+      content: [{ type: "text", text }],
       isError: false,
     });
   } catch (error) {
@@ -213,7 +222,11 @@ export async function handleMcpRequest(
 
 export async function createEnvironmentMcpRuntime(
   environmentId: string,
-  options: { statePath?: string; cacheRoot?: string } = {},
+  options: {
+    statePath?: string;
+    cacheRoot?: string;
+    mode?: EnvironmentMode;
+  } = {},
 ): Promise<McpRuntime> {
   const attached = await findAttachedEnvironment(
     environmentId,
@@ -223,6 +236,10 @@ export async function createEnvironmentMcpRuntime(
     throw new Error(`AgentShare environment is not attached: ${environmentId}`);
   }
   const staged = new Map<string, ProposalOperation>();
+  let observedRevisionId: string | undefined;
+  let stagedBaseRevisionId: string | undefined;
+  const canPropose =
+    options.mode === "propose" && attached.proposalCapability !== undefined;
   const readOptions = {
     ...(options.statePath === undefined
       ? {}
@@ -231,9 +248,28 @@ export async function createEnvironmentMcpRuntime(
       ? {}
       : { cacheRoot: options.cacheRoot }),
   };
-  const sync = () => refreshAttachedEnvironment(environmentId, readOptions);
+  const sync = async () => {
+    await refreshAttachedEnvironment(environmentId, readOptions);
+    const manifest = await readAttachedManifest(environmentId, readOptions);
+    observedRevisionId = manifest.revisionId;
+    if (
+      stagedBaseRevisionId !== undefined &&
+      manifest.revisionId !== stagedBaseRevisionId
+    ) {
+      throw new Error(
+        "Shared revision changed after staging; restart proposal against the new revision",
+      );
+    }
+    return manifest;
+  };
+  const stagingManifest = async () => {
+    if (!canPropose)
+      throw new Error("This AgentShare environment is read-only");
+    return sync();
+  };
   return {
-    canPropose: attached.proposalCapability !== undefined,
+    canPropose,
+    currentRevision: () => observedRevisionId,
     async environmentInfo() {
       await sync();
       const manifest = await readAttachedManifest(environmentId, readOptions);
@@ -243,7 +279,7 @@ export async function createEnvironmentMcpRuntime(
         revisionId: manifest.revisionId,
         files: manifest.workspace.files.length,
         conversationEvents: manifest.conversation.events.length,
-        canPropose: manifest.proposalPolicy.enabled,
+        canPropose: canPropose && manifest.proposalPolicy.enabled,
       };
     },
     async listFiles() {
@@ -271,12 +307,12 @@ export async function createEnvironmentMcpRuntime(
       );
     },
     async stageReplace(path: string, content: string) {
-      await sync();
-      const manifest = await readAttachedManifest(environmentId, readOptions);
+      const manifest = await stagingManifest();
       const file = manifest.workspace.files.find(
         (candidate) => candidate.path === path,
       );
       if (file === undefined) throw new Error(`Shared file not found: ${path}`);
+      stagedBaseRevisionId ??= manifest.revisionId;
       staged.set(path, {
         type: "replace",
         path,
@@ -288,13 +324,13 @@ export async function createEnvironmentMcpRuntime(
       return { staged: "replace", path };
     },
     async stageCreate(path: string, content: string, mediaType?: string) {
-      await sync();
-      const manifest = await readAttachedManifest(environmentId, readOptions);
+      const manifest = await stagingManifest();
       if (
         manifest.workspace.files.some((candidate) => candidate.path === path)
       ) {
         throw new Error(`Shared file already exists: ${path}`);
       }
+      stagedBaseRevisionId ??= manifest.revisionId;
       staged.set(path, {
         type: "create",
         path,
@@ -305,39 +341,42 @@ export async function createEnvironmentMcpRuntime(
       return { staged: "create", path };
     },
     async stageDelete(path: string) {
-      await sync();
-      const manifest = await readAttachedManifest(environmentId, readOptions);
+      const manifest = await stagingManifest();
       const file = manifest.workspace.files.find(
         (candidate) => candidate.path === path,
       );
       if (file === undefined) throw new Error(`Shared file not found: ${path}`);
+      stagedBaseRevisionId ??= manifest.revisionId;
       staged.set(path, { type: "delete", path, baseSha256: file.sha256 });
       return { staged: "delete", path };
     },
-    proposalDiff() {
-      return Promise.resolve(
-        [...staged.values()].map((operation) => ({
-          type: operation.type,
-          path: operation.path,
-          ...(operation.type === "delete"
-            ? {}
-            : {
-                newBytes: Buffer.from(operation.contentBase64, "base64")
-                  .byteLength,
-              }),
-        })),
-      );
+    async proposalDiff() {
+      await stagingManifest();
+      return [...staged.values()].map((operation) => ({
+        type: operation.type,
+        path: operation.path,
+        ...(operation.type === "delete"
+          ? {}
+          : {
+              newBytes: Buffer.from(operation.contentBase64, "base64")
+                .byteLength,
+            }),
+      }));
     },
     async proposalSubmit(summary: string) {
-      if (staged.size === 0) throw new Error("No proposal changes are staged");
+      if (!canPropose)
+        throw new Error("This AgentShare environment is read-only");
+      if (staged.size === 0 || stagedBaseRevisionId === undefined)
+        throw new Error("No proposal changes are staged");
       await sync();
       const proposal = await submitProposalOperations(
         environmentId,
         summary,
         [...staged.values()],
-        readOptions,
+        { ...readOptions, baseRevisionId: stagedBaseRevisionId },
       );
       staged.clear();
+      stagedBaseRevisionId = undefined;
       return { proposalId: proposal.proposalId, summary: proposal.summary };
     },
   };
@@ -347,7 +386,34 @@ export async function runInternalMcpServer(
   environmentId: string,
   options: { statePath?: string; cacheRoot?: string } = {},
 ): Promise<void> {
-  const runtime = await createEnvironmentMcpRuntime(environmentId, options);
+  const mode = process.env.AGENTSHARE_MCP_MODE ?? "ask";
+  if (mode !== "ask" && mode !== "propose")
+    throw new Error("Invalid AgentShare worker mode");
+  const receiptPath = process.env.AGENTSHARE_MCP_RECEIPT_PATH;
+  const runId = process.env.AGENTSHARE_MCP_RUN_ID;
+  if ((receiptPath === undefined) !== (runId === undefined))
+    throw new Error("Incomplete MCP receipt channel");
+  const runtime = await createEnvironmentMcpRuntime(environmentId, {
+    ...options,
+    mode,
+  });
+  const completed =
+    receiptPath === undefined || runId === undefined
+      ? undefined
+      : (tool: string, value: unknown) => {
+          const revisionId = runtime.currentRevision?.();
+          return recordMcpCompletion(
+            {
+              path: receiptPath,
+              runId,
+              environmentId,
+              mode,
+              ...(revisionId === undefined ? {} : { revisionId }),
+            },
+            tool,
+            value,
+          );
+        };
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
   for await (const line of input) {
     if (line.trim().length === 0) continue;
@@ -360,7 +426,21 @@ export async function runInternalMcpServer(
       );
       continue;
     }
-    const response = await handleMcpRequest(request, runtime);
+    const response = await handleMcpRequest(request, runtime, completed);
+    if (
+      receiptPath !== undefined &&
+      runId !== undefined &&
+      request.method === "tools/call" &&
+      response !== undefined
+    ) {
+      const result = asObject(response.result);
+      if (response.error !== undefined || result.isError === true) {
+        await recordMcpFailure(
+          { path: receiptPath, runId, environmentId, mode },
+          optionalString(asObject(request.params), "name") ?? "unknown",
+        );
+      }
+    }
     if (response !== undefined)
       process.stdout.write(`${JSON.stringify(response)}\n`);
   }
@@ -375,6 +455,13 @@ function tool(
   return {
     name,
     description,
+    annotations: {
+      readOnlyHint:
+        !name.startsWith("proposal_stage_") && name !== "proposal_submit",
+      destructiveHint: name.startsWith("proposal_stage_"),
+      idempotentHint: name !== "proposal_submit",
+      openWorldHint: true,
+    },
     inputSchema: {
       type: "object",
       properties,

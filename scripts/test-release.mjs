@@ -1,4 +1,26 @@
 import { spawnSync } from "node:child_process";
+import { runEvidenceCli } from "./release-evidence.mjs";
+
+// Explicit profiles consume independently collected full-flow evidence. Never
+// relabel the legacy source/launcher suites as published-artifact v2 evidence.
+if (process.argv.length > 2) {
+  try {
+    const result = runEvidenceCli(process.argv.slice(2));
+    console.log(
+      `Evidence contract verified: ${result.profile}, ${result.checks} checks, run ${result.runId}. No deployment or publication performed.`,
+    );
+    process.exit(0);
+  } catch (error) {
+    console.error(
+      error instanceof Error ? error.message : "Release evidence rejected",
+    );
+    process.exit(1);
+  }
+}
+
+console.warn(
+  "LEGACY BOTH-AGENT GATE: diagnostic/source isolation evidence only; not promotable as full v2 published-artifact evidence. Use --profile codex-only-v1 with --evidence, --candidate, and --artifact for that contract.",
+);
 
 const relay = requireHttpsOrigin(
   "AGENTSHARE_E2E_RELAY",

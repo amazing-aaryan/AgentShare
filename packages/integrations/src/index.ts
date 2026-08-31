@@ -1,6 +1,9 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { securePrivatePath } from "./private-files.js";
+export { ensurePrivateDirectory, securePrivatePath } from "./private-files.js";
 
 const MARKER = "<!-- managed-by: agentshare -->";
 
@@ -11,13 +14,25 @@ description: Create or manage an encrypted AgentShare collaborative environment 
 
 ${MARKER}
 
-Run this command using the shell tool:
+Use the connected AgentShare creator MCP tools in this conversation. Never publish from an agent-supplied approval flag.
+
+1. Run \`agentshare session-context\` through this session's shell. It returns only the current thread ID and cwd. Do not search transcript files or select the newest session.
+2. Call \`resolve_creator_session\` with that exact thread ID. Ask which scope (conversation/project/both), access (read/read+propose), and expiry the user wants. If the recorded project moved, explicitly choose the replacement root; never infer it from a matching folder name.
+3. Call \`prepare_share\`, then show the authoritative summary and offer \`review_share\` pages. Preparation is local only.
+4. Call \`commit_share\` for that exact draft/digest. The server requests native human confirmation. Never accept or simulate this confirmation on the user's behalf. Decline, cancellation, unsupported host, or timeout permits no new publication writes; an earlier interrupted attempt may still need recovery.
+5. Return the resulting capability link exactly once. On uncertain publication use \`share_status\`; do not create another share blindly.
+
+If creator tools are missing, run \`agentshare doctor\`. Reload MCP servers when supported; otherwise tell the user a host restart is required. Do not open an empty terminal or claim current-session activation without seeing the tools.
+
+Terminal fallback for an already prepared draft is \`agentshare review --draft <returned-id> --digest <returned-digest>\`. The user reviews and confirms in the terminal; the same retained bytes are published.
+
+For a fresh terminal workflow, run:
 
 \`\`\`powershell
 agentshare share --current --source codex
 \`\`\`
 
-AgentShare requires an interactive terminal for creator selection and final review. If this shell cannot provide one, stop and ask the user to run \`agentshare share --current --source codex\` in a real interactive terminal. Do not emulate the selection, add \`--yes\`, invent file paths, inspect AgentShare state, or bypass its secret scanner. Return the resulting environment capability link exactly once. If AgentShare shows an existing environment, let the user choose update/copy/review/new/revoke through its selection UI.
+Terminal fallback requires genuine user review. If this shell cannot provide it, explain that limitation. Do not emulate selection, add \`--yes\`, invent paths, inspect AgentShare state, or bypass scanning. Existing-share updates retain permissions; proposal application and revocation require separate user decisions. Claude and non-Windows real-agent workflows remain unverified for this candidate.
 `;
 
 const CODEX_CREATOR_INTERFACE = `interface:
@@ -81,12 +96,17 @@ Never inspect AgentShare state/cache files directly and never copy decrypted sha
 `;
 
 export type IntegrationRoots = {
+  codexConfig?: string;
   codexSkills: string;
   claudeSkills: string;
 };
 
 export function defaultIntegrationRoots(): IntegrationRoots {
   return {
+    codexConfig: join(
+      process.env.CODEX_HOME ?? join(homedir(), ".codex"),
+      "config.toml",
+    ),
     codexSkills: join(homedir(), ".agents", "skills"),
     claudeSkills: join(homedir(), ".claude", "skills"),
   };
@@ -113,7 +133,12 @@ export async function installIntegrations(
     [join(roots.claudeSkills, "agentshare", "SKILL.md"), CLAUDE_RECEIVER_SKILL],
   ] as const;
   for (const [path, content] of files) await writeManaged(path, content);
-  return files.map(([path]) => path);
+  const installed = files.map(([path]) => path);
+  if (roots.codexConfig !== undefined) {
+    await installCreatorMcpConfiguration(roots.codexConfig);
+    installed.push(roots.codexConfig);
+  }
+  return installed;
 }
 
 export async function removeIntegrations(
@@ -139,6 +164,115 @@ export async function removeIntegrations(
   ] as const;
   for (const [directory, markerFile] of directories) {
     await removeManagedDirectory(directory, markerFile);
+  }
+  if (roots.codexConfig !== undefined)
+    await updateCreatorConfig(roots.codexConfig, "");
+}
+
+const CONFIG_START = "# >>> agentshare managed creator MCP";
+const CONFIG_END = "# <<< agentshare managed creator MCP";
+
+export async function installCreatorMcpConfiguration(
+  path: string,
+  executable = process.execPath,
+  cliPath = process.argv[1],
+): Promise<void> {
+  if (cliPath === undefined)
+    throw new Error("AgentShare CLI path unavailable for MCP installation");
+  const block = [
+    CONFIG_START,
+    "[mcp_servers.agentshare_creator]",
+    `command = ${JSON.stringify(executable)}`,
+    `args = [${JSON.stringify(cliPath)}, "creator-mcp"]`,
+    "enabled = true",
+    "required = false",
+    "tool_timeout_sec = 180",
+    'default_tools_approval_mode = "prompt"',
+    "[mcp_servers.agentshare_creator.tools.resolve_creator_session]",
+    'approval_mode = "approve"',
+    "[mcp_servers.agentshare_creator.tools.review_share]",
+    'approval_mode = "approve"',
+    "[mcp_servers.agentshare_creator.tools.share_status]",
+    'approval_mode = "approve"',
+    CONFIG_END,
+    "",
+  ].join("\n");
+  await updateCreatorConfig(path, block);
+}
+
+async function updateCreatorConfig(path: string, block: string): Promise<void> {
+  const existing = await readFile(path, "utf8").catch((error: unknown) => {
+    if (isNotFound(error)) return "";
+    throw error;
+  });
+  const start = existing.indexOf(CONFIG_START),
+    end = existing.indexOf(CONFIG_END);
+  if (
+    start < 0 !== end < 0 ||
+    (start >= 0 && (end < start || existing.includes(CONFIG_START, start + 1)))
+  ) {
+    throw new Error(
+      "Malformed managed AgentShare MCP configuration; repair manually",
+    );
+  }
+  const unmanaged =
+    start < 0
+      ? existing
+      : existing.slice(0, start) +
+        existing.slice(end + CONFIG_END.length).replace(/^\r?\n/u, "");
+  if (unmanaged.includes("agentshare_creator"))
+    throw new Error(
+      "Refusing to overwrite unmanaged agentshare_creator MCP configuration",
+    );
+  const next =
+    block === ""
+      ? unmanaged
+      : `${unmanaged}${unmanaged.endsWith("\n") || unmanaged === "" ? "" : "\n"}${block}`;
+  if (next === existing) return;
+  await mkdir(dirname(path), { recursive: true });
+  if (existing !== "") {
+    const backup = `${path}.agentshare-backup`;
+    const backupStage = `${path}.${randomUUID()}.backup-tmp`;
+    try {
+      await writeProtectedConfig(backupStage, existing);
+      await link(backupStage, backup);
+    } catch (error) {
+      if (!(
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "EEXIST"
+      ))
+        throw error;
+    } finally {
+      await rm(backupStage, { force: true });
+    }
+    await securePrivatePath(backup);
+  }
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  await writeProtectedConfig(temporary, next);
+  const current = await readFile(path, "utf8").catch((error: unknown) => {
+    if (isNotFound(error)) return "";
+    throw error;
+  });
+  if (current !== existing) {
+    await rm(temporary);
+    throw new Error("Codex configuration changed during installation; retry");
+  }
+  await rename(temporary, path);
+}
+
+async function writeProtectedConfig(
+  path: string,
+  content: string,
+): Promise<void> {
+  // Establish ACL while empty; do not briefly expose copied MCP credentials.
+  await writeFile(path, "", { flag: "wx", mode: 0o600 });
+  try {
+    await securePrivatePath(path);
+    await writeFile(path, content);
+  } catch (error) {
+    await rm(path, { force: true });
+    throw error;
   }
 }
 

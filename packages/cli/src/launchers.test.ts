@@ -5,6 +5,7 @@ import {
   captureProcess,
   runTarget,
   supportsReviewedTargetVersion,
+  supportsReviewedEnvironmentTargetVersion,
   waitForTargetClose,
 } from "./launchers.js";
 
@@ -70,6 +71,25 @@ afterEach(() => {
 });
 
 describe("target process lifecycle", () => {
+  it("pins v2 Codex MCP to 0.147.0 without changing historical legacy support", () => {
+    for (const version of ["0.145.0", "0.146.0"]) {
+      expect(
+        supportsReviewedTargetVersion("codex", `codex-cli ${version}`),
+      ).toBe(true);
+      expect(
+        supportsReviewedEnvironmentTargetVersion(
+          "codex",
+          `codex-cli ${version}`,
+        ),
+      ).toBe(false);
+    }
+    expect(
+      supportsReviewedEnvironmentTargetVersion("codex", "codex-cli 0.147.0"),
+    ).toBe(true);
+    expect(
+      supportsReviewedEnvironmentTargetVersion("codex", "codex-cli 0.148.0"),
+    ).toBe(false);
+  });
   it("allows reviewed hosts and fails closed for unreviewed newer releases", () => {
     expect(supportsReviewedTargetVersion("codex", "codex-cli 0.147.0")).toBe(
       true,

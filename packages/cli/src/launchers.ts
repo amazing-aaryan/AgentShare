@@ -240,6 +240,16 @@ export function supportsReviewedTargetVersion(
   return REVIEWED_VERSIONS[target].test(versionOutput.trim());
 }
 
+/** V2 MCP approvals were validated separately from the legacy query profile. */
+export function supportsReviewedEnvironmentTargetVersion(
+  target: TargetAgent,
+  versionOutput: string,
+): boolean {
+  return target === "codex"
+    ? /^codex-cli 0\.147\.0\s*$/mu.test(versionOutput.trim())
+    : supportsReviewedTargetVersion(target, versionOutput);
+}
+
 async function assertSupportedTarget(
   target: TargetAgent,
   executable: AgentExecutable,
