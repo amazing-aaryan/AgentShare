@@ -114,7 +114,12 @@ try {
   const runCli = (args, selectedHome = home) =>
     execute(process.execPath, [cliEntrypoint, ...args], {
       cwd: directory,
-      env: { ...cliEnvironment, HOME: selectedHome, USERPROFILE: selectedHome },
+      env: {
+        ...cliEnvironment,
+        HOME: selectedHome,
+        USERPROFILE: selectedHome,
+        CODEX_HOME: join(selectedHome, ".codex"),
+      },
     });
 
   const installedVersion = await runCli(["--version"]);

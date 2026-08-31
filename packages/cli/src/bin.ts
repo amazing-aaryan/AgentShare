@@ -14,7 +14,12 @@ import {
   repairOwnedEnvironmentPublications,
   revokeOwnedEnvironment,
 } from "./commands/runtime-v2.js";
-import { shareCurrentV2 } from "./commands/share-v2.js";
+import {
+  copyOwnedEnvironmentLink,
+  reviewShareDraftInTerminal,
+  shareCurrentV2,
+} from "./commands/share-v2.js";
+import { creatorDoctor, runCreatorMcpServer } from "./creator-mcp.js";
 import { runInternalMcpServer } from "./worker/internal-mcp.js";
 import { sanitizeTerminalText } from "./terminal.js";
 import {
@@ -35,6 +40,34 @@ try {
   if (command === "--version") {
     assertKnownOptions(args, new Set());
     process.stdout.write(`${AGENTSHARE_VERSION}\n`);
+  } else if (command === "session-context") {
+    assertKnownOptions(args, new Set());
+    const threadId = process.env.CODEX_THREAD_ID;
+    if (threadId === undefined || threadId.length === 0)
+      throw new Error("SESSION_REQUIRED");
+    process.stdout.write(
+      `${JSON.stringify({ threadId, cwd: process.cwd() })}\n`,
+    );
+  } else if (command === "creator-mcp") {
+    assertKnownOptions(args, new Set(["--state-path"]));
+    const statePath = option(args, "--state-path");
+    await runCreatorMcpServer(statePath === undefined ? {} : { statePath });
+  } else if (command === "doctor") {
+    assertKnownOptions(args, new Set());
+    process.stdout.write(`${JSON.stringify(creatorDoctor())}\n`);
+  } else if (command === "review") {
+    assertKnownOptions(args, new Set(["--draft", "--digest", "--state-path"]));
+    const draftId = option(args, "--draft");
+    const digest = option(args, "--digest");
+    if (draftId === undefined || digest === undefined)
+      throw new Error("Review requires --draft and --digest");
+    const statePath = option(args, "--state-path");
+    const result = await reviewShareDraftInTerminal(
+      draftId,
+      digest,
+      statePath === undefined ? {} : { statePath },
+    );
+    process.stdout.write(`${result.url}\n`);
   } else if (command === "update") {
     assertKnownOptions(args, new Set(["--check"]));
     if (args.includes("--check")) {
@@ -71,6 +104,10 @@ try {
         "--source",
         "--new",
         "--legacy",
+        "--session-id",
+        "--project-root",
+        "--state-path",
+        "--environment",
       ]),
     );
     const current = args.includes("--current");
@@ -92,9 +129,22 @@ try {
         handoffOrigin,
         forceNew: args.includes("--new"),
         ...(ttlSeconds === undefined ? {} : { ttlSeconds }),
+        ...v2ShareIdentityOptions(args),
       });
       process.stdout.write(`${result.url}\n`);
     } else {
+      if (
+        [
+          "--session-id",
+          "--project-root",
+          "--state-path",
+          "--environment",
+        ].some((flag) => args.includes(flag))
+      ) {
+        throw new Error(
+          "Session/project/state/environment options require v2 share --current --source codex|claude",
+        );
+      }
       const inputPath = current ? undefined : positional(args, 0);
       process.stdout.write(
         `${await legacyShare(
@@ -207,6 +257,13 @@ try {
     if (environmentId === undefined) throw new Error("Missing --environment");
     await revokeOwnedEnvironment(environmentId, option(args, "--state-path"));
     process.stdout.write("Environment revoked\n");
+  } else if (command === "copy-environment") {
+    assertKnownOptions(args, new Set(["--environment", "--state-path"]));
+    const environmentId = option(args, "--environment");
+    if (environmentId === undefined) throw new Error("Missing --environment");
+    process.stdout.write(
+      `${await copyOwnedEnvironmentLink(environmentId, option(args, "--state-path"))}\n`,
+    );
   } else if (command === "open") {
     assertKnownOptions(args, new Set(["--target"]));
     await openCommand(targetAgent(option(args, "--target") ?? "codex"));
@@ -215,15 +272,31 @@ try {
     await revokeCommand();
     process.stdout.write("Share revoked\n");
   } else if (command === "init" || command === "repair") {
-    assertKnownOptions(args, new Set(["--state-path"]));
-    const files = await installIntegrations();
+    assertKnownOptions(
+      args,
+      new Set(
+        command === "repair"
+          ? ["--state-path", "--environment"]
+          : ["--state-path"],
+      ),
+    );
+    const environmentId = option(args, "--environment");
+    const files =
+      environmentId === undefined ? await installIntegrations() : [];
     const repaired =
-      command === "repair"
-        ? await repairOwnedEnvironmentPublications(option(args, "--state-path"))
-        : 0;
+      environmentId === undefined
+        ? 0
+        : await repairOwnedEnvironmentPublications(
+            option(args, "--state-path"),
+            environmentId,
+          );
     process.stdout.write(
       sanitizeTerminalText(
-        `Installed integrations:\n${files.join("\n")}\n${repaired > 0 ? `Resumed ${repaired} pending environment publication(s).\n` : ""}`,
+        environmentId === undefined
+          ? `Installed integrations:\n${files.join("\n")}\n${command === "repair" ? "No publications resumed. Use repair --environment ID for scoped recovery.\n" : ""}`
+          : repaired > 0
+            ? `Resumed pending publication for ${environmentId}.\n`
+            : `No pending publication for ${environmentId}.\n`,
       ),
     );
   } else if (command === "remove") {
@@ -307,6 +380,26 @@ function v2StorageOptions(args: string[]): {
   };
 }
 
+function v2ShareIdentityOptions(args: string[]): {
+  sessionId?: string;
+  projectRoot?: string;
+  statePath?: string;
+  existingEnvironmentId?: string;
+} {
+  const sessionId = option(args, "--session-id");
+  const projectRoot = option(args, "--project-root");
+  const statePath = option(args, "--state-path");
+  const existingEnvironmentId = option(args, "--environment");
+  if (existingEnvironmentId !== undefined && args.includes("--new"))
+    throw new Error("--new conflicts with --environment");
+  return {
+    ...(sessionId === undefined ? {} : { sessionId }),
+    ...(projectRoot === undefined ? {} : { projectRoot }),
+    ...(statePath === undefined ? {} : { statePath }),
+    ...(existingEnvironmentId === undefined ? {} : { existingEnvironmentId }),
+  };
+}
+
 function shouldRunPassiveUpdateCheck(command: string | undefined): boolean {
   return (
     command === "share" ||
@@ -325,12 +418,21 @@ function assertKnownOptions(
     if (value.startsWith("--") && !allowed.has(value)) {
       throw new Error(`Unknown option: ${value}`);
     }
+    if (
+      value.startsWith("--") &&
+      args.indexOf(value) !== args.lastIndexOf(value)
+    )
+      throw new Error(`Duplicate option: ${value}`);
   }
 }
 
 function option(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
-  return index === -1 ? undefined : args[index + 1];
+  if (index === -1) return undefined;
+  const value = args[index + 1];
+  if (value === undefined || value.length === 0 || value.startsWith("--"))
+    throw new Error(`Missing value for ${name}`);
+  return value;
 }
 
 function positional(args: string[], position: number): string {
@@ -357,7 +459,7 @@ function targetAgent(value: string): "codex" | "claude" {
 function usage(): void {
   process.stdout.write(`AgentShare\n\n`);
   process.stdout.write(
-    `  agentshare share --current --source codex|claude [--new] [--ttl SECONDS] [--relay URL] [--handoff URL]\n`,
+    `  agentshare share --current --source codex|claude [--session-id ID] [--project-root PATH] [--state-path PATH] [--environment ID|--new] [--ttl SECONDS] [--relay URL] [--handoff URL]\n`,
   );
   process.stdout.write(`  agentshare bootstrap < link-on-stdin\n`);
   process.stdout.write(
@@ -368,6 +470,18 @@ function usage(): void {
   );
   process.stdout.write(`  agentshare inbox --source codex|claude\n`);
   process.stdout.write(`  agentshare revoke-environment --environment ID\n`);
+  process.stdout.write(
+    `  agentshare copy-environment --environment ID [--state-path PATH]\n`,
+  );
+  process.stdout.write(
+    `  agentshare repair --environment ID [--state-path PATH]\n`,
+  );
+  process.stdout.write(
+    `  agentshare review --draft ID --digest SHA256 [--state-path PATH]\n`,
+  );
+  process.stdout.write(`  agentshare creator-mcp [--state-path PATH]\n`);
+  process.stdout.write(`  agentshare doctor\n`);
+  process.stdout.write(`  agentshare session-context\n`);
   process.stdout.write(
     `  agentshare share-v1 <file>|--current [--new] [--ttl SECONDS] [--relay URL] [--handoff URL]\n`,
   );

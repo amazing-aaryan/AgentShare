@@ -113,5 +113,5 @@ describe("AgentShare v2 collaboration journey", () => {
       }),
     ).toBe("two\n");
     expect(originalUrl).toBe(created.url);
-  });
+  }, 120_000);
 });

@@ -1,8 +1,13 @@
 import type { EnvironmentSearchHit } from "../environment/index.js";
 import { searchAttachedEnvironment } from "../environment/accept.js";
 import { refreshAttachedEnvironment } from "../environment/refresh.js";
-import type { TargetAgent, TargetResult } from "../launchers.js";
-import { runEnvironmentTarget } from "../worker/environment-launcher.js";
+import type { TargetAgent } from "../launchers.js";
+import {
+  runEnvironmentTarget,
+  type EnvironmentRuntimeOptions,
+  type EnvironmentTargetResult,
+} from "../worker/environment-launcher.js";
+import { hasRequiredCompletion } from "../worker/completion.js";
 
 export type AskEnvironmentOptions = {
   target: TargetAgent;
@@ -12,8 +17,8 @@ export type AskEnvironmentOptions = {
     target: TargetAgent,
     environmentId: string,
     prompt: string,
-    runtimeOptions: { statePath?: string; cacheRoot?: string },
-  ) => Promise<TargetResult>;
+    runtimeOptions: EnvironmentRuntimeOptions,
+  ) => Promise<EnvironmentTargetResult>;
 };
 
 export async function askAttachedEnvironment(
@@ -22,6 +27,7 @@ export async function askAttachedEnvironment(
   options: AskEnvironmentOptions,
 ): Promise<string> {
   const runtimeOptions = {
+    mode: "ask" as const,
     ...(options.statePath === undefined
       ? {}
       : { statePath: options.statePath }),
@@ -45,6 +51,13 @@ export async function askAttachedEnvironment(
   if (result.exitCode !== 0) {
     throw new Error(`${options.target} exited with code ${result.exitCode}`);
   }
+  if (!hasRequiredCompletion(result.receipts, "ask", environmentId)) {
+    throw new Error(
+      "AgentShare ask failed: no completed shared file or conversation read receipt",
+    );
+  }
+  if (result.output.trim().length === 0)
+    throw new Error("AgentShare ask returned no answer");
   return result.output;
 }
 
@@ -62,7 +75,7 @@ export function buildEnvironmentEvidencePrompt(
   return [
     "You are answering a question about a read-only AgentShare environment.",
     "Answer only from the AgentShare evidence available through the AgentShare MCP tools. Do not use external facts, local host files, network access, shell commands, or unsupported assumptions.",
-    "Use search/read_file/read_conversation as needed to inspect more shared evidence.",
+    "You must call read_file or read_conversation and successfully read relevant nonempty shared evidence before answering. Search, environment_info, list_files, and this initial evidence alone do not complete the request.",
     "Cite every material claim with shared file line references or conversation event references.",
     "If the evidence is insufficient, say so explicitly.",
     "",

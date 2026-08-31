@@ -30,14 +30,12 @@ Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 > regulated data, or other high-risk material. Review the final normalized text,
 > included files, exclusions, and redactions before publication.
 
-> [!NOTE] This repository contains the v0.2 collaborative-environment line. The
-> current patch release candidate is v0.2.1, which ships the Codex
-> minimum-version plus runtime-capability compatibility policy. Stable
-> publication still requires immutable package staging, live split-origin
-> verification, and fresh evidence for every recipient security surface changed
-> by the release. See the
-> [deployment runbook](docs/operations/cloudflare-deployment.md). Until
-> promotion, use the current stable GitHub release for production installation.
+> [!NOTE] This repository contains the v0.3 collaborative-environment candidate.
+> It is not a stable public v0.3 release until the immutable package, live
+> Cloudflare deployment, and the authenticated Codex `codex-only-v1` release
+> profile in the [deployment runbook](docs/operations/cloudflare-deployment.md)
+> pass. Claude live execution is not a v0.3 stable-promotion gate. Until then,
+> use the current stable GitHub release for production installation.
 
 ## Principles
 
@@ -68,9 +66,8 @@ continue**
 
 ### 1. Install the stable CLI and integrations
 
-Requirements: Node.js 22 or newer, plus Codex CLI 0.145.0 or newer with the
-required isolation controls, or an exact-reviewed Claude Code version. Install
-the current immutable package from
+Requirements: Node.js 22 or newer, plus a supported Codex CLI or reviewed Claude
+Code version. Install the current immutable package from
 [GitHub Releases](https://github.com/amazing-aaryan/AgentShare/releases), then
 run:
 
@@ -79,8 +76,7 @@ agentshare init
 ```
 
 Start a new Codex or Claude Code session so the host discovers the managed
-integration. Codex uses a minimum-version plus runtime-capability policy; Claude
-Code currently uses exact-reviewed versions. Both are documented in
+integration. Recipient compatibility policy and reviewed evidence are tracked in
 [recipient compatibility](docs/recipient-compatibility.md).
 
 ### 2. Create a collaborative environment
@@ -389,15 +385,15 @@ npm audit --audit-level=high
 ```
 
 CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22
-and 24. A stable public release additionally requires live split-origin
-deployment verification and fresh recipient compatibility/isolation evidence for
-every agent, launcher, or sandbox surface changed by that release. On a patch
-release, an unchanged adapter may carry forward its most recent recorded
-real-host isolation evidence, but the release record must identify the
-carried-forward surface explicitly.
+and 24. Stable promotion additionally requires the release-specific live
+evidence recorded in the deployment runbook. For the v0.3 collaboration line,
+that is the authenticated Codex `codex-only-v1` profile: live split-origin
+deployment, published-artifact bootstrap, terminal and native Codex creation,
+actual MCP read/proposal/inbox/approval/refresh behavior, isolation, revocation,
+and cleanup. Claude live execution is not part of that v0.3 promotion profile.
 
-`npm run test:release` remains the strongest full two-agent diagnostic when both
-authenticated hosts are available:
+The broader two-agent diagnostic remains available when both authenticated
+reviewed hosts are present:
 
 ```powershell
 $env:AGENTSHARE_E2E_RELAY="https://agentshare-relay.carnation-vermicelli.workers.dev"
@@ -405,11 +401,11 @@ $env:AGENTSHARE_E2E_HANDOFF="https://agentshare-handoff.carnation-vermicelli.wor
 npm run test:release
 ```
 
-A new agent adapter is not considered supported merely because it can receive a
-prompt. It must prove creator extraction, capability handling, and real
-recipient isolation before public support is claimed. Codex additionally fails
-closed on versions below its minimum or when required runtime isolation controls
-disappear.
+A release using a narrower documented profile must not claim this broader
+diagnostic passed unless it actually did. A new agent adapter is not considered
+supported merely because it can receive a prompt; it must prove creator
+extraction, capability handling, and recipient isolation under its documented
+release evidence.
 
 ## What We Intentionally Are Not Building
 

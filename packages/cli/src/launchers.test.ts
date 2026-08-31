@@ -5,6 +5,7 @@ import {
   captureProcess,
   runTarget,
   supportsReviewedTargetVersion,
+  supportsReviewedEnvironmentTargetVersion,
   waitForTargetClose,
 } from "./launchers.js";
 
@@ -70,18 +71,38 @@ afterEach(() => {
 });
 
 describe("target process lifecycle", () => {
-  it("allows Codex at or above the minimum while Claude stays exact-reviewed", () => {
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.144.0")).toBe(
+  it("pins v2 Codex MCP to 0.147.0 without changing general Codex support", () => {
+    for (const version of ["0.145.0", "0.146.0"]) {
+      expect(
+        supportsReviewedTargetVersion("codex", `codex-cli ${version}`),
+      ).toBe(true);
+      expect(
+        supportsReviewedEnvironmentTargetVersion(
+          "codex",
+          `codex-cli ${version}`,
+        ),
+      ).toBe(false);
+    }
+    expect(
+      supportsReviewedEnvironmentTargetVersion("codex", "codex-cli 0.147.0"),
+    ).toBe(true);
+    expect(
+      supportsReviewedEnvironmentTargetVersion("codex", "codex-cli 0.148.0"),
+    ).toBe(false);
+  });
+
+  it("allows capability-compatible Codex releases while keeping Claude reviewed", () => {
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.147.0")).toBe(
+      true,
+    );
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.149.0")).toBe(
+      true,
+    );
+    expect(
+      supportsReviewedTargetVersion("codex", "codex-cli 99.4.7-beta.1"),
+    ).toBe(true);
+    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.144.9")).toBe(
       false,
-    );
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.145.0")).toBe(
-      true,
-    );
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 0.150.0")).toBe(
-      true,
-    );
-    expect(supportsReviewedTargetVersion("codex", "codex-cli 1.0.0")).toBe(
-      true,
     );
     expect(
       supportsReviewedTargetVersion("claude", "2.1.238 (Claude Code)"),
@@ -131,7 +152,7 @@ describe("target process lifecycle", () => {
 
   it("fails closed before launch when a required isolation control is absent", async () => {
     spawnMock
-      .mockImplementationOnce(() => fakeProcess("codex-cli 0.150.0\n"))
+      .mockImplementationOnce(() => fakeProcess("codex-cli 0.147.0\n"))
       .mockImplementationOnce(() => fakeProcess(CODEX_INCOMPLETE_HELP));
 
     await expect(runTarget("codex", "question")).rejects.toThrow(
@@ -140,8 +161,8 @@ describe("target process lifecycle", () => {
     expect(spawnMock).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects Codex below the minimum without running its help command", async () => {
-    spawnMock.mockImplementationOnce(() => fakeProcess("codex-cli 0.144.0\n"));
+  it("rejects a too-old Codex version without running its help command", async () => {
+    spawnMock.mockImplementationOnce(() => fakeProcess("codex-cli 0.144.9\n"));
 
     await expect(runTarget("codex", "question")).rejects.toThrow(
       "requires Codex CLI >= 0.145.0",

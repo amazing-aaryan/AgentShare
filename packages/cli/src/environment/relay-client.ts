@@ -26,8 +26,22 @@ export class EnvironmentRelayClient {
 
   constructor(origin: string, fetchImpl: typeof fetch = fetch) {
     const url = new URL(origin);
-    if (url.protocol !== "https:" && !isLoopback(url.hostname)) {
+    if (
+      url.protocol !== "https:" &&
+      !(url.protocol === "http:" && isLoopback(url.hostname))
+    ) {
       throw new Error("AgentShare relays require HTTPS except on loopback");
+    }
+    if (
+      url.username !== "" ||
+      url.password !== "" ||
+      url.search !== "" ||
+      url.hash !== "" ||
+      url.pathname !== "/"
+    ) {
+      throw new Error(
+        "AgentShare relay must be an origin without credentials, path, query or fragment",
+      );
     }
     this.#origin = url.origin;
     this.#fetch = fetchImpl;

@@ -289,3 +289,240 @@ subscription access and no `ANTHROPIC_API_KEY` is configured. **Impact:** Relay
 active version `ad67746a`, handoff active version `8b0e7909`; stable promotion
 requires Anthropic API-key auth or organization subscription enablement, then
 rerun `npm run test:release`.
+
+## [2026-08-27 16:00] Implement reviewed reliability and chat program
+
+**Decision:** Implement eight saved plans under
+.claude/plan/agentshare-reliability-and-chat. Certify Windows build26200,
+Node24.14.0 and Codex0.147.0 first; Claude explicitly unverified. **Why:** Later
+published-package diagnostic disproved full v2 MCP success: calls cancelled and
+no proposal despite exit zero. Earlier relay/legacy tests were insufficient.
+**Impact:** No stable promotion before exact-artifact full journey and native
+chat consent pass; v0.2.0 remains immutable. Parent owns drafts/state/proposals.
+Native workers own scanner, recipient runtime, and release validator in disjoint
+scopes; close after integration. No deployments in worker tasks.
+
+## [2026-08-27 21:54] PR2 scanner worker lossless scan handoff (scanner-71-20260827)
+
+**Decision:** Share normalized MIME/strict UTF-8 classification across scanner,
+workspace snapshots, and recipient reads/indexing. Preserve clean bytes and
+BOM/CRLF; block suspected binary secrets; reject secret operational paths
+instead of renaming. Export scanText, assertSafeResourcePath, and
+sanitizeResourcePath for parent metadata/proposal integration. **Why:** The
+original MIME allowlist rejected YAML/TOML secrets while permissive UTF-8
+conversion could corrupt mislabeled binary. Quoted JSON credential keys and v2
+environment capability URLs needed coverage; diagnostics must not echo secret
+fragments. **Impact:** 71 focused tests across four files pass; scanner
+typecheck, focused ESLint, and diff whitespace checks pass. Full CLI typecheck
+encountered concurrent out-of-scope owned-snapshot/internal-mcp test edits.
+Modified only scanner sources/tests, snapshot/accept and tests, plus this
+append-only record; no commits, deployments, public shares, or agents.
+Proceeding to user-assigned PR5 apply/inbox work; parent retains
+submit/publication ownership.
+
+## [2026-08-27 21:54] PR7 release-evidence worker freezes offline contract (pr7-evidence-6f41)
+
+**Decision:** Added strict codex-only-v1 report/candidate validation, 18
+terminal/chat lifecycle checks, observed assertions, archive/attachment SHA-256
+and size checks, full Worker identities, resource cleanup accounting, and
+explicit-profile dispatch while retaining the legacy both-agent default as
+nonpromotable for full v2 evidence. **Why:** Legacy suites and zero process exit
+cannot prove actual published-artifact MCP
+read/propose/approval/refresh/isolation/revocation success. Independent
+candidate inputs prevent a report from choosing its own expected hashes or
+deployment IDs. **Impact:** 86 synthetic Node tests passed; owned files pass
+Prettier and diff checks. Parent must integrate actual collection against
+docs/release-v0.3.0.md; no real-flow, publication, deployment, or
+external-service action was performed. Evidence files changed:
+scripts/test-release.mjs, scripts/release-evidence.mjs,
+scripts/release-evidence.test.mjs, docs/recipient-compatibility.md,
+docs/release-v0.3.0.md. Proceeding separately to assigned PR4 session/terminal
+lifecycle.
+
+## [2026-08-27 22:00] PR1 recipient MCP receipts and PR5 staging pin (recipient-8c7d-20260827)
+
+**Decision:** Gate v2 Codex to 0.147.0 while preserving legacy 0.145/146
+support; use exact per-mode MCP tool allowlists, required server, truthful
+annotations, and per-tool approve without changing global never approval or
+sandbox isolation. Require trusted metadata-only MCP receipts outside the
+recipient workspace for nonempty file/conversation reads and successful proposal
+submission. Pin the first staging revision and pass baseRevisionId to
+parent-owned submit validation. **Why:** Exit-zero model output and
+attempted/cancelled MCP calls do not prove completion. A refreshed revision must
+not silently relabel staged operations. Official config reference and the
+rust-v0.147.0 schema confirm the scoped approval fields. **Impact:** 32 focused
+tests and root TypeScript pass; two opt-in real Codex 0.147.0 local synthetic
+MCP tests pass (ask 17.4s; propose 19.5s), with receipts and no cancellation.
+This is not public relay/apply or release evidence. Parent received interfaces
+and bounded read-only findings for recovery identity/commit receipts, stale-lock
+unlink race, Windows storage ACLs, stale ownership resurrection, and cross-root
+updates; parent reported fixing the first three. Changed launchers/tests, worker
+completion/internal-MCP/environment-launcher/tests and local fixture test,
+ask-v2/propose-v2/tests only. No commits, pushes, deployments, public shares, or
+recursive delegation.
+
+## [2026-08-27 22:01] Recipient final parent review handoff (recipient-8c7d-final)
+
+**Decision:** Finish the bounded read-only review after inspecting parent fixes
+for persisted ownership, locked recovery identity, exact commit receipts,
+approved workspace rebinding, exact owner ACLs, and protected state/backup
+staging. Report the remaining legacy generation-zero ownership resurrection edge
+for parent disposition; do not edit parent-owned modules. **Why:** New
+generation checks distinguish removed v3 ownership but cannot distinguish a
+stale generation-zero v2 object from a fresh creation. Parent retains migration
+and state authority. **Impact:** Recipient focused suite still passes 32 tests;
+scoped ESLint, Prettier, and diff checks passed. Latest root TypeScript run was
+interrupted by concurrent removal/rewrite of parent/other-worker
+proposals/apply.ts (four missing-module diagnostics), after an earlier full
+typecheck passed. Parent owns final full app/package/public lifecycle
+validation. Real local MCP evidence remains 2/2 passing and does not establish
+public release readiness.
+
+## [2026-08-27 22:10] PR4 terminal/session lifecycle handoff (pr4-terminal-6f41)
+
+**Decision:** Bound Codex capture to explicit/host session ID with metadata
+validation and configured CODEX_HOME; added explicit project relocation while
+preserving recorded roots. Terminal publication now reviews and commits one
+encrypted persisted draft with cancel default, paginated retained text, binary
+metadata only, and authoritative relay/scope/target/base/cutoff/root fields.
+Added saved-state copy, explicit environment selection and scoped repair/revoke
+without transcript capture. Added creator-mcp, doctor, session-context and
+same-draft review CLI branches. **Why:** Eliminate newest-session guessing,
+preview/recapture races, implicit publication approval, binary decoding,
+silently chosen duplicate environments, and unscoped recovery. Metadata-only
+adapter callers can report missing recorded roots; explicit projectRoot or
+validateProjectRoot performs access validation. Parent owns creator MCP, draft
+storage/publication, integrations, and proposal changes. **Impact:** Final
+focused run passed 21/21 tests across adapter, share-v2, runtime-v2 and bin (97
+seconds). All eight owned files pass ESLint/Prettier and tracked diff checks.
+The three-publication relocation test has a 60-second timeout for actual Windows
+ACL helpers; other global timeouts unchanged. Latest TypeScript run reports only
+sibling proposals/apply.test.ts:169 possibly undefined; no sibling edits made.
+PR7 separately passed 86 fixture tests. Changed PR4 files:
+packages/adapter-codex/src/index.ts and adapter.test.ts;
+packages/cli/src/commands/share-v2.ts and share-v2.test.ts;
+commands/runtime-v2.ts and new runtime-v2.test.ts; packages/cli/src/bin.ts and
+bin.test.ts. No commits, pushes, deployments, public shares, live agent tests,
+integration installs, or recursive agents. Parent proceeds to packaged
+local-relay diagnostic, explicitly nonpromotable; real full-flow evidence
+remains required.
+
+## [2026-08-27 22:17] PR5 apply/inbox worker scoped approval handoff (scanner-pr5-93-20260827)
+
+**Decision:** Implement proposal review against authenticated committed
+readOwnedSnapshot data, pin proposal/base/outbound digest, revalidate under
+withEnvironmentLock, and publish only the base plus approved operations through
+preparedCapture. Preserve the legacy capture argument without reading it.
+Enforce shared membership, raw owner hashes, current ignore/credential rules
+including ancestor directories, safe portable paths/junction checks, strict
+content scanning, and bounded sizes. Inbox keeps a sanitized shared-base diff in
+the decision prompt, defaults to Cancel, and accepts an optional environment ID
+scope. **Why:** Approval must not recapture unrelated owner files or
+conversation, expose raw private content during review, or silently reapply
+after a crash. Per-operation encrypted journal phases permit guarded rollback
+and exact publication retry while preserving conflicting local edits.
+**Impact:** Final combined run passed 93/93 tests across six files (206
+seconds), including actual Windows private-store ACL enforcement. The final
+expanded ignore/path test separately passed after strict ignore decoding and
+ancestor-policy tightening. CLI TypeScript, owned-file ESLint, Prettier, and
+diff checks pass. Journals use .agentshare-private/transactions; existing
+records are hardened before reads, new encrypted files inherit enforced
+owner-only ACLs, outgoing revision IDs are persisted and passed to pinned
+recovery. Legacy journals fail closed for manual recovery. Node path/hash checks
+do not provide an OS-wide atomic CAS against arbitrary external filesystem
+writers. PR5 changed only packages/cli/src/proposals/apply.ts and apply.test.ts,
+packages/cli/src/commands/inbox-v2.ts and new inbox-v2.test.ts; PR2 files were
+recorded above. Parent retains publication, submit, state, private-store, and
+full integration/release ownership. No commits, pushes, deployments, public
+shares, source-session capture, or recursive agents.
+
+## [2026-08-27 22:30] Integrate candidate; retain release and native-host gates
+
+**Decision:** Integrated all three workers; closed Dewey, Leibniz and Hooke.
+Parent completed immutable encrypted drafts, exact commit/recovery identity,
+generation-zero removal tombstones, protected state migration/backup, shared
+owner-only Windows ACL enforcement including config staging/backup, creator MCP
+native form protocol and proposal/revoke approvals. Preserved saved update
+expiry and binary-only metadata review. Offline contract verification explicitly
+returns nonpromotable because attachment hashes do not attest native consent.
+**Why:** A passing model process or synthetic form response is not human consent
+or published-artifact proof. Parent reviews caught race, ACL and presentation
+gaps beyond the initial parallel patches. **Impact:** Latest packaged real Codex
+loopback journey passed all seven stages with synthetic fixture confirmations.
+Retained 154248-byte candidate SHA-256
+ff62c0780fc68867cffd2e253f8a008c2a694e257b2d15736ef300752926c61a under ignored
+artifacts. Lint/build/package/format and targeted security checks passed; final
+suite result recorded separately. Native app/PTY/public artifact gates remain
+outstanding; no commit/push/deployment/release/global install/config or skill
+rollout. See docs/implementation-v0.3.0.md. Agent ledger: three closed, none
+open. Old OneDrive session directory remains a pointer, not source checkout.
+
+## [2026-08-27 22:31] Final integrated local verification
+
+**Decision:** Retain the tested local candidate without promoting it. **Why:**
+Final full Vitest run passed 325 tests across 61 suites, with eight opt-in tests
+skipped; the offline validator passed 86 fixtures. Expanded creator consent
+tests separately passed six cases after adding cancel, wrong-request and timeout
+coverage. Latest packaged handoff passed seven stages. **Impact:** These results
+support local implementation, not native host or public release certification.
+Full release collection and local rollout remain pending; no workers remain
+open.
+
+## [2026-08-28 11:31] Register isolated candidate for native MCP testing
+
+**Decision:** After explicit user approval, register agentshare_creator in the
+user Codex config using the retained ff62c0780fc6 candidate archive.
+
+**Why:** Native-app confirmation cannot be tested until the host loads the
+candidate server. The existing installed CLI and skill must remain intact.
+
+**Impact:** Isolated installation and test state live under ignored artifacts/
+native-mcp-ff62c0780fc6. Original config is preserved byte-for-byte in
+C:/Users/aarya/.codex/config.toml.agentshare-backup. Unrelated config, installed
+CLI and skill hashes remain unchanged; config has an exact owner-only ACL. Codex
+CLI parses the registration; a read-only transport probe passed startup, ping
+and all nine tool definitions. No sharing or approval was performed. Current
+task tool catalog still lacks agentshare_creator; user must reload or restart
+Codex before native confirmation testing. Native UI and public release gates
+remain unverified. Receipt: artifacts/native-mcp-registration.json. Rollback
+should remove only the managed block, preserving later user edits.
+
+## [2026-08-28 12:09] Native tools loaded; publication approval cancelled
+
+**Decision:** Test the connected creator MCP with one synthetic workspace file.
+
+**Why:** Verify native-host behavior without sharing the user conversation or
+source project. Exact current thread resolution and retained review succeeded.
+
+**Impact:** All nine tools loaded after restart. Draft
+draft_e3254fb5-298c-49e7-8e5b-c127eba16e17 contains only synthetic notes.txt
+(142 bytes), no conversation, read/propose access and a one-hour lifetime.
+Commit returned cancellation before publication; status remains prepared. Do not
+retry consent automatically. Ask whether the user saw and declined the native
+dialog or whether cancellation occurred without a visible prompt. No public
+share exists from this attempt; positive native consent is unverified.
+
+## [2026-08-31 10:05] Fixed cross-platform rollback fault-injection test
+
+**Decision:** Resolve proposal-apply renames through the shared fs/promises
+module namespace. **Why:** macOS CI did not observe the test's rename spy on a
+directly imported binding; Windows passed by runtime behavior. Production
+semantics remain unchanged. **Impact:** Local proposal suite passes 16/16. CI
+candidate needs rerun before any public package/release publication.
+
+## [2026-08-31 10:11] Hardened macOS test portability
+
+**Decision:** Mock the shared rename function directly and compare relocated
+roots after realpath normalization. **Why:** macOS ESM mocking did not replace a
+namespace property reliably, and `/var` resolves to `/private/var` on hosted
+runners. **Impact:** Proposal and Codex adapter suites pass 20/20 locally. Push
+fix for full CI matrix.
+
+## [2026-08-31 10:25] Made rollback tests deterministic across runners
+
+**Decision:** Exercise clean rollback with a pre-existing create target and
+concurrent-edit preservation with a post-apply journal failure. **Why:**
+Built-in fs interception remains runtime-specific on hosted macOS; deterministic
+seams preserve coverage of both rollback outcomes. **Impact:** Both rollback
+cases pass locally; prior production code restored unchanged. CI must rerun on
+this test-only fix.

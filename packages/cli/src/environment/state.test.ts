@@ -1,4 +1,4 @@
-import { mkdtemp, stat } from "node:fs/promises";
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -11,6 +11,34 @@ import {
 } from "./state.js";
 
 describe("environment state v2", () => {
+  it("migrates v2 without changing capabilities and retains the original backup", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "agentshare-state-migration-"));
+    const path = join(dir, "state-v2.json");
+    const attached = {
+      environmentId: "env_migration",
+      relayOrigin: "https://relay.example",
+      environmentMasterKey: "m".repeat(43),
+      readCapability: "r".repeat(43),
+      currentRevisionId: null,
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      attachedAt: new Date().toISOString(),
+      title: "Migration fixture",
+    };
+    const legacy = JSON.stringify({
+      version: 2,
+      ownedEnvironments: [],
+      attachedEnvironments: [attached],
+      transactions: [],
+    });
+    await writeFile(path, legacy);
+    await saveAttachedEnvironment(attached, path);
+    expect(await readFile(`${path}.v2-backup`, "utf8")).toBe(legacy);
+    expect((await loadEnvironmentState(path)).attachedEnvironments).toEqual([
+      attached,
+    ]);
+    await saveAttachedEnvironment({ ...attached, title: "Updated" }, path);
+    expect(await readFile(`${path}.v2-backup`, "utf8")).toBe(legacy);
+  });
   it("persists owner and recipient capabilities separately", async () => {
     const dir = await mkdtemp(join(tmpdir(), "agentshare-state-v2-"));
     const path = join(dir, "state-v2.json");
@@ -51,7 +79,7 @@ describe("environment state v2", () => {
       path,
     );
 
-    expect((await loadEnvironmentState(path)).version).toBe(2);
+    expect((await loadEnvironmentState(path)).version).toBe(3);
     expect(
       (await findOwnedEnvironmentForWorkspace("/workspace/project", path))
         ?.updateCapability,

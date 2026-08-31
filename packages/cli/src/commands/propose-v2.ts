@@ -1,7 +1,12 @@
 import { refreshAttachedEnvironment } from "../environment/refresh.js";
 import { findAttachedEnvironment } from "../environment/state.js";
-import type { TargetAgent, TargetResult } from "../launchers.js";
-import { runEnvironmentTarget } from "../worker/environment-launcher.js";
+import type { TargetAgent } from "../launchers.js";
+import {
+  runEnvironmentTarget,
+  type EnvironmentRuntimeOptions,
+  type EnvironmentTargetResult,
+} from "../worker/environment-launcher.js";
+import { hasRequiredCompletion } from "../worker/completion.js";
 
 export type ProposeEnvironmentOptions = {
   target: TargetAgent;
@@ -11,8 +16,8 @@ export type ProposeEnvironmentOptions = {
     target: TargetAgent,
     environmentId: string,
     prompt: string,
-    runtimeOptions: { statePath?: string; cacheRoot?: string },
-  ) => Promise<TargetResult>;
+    runtimeOptions: EnvironmentRuntimeOptions,
+  ) => Promise<EnvironmentTargetResult>;
 };
 
 export async function proposeAttachedEnvironmentChange(
@@ -31,6 +36,7 @@ export async function proposeAttachedEnvironmentChange(
     throw new Error("This AgentShare environment is read-only");
   }
   const runtimeOptions = {
+    mode: "propose" as const,
     ...(options.statePath === undefined
       ? {}
       : { statePath: options.statePath }),
@@ -49,6 +55,11 @@ export async function proposeAttachedEnvironmentChange(
   if (result.exitCode !== 0) {
     throw new Error(`${options.target} exited with code ${result.exitCode}`);
   }
+  if (!hasRequiredCompletion(result.receipts, "propose", environmentId)) {
+    throw new Error(
+      "AgentShare propose failed: no completed proposal submission receipt",
+    );
+  }
   return result.output;
 }
 
@@ -59,6 +70,7 @@ export function buildProposalWorkerPrompt(instruction: string): string {
     "Search and read the shared environment as needed.",
     "Use proposal_stage_replace, proposal_stage_create, and proposal_stage_delete to build a proposal overlay. Staging never writes UserA's workspace.",
     "Before submission, call proposal_diff and inspect the staged operations.",
+    "Staging pins the shared revision. If it changes, stop and request a fresh proposal run; never relabel old operations with the new revision.",
     "When the requested change is coherent, call proposal_submit with a concise summary. UserA must separately approve it before any real workspace mutation occurs.",
     "If the request cannot be completed safely from the shared evidence, do not submit a proposal; explain what is missing.",
     "",

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,6 +24,67 @@ async function fixture(): Promise<string> {
 }
 
 describe("buildWorkspaceSnapshot", () => {
+  it("classifies complete file bytes and preserves content exactly", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-encodings-"));
+    const files = [
+      {
+        path: "settings.yaml",
+        bytes: Buffer.from("\uFEFFname: café\r\n"),
+        mediaType: "application/yaml",
+      },
+      {
+        path: "settings.toml",
+        bytes: Buffer.from('name = "demo"\r\n'),
+        mediaType: "application/toml",
+      },
+      {
+        path: "invalid.json",
+        bytes: Buffer.from([0xff, 0xfe, 0x61]),
+        mediaType: "application/octet-stream",
+      },
+      {
+        path: "utf16.txt",
+        bytes: Buffer.from("hello", "utf16le"),
+        mediaType: "application/octet-stream",
+      },
+      {
+        path: "late-nul",
+        bytes: Buffer.concat([Buffer.alloc(9000, 0x61), Buffer.from([0])]),
+        mediaType: "application/octet-stream",
+      },
+      {
+        path: "late-invalid.ts",
+        bytes: Buffer.concat([Buffer.alloc(9000, 0x61), Buffer.from([0xff])]),
+        mediaType: "application/octet-stream",
+      },
+    ];
+    for (const file of files)
+      await writeFile(join(root, file.path), file.bytes);
+    const snapshot = await buildWorkspaceSnapshot(root, { preferGit: false });
+    for (const file of files) {
+      expect(
+        snapshot.files.find((entry) => entry.path === file.path),
+      ).toMatchObject({
+        mediaType: file.mediaType,
+        byteLength: file.bytes.length,
+        sha256: createHash("sha256").update(file.bytes).digest("hex"),
+        contentBase64: file.bytes.toString("base64"),
+      });
+    }
+  });
+
+  it("rejects a credential in an operational filename without echoing it", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-path-secret-"));
+    const secret = `sk-${"x".repeat(24)}`;
+    await writeFile(join(root, `${secret}.txt`), "safe");
+    await expect(
+      buildWorkspaceSnapshot(root, { preferGit: false }),
+    ).rejects.toThrow("[REDACTED:openai-api-key].txt");
+    await expect(
+      buildWorkspaceSnapshot(root, { preferGit: false }),
+    ).rejects.not.toThrow(secret);
+  });
+
   it("includes safe regular files with normalized paths and hashes", async () => {
     const root = await fixture();
     const snapshot = await buildWorkspaceSnapshot(root, { preferGit: false });

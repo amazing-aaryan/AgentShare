@@ -140,8 +140,17 @@ Recipient isolation evidence follows the surface changed by the release:
   recorded real-host isolation evidence, and the release record must say so
   explicitly.
 
+For the v0.3 collaboration release line, the promotable profile is the explicit
+`codex-only-v1` contract in [`../release-v0.3.0.md`](../release-v0.3.0.md). It
+requires the published artifact, live public origins, real terminal and native
+Codex chat creation paths, actual MCP read/proposal/inbox/approval/refresh
+behavior, isolation, revocation, cleanup, and explicit creator approval. Claude
+live execution is outside that profile and is not a v0.3 stable-promotion gate.
+This narrows release evidence; it does not remove the existing Claude adapter or
+claim new Claude compatibility evidence.
+
 When authenticated reviewed Codex and Claude installations are both available,
-the repository's full two-agent diagnostic remains:
+the repository's full two-agent diagnostic remains useful:
 
 ```powershell
 $env:AGENTSHARE_E2E_RELAY="https://agentshare-relay.carnation-vermicelli.workers.dev"
@@ -149,10 +158,10 @@ $env:AGENTSHARE_E2E_HANDOFF="https://agentshare-handoff.carnation-vermicelli.wor
 npm run test:release
 ```
 
-`npm run test:release` intentionally still requires both agents. A patch release
-that carries forward an unchanged adapter must not claim that this full
-diagnostic passed; its release record instead identifies the exact fresh and
-carried-forward evidence.
+`npm run test:release` intentionally still requires both agents. A release using
+a narrower explicitly documented profile must not claim that this full
+diagnostic passed; its release record instead identifies the exact profile and
+evidence that did pass.
 
 AgentShare's agent-agnostic direction does not weaken the fail-closed boundary.
 Each newly supported target still requires equivalent real isolation review.
@@ -198,16 +207,3 @@ trusted handoff origin independently:
 ```powershell
 agentshare share --current --source codex --relay https://relay.example --handoff https://handoff.example
 ```
-
-Equivalent environment variables are:
-
-```text
-AGENTSHARE_RELAY=https://relay.example
-AGENTSHARE_HANDOFF=https://handoff.example
-```
-
-A compatible handoff deployment must preserve the fragment-secrecy boundary; the
-`relay=` query value is non-secret transport metadata, while read, proposal, and
-key material remain in the fragment.
-
-Self-hosting is an interoperability property, not an enterprise SKU.
