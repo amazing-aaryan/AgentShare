@@ -275,13 +275,14 @@ describe("v2 share command", () => {
       ttlSeconds: 3600,
     };
     const second = await shareCaptureV2(capture, freshOptions);
-    const actualTtlMs = Date.parse(second.environment.expiresAt) - before;
+    const after = Date.now();
+    const expiresAt = Date.parse(second.environment.expiresAt);
 
     expect(second.environment.environmentId).not.toBe(
       first.environment.environmentId,
     );
-    expect(actualTtlMs).toBeGreaterThanOrEqual(3_590_000);
-    expect(actualTtlMs).toBeLessThanOrEqual(3_610_000);
+    expect(expiresAt).toBeGreaterThanOrEqual(before + 3_600_000);
+    expect(expiresAt).toBeLessThanOrEqual(after + 3_600_000);
   });
 
   it("publishes the reviewed retained bytes after workspace changes and uses cancel as the default", async () => {
