@@ -31,10 +31,11 @@ Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 > included files, exclusions, and redactions before publication.
 
 > [!NOTE] This repository contains the v0.3 collaborative-environment candidate.
-> It is not a stable public v0.3.0 release until the immutable package, live
-> Cloudflare deployment, and authenticated Codex/Claude release gates in the
-> [deployment runbook](docs/operations/cloudflare-deployment.md) pass. Until
-> then, use the current stable GitHub release for production installation.
+> It is not a stable public v0.3 release until the immutable package, live
+> Cloudflare deployment, and the authenticated Codex `codex-only-v1` release
+> profile in the [deployment runbook](docs/operations/cloudflare-deployment.md)
+> pass. Claude live execution is not a v0.3 stable-promotion gate. Until then,
+> use the current stable GitHub release for production installation.
 
 ## Principles
 
@@ -65,8 +66,8 @@ continue**
 
 ### 1. Install the stable CLI and integrations
 
-Requirements: Node.js 22 or newer, plus a reviewed Codex CLI or Claude Code
-version. Install the current immutable package from
+Requirements: Node.js 22 or newer, plus a supported Codex CLI or reviewed Claude
+Code version. Install the current immutable package from
 [GitHub Releases](https://github.com/amazing-aaryan/AgentShare/releases), then
 run:
 
@@ -75,7 +76,7 @@ agentshare init
 ```
 
 Start a new Codex or Claude Code session so the host discovers the managed
-integration. Exact reviewed recipient versions are tracked in
+integration. Recipient compatibility policy and reviewed evidence are tracked in
 [recipient compatibility](docs/recipient-compatibility.md).
 
 ### 2. Create a collaborative environment
@@ -383,10 +384,16 @@ npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
 npm audit --audit-level=high
 ```
 
-CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22
-and 24. A stable public release additionally requires live split-origin
-deployment verification and authenticated real Codex/Claude recipient-isolation
-tests:
+CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22 and
+24. Stable promotion additionally requires the release-specific live evidence
+recorded in the deployment runbook. For the v0.3 collaboration line, that is the
+authenticated Codex `codex-only-v1` profile: live split-origin deployment,
+published-artifact bootstrap, terminal and native Codex creation, actual MCP
+read/proposal/inbox/approval/refresh behavior, isolation, revocation, and
+cleanup. Claude live execution is not part of that v0.3 promotion profile.
+
+The broader two-agent diagnostic remains available when both authenticated
+reviewed hosts are present:
 
 ```powershell
 $env:AGENTSHARE_E2E_RELAY="https://agentshare-relay.carnation-vermicelli.workers.dev"
@@ -394,9 +401,11 @@ $env:AGENTSHARE_E2E_HANDOFF="https://agentshare-handoff.carnation-vermicelli.wor
 npm run test:release
 ```
 
-A new agent adapter is not considered supported merely because it can receive a
-prompt. It must prove creator extraction, capability handling, and recipient
-isolation on exact reviewed releases.
+A release using a narrower documented profile must not claim this broader
+diagnostic passed unless it actually did. A new agent adapter is not considered
+supported merely because it can receive a prompt; it must prove creator
+extraction, capability handling, and recipient isolation under its documented
+release evidence.
 
 ## What We Intentionally Are Not Building
 
