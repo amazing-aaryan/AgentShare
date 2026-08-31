@@ -118,7 +118,7 @@ describe("creator and launcher", () => {
       supportsReviewedTargetVersion("claude", "2.1.232 (Claude Code)"),
     ).toBe(false);
     expect(supportsReviewedTargetVersion("codex", "codex-cli 0.999.0")).toBe(
-      false,
+      true,
     );
     expect(
       unsupportedTargetVersionMessage("claude", "not-claude 2.1.232"),
