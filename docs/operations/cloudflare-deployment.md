@@ -8,7 +8,7 @@ self-hosted deployments are part of the normal AgentShare model; see
 [Blind Relay Protocol](../protocol/relay-v1.md), and the
 [Environment v2 Protocol](../protocol/environment-v2.md).
 
-The v0.2.0 candidate uses two public Workers with different responsibilities:
+The v0.3.0 candidate uses two public Workers with different responsibilities:
 
 - `agentshare-relay` stores ciphertext and capability digests in Durable
   Objects. It serves both legacy v1 shares and v2 environments.
@@ -62,7 +62,7 @@ npm audit --audit-level=high
 The same commit must also pass the GitHub Actions matrix on Ubuntu, macOS, and
 Windows with Node.js 22 and 24.
 
-The v0.2.0 handoff Worker pins the immutable `agentshare-0.2.0.tgz`
+The v0.3.0 handoff Worker pins the immutable `agentshare-0.3.0.tgz`
 GitHub-release asset. Stage that exact asset before the handoff deployment so
 the browser command cannot point at a missing package. Keep the GitHub release
 marked as a prerelease until the strict live gate passes; the AgentShare updater
@@ -141,7 +141,7 @@ support is claimed.
 
 ## Promote the Release
 
-Only after the strict live gate succeeds should the staged v0.2.0 GitHub release
+Only after the strict live gate succeeds should the staged v0.3.0 GitHub release
 be promoted from prerelease to stable. Verify an anonymous download against the
 recorded byte size and SHA-256 and perform a fresh isolated installation from
 the same immutable asset.
@@ -158,7 +158,7 @@ Codex/Claude versions, and live-gate evidence under `docs/releases/`.
 A rollback must preserve Durable Object storage and migration history. Do not
 delete or recreate the relay namespace to undo an application deployment.
 
-If a defect appears before v0.2.0 is promoted to stable, keep the release marked
+If a defect appears before v0.3.0 is promoted to stable, keep the release marked
 as a prerelease, roll back the affected Worker code, and leave the current
 stable package as the recommended version. If a defect appears after promotion,
 stop promoting the affected release, roll back the Worker code where safe, and

@@ -30,8 +30,8 @@ Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 > regulated data, or other high-risk material. Review the final normalized text,
 > included files, exclusions, and redactions before publication.
 
-> [!NOTE] This repository contains the v0.2 collaborative-environment candidate.
-> It is not a stable public v0.2.0 release until the immutable package, live
+> [!NOTE] This repository contains the v0.3 collaborative-environment candidate.
+> It is not a stable public v0.3.0 release until the immutable package, live
 > Cloudflare deployment, and authenticated Codex/Claude release gates in the
 > [deployment runbook](docs/operations/cloudflare-deployment.md) pass. Until
 > then, use the current stable GitHub release for production installation.

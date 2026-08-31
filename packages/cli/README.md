@@ -18,7 +18,7 @@ than through a proprietary server-side session store.
 Requires Node.js 22 or newer.
 
 > [!NOTE] The repository contains the v0.2 collaborative-environment
-> implementation. Until v0.2.0 passes the documented live release gate and is
+> implementation. Until v0.3.0 passes the documented live release gate and is
 > promoted to a stable GitHub release, use the current published stable package
 > for production installation and treat v0.2 commands as release-candidate
 > behavior.

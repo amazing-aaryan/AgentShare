@@ -7,7 +7,7 @@ describe("v2 environment handoff", () => {
     expect(bootstrap.protocol).toBe("agentshare-bootstrap-v1");
     expect(bootstrap.environmentProtocol).toBe("agentshare-environment-v2");
     expect(bootstrap.minimumNodeVersion).toBe("22");
-    expect(bootstrap.release.packageUrl).toContain("agentshare-0.2.0.tgz");
+    expect(bootstrap.release.packageUrl).toContain("agentshare-0.3.0.tgz");
     expect(bootstrap.actions.accept.command).toBe("agentshare bootstrap");
   });
 
