@@ -537,3 +537,53 @@ artifact SHA-256 is
 `7f701516ca92adb71fb2b1f36522a27084d00b36a7f44c74766e44a0574353d1`, and live
 bootstrap serves `0.3.0`. Stable-release sign-off remains blocked on native
 creator consent/public-share evidence and future Claude validation.
+
+## [2026-08-31 10:53] Native consent cancelled again without publication
+
+**Decision:** Retry the native creator consent flow only after the user's explicit
+request, using four synthetic fixture files and no conversation content.
+**Why:** Close the remaining public-beta consent evidence gap without exposing
+private project or chat data.
+**Impact:** Draft `draft_31dbf954-b86b-47a8-bc3c-7fcc9daa6045` remains prepared;
+commit returned immediate cancellation and created no public share. Do not retry
+again without confirming whether a native approval form was visible to the user.
+
+## [2026-08-31 15:53] Repointed creator MCP to public v0.3.0 artifact
+
+**Decision:** Install the verified public release tarball in an isolated directory
+and update only the managed creator MCP executable path, preserving the existing
+test state path. **Why:** Two consent attempts were cancelled before the native
+form rendered, while Codex was still running a retained pre-release artifact.
+**Impact:** Codex must reload before another attempt. No consent was simulated and
+no share was published; retry only after reload and explicit user confirmation.
+
+## [2026-08-31 19:28] Used terminal consent fallback after chat form failure
+
+**Decision:** Prepare a fresh v0.3.0 terminal draft from only the four synthetic
+fixtures, then stop at the exact-draft publication prompt for user confirmation.
+**Why:** The chat MCP form bridge auto-cancelled, while the in-app terminal gives
+the user a direct interactive approval surface without weakening consent.
+**Impact:** Draft `draft_c2521a0d-18bf-4178-a33b-17a2aa812aff` has digest
+`ed146855acd530142b25ccf964c4cbbc66b1acdbdcd3e463fa6673f6c56cd961`, no
+conversation, 4 files/1508 bytes, read+propose, 900-second TTL. Publication is
+pending user selection; no share exists yet.
+
+## [2026-08-31 21:17] Native v0.3.0 form still auto-cancelled after reload
+
+**Decision:** After removing an abandoned lock whose owner PID no longer existed,
+prepare and fully review a fresh safe draft, attempt native commit once, then move
+the same immutable draft to terminal review when the host cancelled immediately.
+**Why:** User explicitly requested another attempt; terminal fallback preserves
+human consent while avoiding another capture.
+**Impact:** Draft `draft_5945c771-b7c1-4302-aea2-95063d85b3bc`, digest
+`e12dcf33708ea28a3bd4cc99aba0ba9c020f1d122cd840140ba48e81cf8344eb`, is
+awaiting user approval in terminal session 69603. It contains 4 synthetic files,
+1508 bytes, no conversation, read+propose, 900-second TTL. No share yet.
+
+## [2026-08-31 21:33] Commit all release-session documentation
+
+**Decision:** Commit the accumulated native-consent findings and all untracked
+AgentShare reliability plan documents together, as explicitly requested.
+**Why:** Preserve the complete local release and design record in Git.
+**Impact:** The commit records the unresolved native Codex consent UI blocker;
+publishing the commit remains a separate push operation.
