@@ -28,6 +28,19 @@ type ResolveCodexHome = (
   environment: NodeJS.ProcessEnv,
   defaultHome: string,
 ) => Promise<string>;
+type PrepareNativeIsolation = (
+  platform: NodeJS.Platform,
+  versionOutput: string,
+  environment: NodeJS.ProcessEnv,
+  defaultHome: string,
+  outputDirectory: string,
+) => Promise<
+  | {
+      codexModelCatalogPath: string;
+      codexSplitReadBoundary: false;
+    }
+  | undefined
+>;
 
 function prepareCatalog(): PrepareCatalog {
   const candidate = (
@@ -51,10 +64,43 @@ function resolveHome(): ResolveCodexHome {
   return candidate;
 }
 
+function prepareNativeIsolation(): PrepareNativeIsolation {
+  const candidate = (
+    windowsIsolation as unknown as {
+      prepareNativeWindowsCodexIsolation?: PrepareNativeIsolation;
+    }
+  ).prepareNativeWindowsCodexIsolation;
+  if (typeof candidate !== "function") {
+    throw new Error("prepareNativeWindowsCodexIsolation is not implemented");
+  }
+  return candidate;
+}
+
 async function temporaryRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "agentshare-windows-codex-"));
   roots.push(root);
   return root;
+}
+
+async function writeReviewedCache(codexHome: string): Promise<void> {
+  await mkdir(codexHome, { recursive: true });
+  await writeFile(
+    join(codexHome, "models_cache.json"),
+    JSON.stringify({
+      client_version: "0.152.1",
+      models: [
+        {
+          slug: "gpt-5.6-codex",
+          display_name: "GPT-5.6 Codex",
+          shell_type: "shell_command",
+          apply_patch_tool_type: "freeform",
+          supports_search_tool: true,
+          input_modalities: ["text", "image"],
+        },
+      ],
+    }),
+    "utf8",
+  );
 }
 
 describe("native Windows Codex catalog preparation", () => {
@@ -62,24 +108,7 @@ describe("native Windows Codex catalog preparation", () => {
     const root = await temporaryRoot();
     const codexHome = join(root, "codex-home");
     const output = join(root, "private-output");
-    await mkdir(codexHome, { recursive: true });
-    await writeFile(
-      join(codexHome, "models_cache.json"),
-      JSON.stringify({
-        client_version: "0.152.1",
-        models: [
-          {
-            slug: "gpt-5.6-codex",
-            display_name: "GPT-5.6 Codex",
-            shell_type: "shell_command",
-            apply_patch_tool_type: "freeform",
-            supports_search_tool: true,
-            input_modalities: ["text", "image"],
-          },
-        ],
-      }),
-      "utf8",
-    );
+    await writeReviewedCache(codexHome);
 
     const path = await prepareCatalog()(codexHome, output);
     expect(path).toBe(join(output, "codex-model-catalog.json"));
@@ -139,5 +168,47 @@ describe("native Windows Codex catalog preparation", () => {
     await expect(
       resolveHome()({ CODEX_HOME: join(root, "missing") }, defaultHome),
     ).rejects.toThrow("CODEX_HOME points to");
+  });
+
+  it("applies the reviewed tool-isolation profile only on native Windows", async () => {
+    const root = await temporaryRoot();
+    const defaultHome = join(root, "home");
+    const codexHome = join(defaultHome, ".codex");
+    const output = join(root, "private-output");
+    await writeReviewedCache(codexHome);
+
+    await expect(
+      prepareNativeIsolation()(
+        "linux",
+        "codex-cli 99.4.7",
+        {},
+        defaultHome,
+        output,
+      ),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      prepareNativeIsolation()(
+        "win32",
+        "codex-cli 0.153.0",
+        {},
+        defaultHome,
+        output,
+      ),
+    ).rejects.toThrow(
+      "Native Windows AgentShare recipient isolation is reviewed only for Codex CLI 0.152.1",
+    );
+
+    const result = await prepareNativeIsolation()(
+      "win32",
+      "codex-cli 0.152.1",
+      {},
+      defaultHome,
+      output,
+    );
+    expect(result).toEqual({
+      codexModelCatalogPath: join(output, "codex-model-catalog.json"),
+      codexSplitReadBoundary: false,
+    });
   });
 });
