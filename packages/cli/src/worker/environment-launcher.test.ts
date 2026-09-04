@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   claudeEnvironmentArgs,
   codexEnvironmentArgs,
@@ -10,7 +10,10 @@ import { environmentToolNames } from "./completion.js";
 
 const command = "/usr/bin/node";
 const cli = "/opt/agentshare/dist/bin.js";
-const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
+const { spawnMock, captureProcessMock } = vi.hoisted(() => ({
+  spawnMock: vi.fn(),
+  captureProcessMock: vi.fn(),
+}));
 vi.mock("node:child_process", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:child_process")>()),
   spawn: spawnMock,
@@ -20,15 +23,19 @@ vi.mock("../launchers.js", async (importOriginal) => ({
   verifyTarget: vi.fn().mockResolvedValue(undefined),
   resolveAgentExecutable: () => ({ command: "codex", prefixArgs: [] }),
   discoverUserSkills: vi.fn().mockResolvedValue([]),
-  captureProcess: vi
-    .fn()
-    .mockImplementation((_command: string, args: string[]) =>
-      Promise.resolve(args.includes("--version") ? "codex-cli 0.147.0" : "mcp"),
-    ),
+  captureProcess: captureProcessMock,
 }));
 
+beforeEach(() => {
+  spawnMock.mockReset();
+  captureProcessMock.mockReset();
+  captureProcessMock.mockImplementation((_command: string, args: string[]) =>
+    Promise.resolve(args.includes("--version") ? "codex-cli 0.152.1" : "mcp"),
+  );
+});
+
 describe("environment worker launcher", () => {
-  it("returns nonzero for exit-zero fabricated success without trusted receipts", async () => {
+  it("allows a newer Codex through the v2 preflight when MCP support is still advertised", async () => {
     const child = Object.assign(new EventEmitter(), {
       stdout: new PassThrough(),
       stderr: new PassThrough(),
@@ -63,6 +70,23 @@ describe("environment worker launcher", () => {
       stderr.mockRestore();
     }
   });
+
+  it("fails closed for a newer Codex when MCP client support disappears", async () => {
+    captureProcessMock.mockImplementation(
+      (_command: string, args: string[]) =>
+        Promise.resolve(
+          args.includes("--version")
+            ? "codex-cli 0.152.1"
+            : "usage: codex protocol configuration",
+        ),
+    );
+
+    await expect(
+      runEnvironmentTarget("codex", "env_test", "read", { mode: "ask" }),
+    ).rejects.toThrow("codex no longer advertises MCP client support");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
   it("configures Codex with only the local AgentShare MCP on top of the hardened sandbox", () => {
     const args = codexEnvironmentArgs(
       "/tmp/empty",
