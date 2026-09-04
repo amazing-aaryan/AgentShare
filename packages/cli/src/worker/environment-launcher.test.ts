@@ -117,9 +117,13 @@ describe("environment worker launcher", () => {
 
     expect(args).toContain('sandbox_mode="read-only"');
     expect(joined).not.toContain("permissions.agentshare-query.filesystem=");
-    expect(args).toContain("permissions.agentshare-query.network.enabled=false");
+    expect(args).toContain(
+      "permissions.agentshare-query.network.enabled=false",
+    );
     expect(args).toContain('model="gpt-5.6-sol"');
-    expect(args).toContain(`model_catalog_json=${JSON.stringify(modelCatalogPath)}`);
+    expect(args).toContain(
+      `model_catalog_json=${JSON.stringify(modelCatalogPath)}`,
+    );
     for (const feature of [
       "shell_tool",
       "unified_exec",
