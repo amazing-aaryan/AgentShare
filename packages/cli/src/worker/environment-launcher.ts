@@ -32,6 +32,8 @@ export type EnvironmentRuntimeOptions = {
   cacheRoot?: string;
   mode?: EnvironmentMode;
   receiptChannel?: ReceiptChannel;
+  codexModelCatalogPath?: string;
+  codexSplitReadBoundary?: boolean;
 };
 export type EnvironmentTargetResult = TargetResult & {
   receipts?: McpCompletionReceipt[];
@@ -136,9 +138,19 @@ export function codexEnvironmentArgs(
 ): string[] {
   const base = codexArgs(workspace, disabledSkills);
   const promptMarker = base.at(-1) === "-" ? base.slice(0, -1) : base;
+  const isolationArgs =
+    options.codexSplitReadBoundary === false
+      ? withoutCodexSplitReadPermissionProfile(promptMarker)
+      : promptMarker;
   const mcpArgs = internalMcpArgs(environmentId, options);
   return [
-    ...promptMarker,
+    ...isolationArgs,
+    ...(options.codexModelCatalogPath === undefined
+      ? []
+      : [
+          "--config",
+          `model_catalog_json=${tomlString(options.codexModelCatalogPath)}`,
+        ]),
     "--config",
     `mcp_servers.agentshare.command=${tomlString(nodeCommand)}`,
     "--config",
@@ -255,6 +267,25 @@ function internalMcpArgs(
       ? []
       : ["--cache-root", options.cacheRoot]),
   ];
+}
+
+function withoutCodexSplitReadPermissionProfile(args: string[]): string[] {
+  const blocked = new Set([
+    'default_permissions="agentshare-query"',
+    'permissions.agentshare-query.filesystem={":minimal"="deny",":workspace_roots"="deny"}',
+    "permissions.agentshare-query.network.enabled=false",
+  ]);
+  const result: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    const next = args[index + 1];
+    if (value === "--config" && next !== undefined && blocked.has(next)) {
+      index += 1;
+      continue;
+    }
+    if (value !== undefined) result.push(value);
+  }
+  return result;
 }
 
 function tomlString(value: string): string {
