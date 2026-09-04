@@ -103,7 +103,7 @@ describe("environment worker launcher", () => {
     expect(args.join(" ")).not.toContain("environmentMasterKey");
   });
 
-  it("uses an MCP-only Codex profile on Windows without unsupported split-read ACLs", () => {
+  it("uses an MCP-only Codex profile on Windows with the built-in root-readable read-only sandbox", () => {
     const modelCatalogPath = "C:\\trusted\\agentshare-models.json";
     const args = codexEnvironmentArgs(
       "C:\\temp\\empty",
@@ -117,10 +117,9 @@ describe("environment worker launcher", () => {
     const joined = args.join(" ");
 
     expect(args).toContain('sandbox_mode="read-only"');
-    expect(joined).not.toContain("permissions.agentshare-query.filesystem=");
-    expect(args).toContain(
-      "permissions.agentshare-query.network.enabled=false",
-    );
+    expect(args).toContain('default_permissions=":read-only"');
+    expect(args).not.toContain('default_permissions="agentshare-query"');
+    expect(joined).not.toContain("permissions.agentshare-query.");
     expect(args).toContain('model="gpt-5.6-sol"');
     expect(args).toContain(
       `model_catalog_json=${JSON.stringify(modelCatalogPath)}`,
