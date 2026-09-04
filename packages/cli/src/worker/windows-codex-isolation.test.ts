@@ -1,4 +1,11 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -125,7 +132,7 @@ describe("native Windows Codex catalog preparation", () => {
 
     await expect(
       resolveHome()({ CODEX_HOME: configured }, defaultHome),
-    ).resolves.toBe(configured);
+    ).resolves.toBe(await realpath(configured));
     await expect(resolveHome()({}, defaultHome)).resolves.toBe(
       join(defaultHome, ".codex"),
     );
