@@ -57,4 +57,19 @@ describe("Windows Codex model catalog isolation", () => {
       ],
     });
   });
+
+  it("fails closed for stale or malformed model caches", () => {
+    expect(() => hardener()(null, "0.152.1")).toThrow(
+      "Codex models cache must be a JSON object",
+    );
+    expect(() =>
+      hardener()({ client_version: "0.151.0", models: [{ slug: "model" }] }, "0.152.1"),
+    ).toThrow("Codex models cache version must be 0.152.1");
+    expect(() =>
+      hardener()({ client_version: "0.152.1", models: [] }, "0.152.1"),
+    ).toThrow("Codex models cache must contain at least one model");
+    expect(() =>
+      hardener()({ client_version: "0.152.1", models: [{}] }, "0.152.1"),
+    ).toThrow("missing a model slug");
+  });
 });
