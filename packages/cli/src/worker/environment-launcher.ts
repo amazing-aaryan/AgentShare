@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -25,6 +25,31 @@ import {
   type McpCompletionReceipt,
   type ReceiptChannel,
 } from "./completion.js";
+
+const WINDOWS_REVIEWED_CODEX_VERSION = "0.152.1";
+const WINDOWS_REVIEWED_CODEX_MODEL = "gpt-5.6-sol";
+const WINDOWS_MCP_ONLY_FEATURES = [
+  "shell_tool",
+  "unified_exec",
+  "view_image",
+  "shell_snapshot",
+  "code_mode",
+  "code_mode_host",
+  "code_mode_only",
+  "multi_agent",
+  "multi_agent_v2",
+  "image_generation",
+  "skill_search",
+  "plugins",
+  "apps",
+  "hooks",
+  "memories",
+] as const;
+
+type CodexEnvironmentLaunchProfile = {
+  platform?: NodeJS.Platform;
+  modelCatalogPath?: string;
+};
 
 export type EnvironmentRuntimeOptions = {
   statePath?: string;
@@ -60,10 +85,20 @@ export async function runEnvironmentTarget(
     await ensurePrivateDirectory(receiptDirectory);
     await verifyTarget(target);
     const executable = resolveAgentExecutable(target);
-    await verifyEnvironmentMcpSupport(target, executable);
+    await verifyEnvironmentMcpSupport(target, executable, process.platform);
     const cliPath = process.argv[1];
     if (cliPath === undefined)
       throw new Error("AgentShare CLI entrypoint is unavailable");
+    const modelCatalogPath =
+      target === "codex" && process.platform === "win32"
+        ? join(receiptDirectory, "codex-models.json")
+        : undefined;
+    if (modelCatalogPath !== undefined) {
+      await writeFile(modelCatalogPath, windowsCodexModelCatalog(), {
+        encoding: "utf8",
+        mode: 0o600,
+      });
+    }
     const args =
       target === "codex"
         ? codexEnvironmentArgs(
@@ -73,6 +108,7 @@ export async function runEnvironmentTarget(
             cliPath,
             runtimeOptions,
             await discoverUserSkills(),
+            { platform: process.platform, modelCatalogPath },
           )
         : claudeEnvironmentArgs(
             environmentId,
@@ -132,12 +168,26 @@ export function codexEnvironmentArgs(
   cliPath: string,
   options: EnvironmentRuntimeOptions = {},
   disabledSkills: string[] = [],
+  profile: CodexEnvironmentLaunchProfile = {},
 ): string[] {
+  const platform = profile.platform ?? process.platform;
   const base = codexArgs(workspace, disabledSkills);
   const promptMarker = base.at(-1) === "-" ? base.slice(0, -1) : base;
+  const hardenedBase =
+    platform === "win32"
+      ? removeCodexConfig(
+          promptMarker,
+          "permissions.agentshare-query.filesystem=",
+        )
+      : promptMarker;
+  const windowsOverrides =
+    platform === "win32"
+      ? windowsCodexEnvironmentOverrides(profile.modelCatalogPath)
+      : [];
   const mcpArgs = internalMcpArgs(environmentId, options);
   return [
-    ...promptMarker,
+    ...hardenedBase,
+    ...windowsOverrides,
     "--config",
     `mcp_servers.agentshare.command=${tomlString(nodeCommand)}`,
     "--config",
@@ -165,6 +215,19 @@ export function codexEnvironmentArgs(
     ),
     "-",
   ];
+}
+
+export function windowsCodexModelCatalog(): string {
+  return `${JSON.stringify({ models: [] })}\n`;
+}
+
+export function supportsReviewedWindowsEnvironmentTargetVersion(
+  version: string,
+): boolean {
+  return new RegExp(
+    `^codex-cli ${WINDOWS_REVIEWED_CODEX_VERSION.replaceAll(".", "\\.")}(?:\\s|$)`,
+    "u",
+  ).test(version.trim());
 }
 
 export function claudeEnvironmentArgs(
@@ -201,6 +264,7 @@ export function claudeEnvironmentArgs(
 async function verifyEnvironmentMcpSupport(
   target: TargetAgent,
   executable: { command: string; prefixArgs: string[] },
+  platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
   const version = await captureProcess(executable.command, [
     ...executable.prefixArgs,
@@ -211,6 +275,15 @@ async function verifyEnvironmentMcpSupport(
       target === "codex"
         ? "codex has not passed AgentShare v2 MCP preflight; Codex v2 requires a recognizable Codex CLI >= 0.147.0 plus the required runtime isolation and MCP controls."
         : `${target} has not passed AgentShare v2 MCP review; install a reviewed ${target} version.`,
+    );
+  }
+  if (
+    target === "codex" &&
+    platform === "win32" &&
+    !supportsReviewedWindowsEnvironmentTargetVersion(version)
+  ) {
+    throw new Error(
+      `Codex ${WINDOWS_REVIEWED_CODEX_VERSION} is the only Windows v2 recipient version reviewed for AgentShare's MCP-only isolation profile; refusing an unreviewed Windows Codex tool surface.`,
     );
   }
   if (target === "claude") {
@@ -237,6 +310,42 @@ async function verifyEnvironmentMcpSupport(
       "codex no longer advertises MCP client support; refusing to weaken AgentShare isolation",
     );
   }
+}
+
+function windowsCodexEnvironmentOverrides(
+  modelCatalogPath: string | undefined,
+): string[] {
+  if (modelCatalogPath === undefined) {
+    throw new Error(
+      "Windows Codex recipient isolation requires a private AgentShare model catalog",
+    );
+  }
+  return [
+    "--config",
+    `model=${tomlString(WINDOWS_REVIEWED_CODEX_MODEL)}`,
+    "--config",
+    `model_catalog_json=${tomlString(modelCatalogPath)}`,
+    ...WINDOWS_MCP_ONLY_FEATURES.flatMap((feature) => [
+      "--config",
+      `features.${feature}=false`,
+    ]),
+  ];
+}
+
+function removeCodexConfig(args: string[], prefix: string): string[] {
+  const filtered: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (
+      args[index] === "--config" &&
+      args[index + 1]?.startsWith(prefix) === true
+    ) {
+      index += 1;
+      continue;
+    }
+    const value = args[index];
+    if (value !== undefined) filtered.push(value);
+  }
+  return filtered;
 }
 
 function internalMcpArgs(
