@@ -1,9 +1,4 @@
-import {
-  readFile,
-  realpath,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   ensurePrivateDirectory,
