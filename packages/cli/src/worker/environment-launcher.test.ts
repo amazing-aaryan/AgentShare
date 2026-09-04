@@ -12,6 +12,7 @@ import { environmentToolNames } from "./completion.js";
 
 const command = "/usr/bin/node";
 const cli = "/opt/agentshare/dist/bin.js";
+const NON_WINDOWS_CODEX_PROFILE = { platform: "linux" as const };
 const { spawnMock, captureProcessMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
   captureProcessMock: vi.fn(),
@@ -94,6 +95,9 @@ describe("environment worker launcher", () => {
       "env_12345678901234567890",
       command,
       cli,
+      {},
+      [],
+      NON_WINDOWS_CODEX_PROFILE,
     );
     expect(args).toContain("--ephemeral");
     expect(args.join(" ")).toContain('sandbox_mode="read-only"');
@@ -202,6 +206,8 @@ describe("environment worker launcher", () => {
         command,
         cli,
         { mode },
+        [],
+        NON_WINDOWS_CODEX_PROFILE,
       );
       expect(args).toContain('approval_policy="never"');
       expect(args).toContain(
