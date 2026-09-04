@@ -108,7 +108,10 @@ export async function runEnvironmentTarget(
             cliPath,
             runtimeOptions,
             await discoverUserSkills(),
-            { platform: process.platform, modelCatalogPath },
+            {
+              platform: process.platform,
+              ...(modelCatalogPath === undefined ? {} : { modelCatalogPath }),
+            },
           )
         : claudeEnvironmentArgs(
             environmentId,
