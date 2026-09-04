@@ -5,6 +5,7 @@ import {
   claudeEnvironmentArgs,
   codexEnvironmentArgs,
   runEnvironmentTarget,
+  windowsCodexModelCatalog,
 } from "./environment-launcher.js";
 import { environmentToolNames } from "./completion.js";
 
@@ -99,6 +100,53 @@ describe("environment worker launcher", () => {
     expect(args.join(" ")).toContain("internal-mcp");
     expect(args.join(" ")).not.toContain("#r=");
     expect(args.join(" ")).not.toContain("environmentMasterKey");
+  });
+
+  it("uses an MCP-only Codex profile on Windows without unsupported split-read ACLs", () => {
+    const modelCatalogPath = "C:\\trusted\\agentshare-models.json";
+    const args = codexEnvironmentArgs(
+      "C:\\temp\\empty",
+      "env_test",
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\agentshare\\dist\\bin.js",
+      { mode: "ask" },
+      [],
+      { platform: "win32", modelCatalogPath },
+    );
+    const joined = args.join(" ");
+
+    expect(args).toContain('sandbox_mode="read-only"');
+    expect(joined).not.toContain("permissions.agentshare-query.filesystem=");
+    expect(args).toContain("permissions.agentshare-query.network.enabled=false");
+    expect(args).toContain('model="gpt-5.6-sol"');
+    expect(args).toContain(`model_catalog_json=${JSON.stringify(modelCatalogPath)}`);
+    for (const feature of [
+      "shell_tool",
+      "unified_exec",
+      "view_image",
+      "shell_snapshot",
+      "code_mode",
+      "code_mode_host",
+      "code_mode_only",
+      "multi_agent",
+      "multi_agent_v2",
+      "image_generation",
+      "skill_search",
+      "plugins",
+      "apps",
+      "hooks",
+      "memories",
+    ]) {
+      expect(args).toContain(`features.${feature}=false`);
+    }
+    expect(args).toContain("mcp_servers.agentshare.required=true");
+    expect(args).toContain(
+      `mcp_servers.agentshare.enabled_tools=${JSON.stringify(environmentToolNames("ask"))}`,
+    );
+  });
+
+  it("uses an empty authoritative Windows model catalog to force safe fallback metadata", () => {
+    expect(JSON.parse(windowsCodexModelCatalog())).toEqual({ models: [] });
   });
 
   it("configures Claude with no built-in tools and explicit AgentShare MCP tools", () => {
