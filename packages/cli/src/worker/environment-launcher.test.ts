@@ -5,6 +5,7 @@ import {
   claudeEnvironmentArgs,
   codexEnvironmentArgs,
   runEnvironmentTarget,
+  supportsReviewedWindowsEnvironmentTargetVersion,
   windowsCodexModelCatalog,
 } from "./environment-launcher.js";
 import { environmentToolNames } from "./completion.js";
@@ -151,6 +152,32 @@ describe("environment worker launcher", () => {
 
   it("uses an empty authoritative Windows model catalog to force safe fallback metadata", () => {
     expect(JSON.parse(windowsCodexModelCatalog())).toEqual({ models: [] });
+  });
+
+  it("pins the Windows MCP-only surface to the reviewed Codex release", () => {
+    expect(
+      supportsReviewedWindowsEnvironmentTargetVersion("codex-cli 0.152.1"),
+    ).toBe(true);
+    expect(
+      supportsReviewedWindowsEnvironmentTargetVersion("codex-cli 0.152.2"),
+    ).toBe(false);
+    expect(
+      supportsReviewedWindowsEnvironmentTargetVersion("codex-cli 99.4.7"),
+    ).toBe(false);
+  });
+
+  it("refuses a Windows Codex profile without a private model catalog", () => {
+    expect(() =>
+      codexEnvironmentArgs(
+        "C:\\temp\\empty",
+        "env_test",
+        "node.exe",
+        "C:\\agentshare\\dist\\bin.js",
+        { mode: "ask" },
+        [],
+        { platform: "win32" },
+      ),
+    ).toThrow("requires a private AgentShare model catalog");
   });
 
   it("configures Claude with no built-in tools and explicit AgentShare MCP tools", () => {
