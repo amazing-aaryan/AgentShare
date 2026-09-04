@@ -1,0 +1,57 @@
+name: apply-windows-launch-profile
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - fix/windows-codex-recipient-isolation
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fix/windows-codex-recipient-isolation
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply launch-profile implementation
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'packages/cli/src/worker/environment-launcher.ts';
+          let text = fs.readFileSync(path, 'utf8');
+
+          const optionsNeedle = `export type EnvironmentRuntimeOptions = {\n  statePath?: string;\n  cacheRoot?: string;\n  mode?: EnvironmentMode;\n  receiptChannel?: ReceiptChannel;\n};`;
+          const optionsReplacement = `export type EnvironmentRuntimeOptions = {\n  statePath?: string;\n  cacheRoot?: string;\n  mode?: EnvironmentMode;\n  receiptChannel?: ReceiptChannel;\n  codexModelCatalogPath?: string;\n  codexSplitReadBoundary?: boolean;\n};`;
+          if (!text.includes(optionsNeedle)) throw new Error('runtime options anchor not found');
+          text = text.replace(optionsNeedle, optionsReplacement);
+
+          const argsNeedle = `  const base = codexArgs(workspace, disabledSkills);\n  const promptMarker = base.at(-1) === "-" ? base.slice(0, -1) : base;\n  const mcpArgs = internalMcpArgs(environmentId, options);\n  return [\n    ...promptMarker,`;
+          const argsReplacement = `  const base = codexArgs(workspace, disabledSkills);\n  const promptMarker = base.at(-1) === "-" ? base.slice(0, -1) : base;\n  const isolationArgs =\n    options.codexSplitReadBoundary === false\n      ? withoutCodexSplitReadPermissionProfile(promptMarker)\n      : promptMarker;\n  const mcpArgs = internalMcpArgs(environmentId, options);\n  return [\n    ...isolationArgs,\n    ...(options.codexModelCatalogPath === undefined\n      ? []\n      : [\n          "--config",\n          \`model_catalog_json=\${tomlString(options.codexModelCatalogPath)}\`,\n        ]),`;
+          if (!text.includes(argsNeedle)) throw new Error('codex environment args anchor not found');
+          text = text.replace(argsNeedle, argsReplacement);
+
+          const helperNeedle = `function tomlString(value: string): string {\n  return JSON.stringify(value);\n}`;
+          const helperReplacement = `function withoutCodexSplitReadPermissionProfile(args: string[]): string[] {\n  const blocked = new Set([\n    'default_permissions="agentshare-query"',\n    'permissions.agentshare-query.filesystem={":minimal"="deny",":workspace_roots"="deny"}',\n    "permissions.agentshare-query.network.enabled=false",\n  ]);\n  const result: string[] = [];\n  for (let index = 0; index < args.length; index += 1) {\n    const value = args[index];\n    const next = args[index + 1];\n    if (value === "--config" && next !== undefined && blocked.has(next)) {\n      index += 1;\n      continue;\n    }\n    if (value !== undefined) result.push(value);\n  }\n  return result;\n}\n\nfunction tomlString(value: string): string {\n  return JSON.stringify(value);\n}`;
+          if (!text.includes(helperNeedle)) throw new Error('toml helper anchor not found');
+          text = text.replace(helperNeedle, helperReplacement);
+          fs.writeFileSync(path, text);
+          NODE
+          npx prettier --write packages/cli/src/worker/environment-launcher.ts
+          rm .github/workflows/apply-windows-launch-profile.yml
+      - name: Commit implementation and remove helper
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/cli/src/worker/environment-launcher.ts .github/workflows/apply-windows-launch-profile.yml
+          git commit -m "fix: support tool-isolated native Windows Codex profile"
+          git push origin HEAD:fix/windows-codex-recipient-isolation
