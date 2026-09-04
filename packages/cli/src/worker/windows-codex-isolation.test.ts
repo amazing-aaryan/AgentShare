@@ -106,7 +106,10 @@ describe("native Windows Codex catalog preparation", () => {
 
     await writeFile(
       join(codexHome, "models_cache.json"),
-      JSON.stringify({ client_version: "0.153.0", models: [{ slug: "model" }] }),
+      JSON.stringify({
+        client_version: "0.153.0",
+        models: [{ slug: "model" }],
+      }),
       "utf8",
     );
     await expect(prepareCatalog()(codexHome, output)).rejects.toThrow(
@@ -120,9 +123,9 @@ describe("native Windows Codex catalog preparation", () => {
     const defaultHome = join(root, "home");
     await mkdir(configured, { recursive: true });
 
-    await expect(resolveHome()({ CODEX_HOME: configured }, defaultHome)).resolves.toBe(
-      configured,
-    );
+    await expect(
+      resolveHome()({ CODEX_HOME: configured }, defaultHome),
+    ).resolves.toBe(configured);
     await expect(resolveHome()({}, defaultHome)).resolves.toBe(
       join(defaultHome, ".codex"),
     );
