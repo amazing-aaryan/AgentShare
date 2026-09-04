@@ -1,8 +1,16 @@
 type JsonObject = Record<string, unknown>;
 
+export const REVIEWED_NATIVE_WINDOWS_CODEX_VERSION = "0.152.1";
+
 export type HardenedCodexModelCatalog = {
   models: JsonObject[];
 };
+
+export function supportsReviewedNativeWindowsCodexVersion(
+  output: string,
+): boolean {
+  return output.trim() === `codex-cli ${REVIEWED_NATIVE_WINDOWS_CODEX_VERSION}`;
+}
 
 export function hardenCodexModelsCache(
   value: unknown,
