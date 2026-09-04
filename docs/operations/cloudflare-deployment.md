@@ -140,14 +140,26 @@ Recipient isolation evidence follows the surface changed by the release:
   recorded real-host isolation evidence, and the release record must say so
   explicitly.
 
-For the v0.3 collaboration release line, the promotable profile is the explicit
-`codex-only-v1` contract in [`../release-v0.3.0.md`](../release-v0.3.0.md). It
-requires the published artifact, live public origins, real terminal and native
-Codex chat creation paths, actual MCP read/proposal/inbox/approval/refresh
-behavior, isolation, revocation, cleanup, and explicit creator approval. Claude
-live execution is outside that profile and is not a v0.3 stable-promotion gate.
-This narrows release evidence; it does not remove the existing Claude adapter or
-claim new Claude compatibility evidence.
+The v0.3.0 `codex-only-v1` contract in
+[`../release-v0.3.0.md`](../release-v0.3.0.md) is frozen historical evidence for
+AgentShare `0.3.0` with its exact reviewed runtime, including Codex CLI `0.147.0`.
+Do not reinterpret that profile to cover a newer Codex release or a package that
+contains post-v0.3.0 fixes.
+
+A stable candidate that includes the Codex v2 forward-compatibility patch must
+be staged as a **new immutable package with a new release-evidence profile**. Its
+native Codex version is the exact current version used by the successful
+creator-to-recipient run, while the product compatibility policy remains the
+reviewed v2 floor plus runtime capability checks. Before promotion, freshly
+prove that the current Codex passes the isolation-control and MCP preflights and
+complete the real terminal and native chat creation paths through actual MCP
+read/proposal/inbox/approval/refresh behavior, isolation, revocation, cleanup,
+and explicit creator approval. A version-preflight success alone is not release
+evidence.
+
+Claude live execution remains outside the v0.3 collaboration stable-promotion
+profile. This narrows release evidence; it does not remove the existing Claude
+adapter or claim new Claude compatibility evidence.
 
 When authenticated reviewed Codex and Claude installations are both available,
 the repository's full two-agent diagnostic remains useful:
