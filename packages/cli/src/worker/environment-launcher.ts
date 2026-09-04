@@ -150,8 +150,9 @@ export function codexEnvironmentArgs(
     "mcp_servers.agentshare.required=true",
     "--config",
     `mcp_servers.agentshare.enabled_tools=${JSON.stringify(environmentToolNames(options.mode ?? "ask"))}`,
-    // Schema verified against openai/codex rust-v0.147.0. Do not change the
-    // global approval policy or server-wide default to make these calls work.
+    // Baseline schema reviewed against openai/codex rust-v0.147.0. Do not
+    // change the global approval policy or server-wide default to make these
+    // calls work on a newer release.
     ...environmentToolNames(options.mode ?? "ask").flatMap((name) => [
       "--config",
       `mcp_servers.agentshare.tools.${name}.approval_mode="approve"`,
@@ -207,7 +208,9 @@ async function verifyEnvironmentMcpSupport(
   ]);
   if (!supportsReviewedEnvironmentTargetVersion(target, version)) {
     throw new Error(
-      `${target} has not passed AgentShare v2 MCP review; Codex v2 requires 0.147.0. Legacy query compatibility does not establish v2 compatibility.`,
+      target === "codex"
+        ? "codex has not passed AgentShare v2 MCP preflight; Codex v2 requires a recognizable Codex CLI >= 0.147.0 plus the required runtime isolation and MCP controls."
+        : `${target} has not passed AgentShare v2 MCP review; install a reviewed ${target} version.`,
     );
   }
   if (target === "claude") {
