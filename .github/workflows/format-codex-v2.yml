@@ -1,0 +1,43 @@
+name: format-codex-v2
+
+on:
+  push:
+    branches:
+      - fix/codex-v2-forward-compat
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fix/codex-v2-forward-compat
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Format compatibility candidate
+        run: >-
+          npx prettier --write
+          packages/cli/src/launchers.ts
+          packages/cli/src/launchers.test.ts
+          packages/cli/src/worker/environment-launcher.ts
+          packages/cli/src/worker/environment-launcher.test.ts
+          docs/recipient-compatibility.md
+          docs/operations/cloudflare-deployment.md
+      - name: Commit formatting and remove helper workflow
+        shell: bash
+        run: |
+          rm .github/workflows/format-codex-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "style: format Codex v2 compatibility fix"
+          git push origin HEAD:fix/codex-v2-forward-compat
