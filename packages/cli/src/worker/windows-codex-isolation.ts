@@ -46,6 +46,7 @@ export async function resolveCodexHome(
   } catch (error) {
     throw new Error(
       `failed to canonicalize CODEX_HOME ${JSON.stringify(configured)}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 }
