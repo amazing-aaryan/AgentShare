@@ -13,10 +13,39 @@ export type HardenedCodexModelCatalog = {
   models: JsonObject[];
 };
 
+export type NativeWindowsCodexIsolation = {
+  codexModelCatalogPath: string;
+  codexSplitReadBoundary: false;
+};
+
 export function supportsReviewedNativeWindowsCodexVersion(
   output: string,
 ): boolean {
   return output.trim() === `codex-cli ${REVIEWED_NATIVE_WINDOWS_CODEX_VERSION}`;
+}
+
+export async function prepareNativeWindowsCodexIsolation(
+  platform: NodeJS.Platform,
+  versionOutput: string,
+  environment: NodeJS.ProcessEnv,
+  defaultHome: string,
+  outputDirectory: string,
+): Promise<NativeWindowsCodexIsolation | undefined> {
+  if (platform !== "win32") return undefined;
+  if (!supportsReviewedNativeWindowsCodexVersion(versionOutput)) {
+    throw new Error(
+      `Native Windows AgentShare recipient isolation is reviewed only for Codex CLI ${REVIEWED_NATIVE_WINDOWS_CODEX_VERSION}; refusing unreviewed Windows Codex version`,
+    );
+  }
+  const codexHome = await resolveCodexHome(environment, defaultHome);
+  const codexModelCatalogPath = await prepareHardenedCodexModelCatalog(
+    codexHome,
+    outputDirectory,
+  );
+  return {
+    codexModelCatalogPath,
+    codexSplitReadBoundary: false,
+  };
 }
 
 export async function resolveCodexHome(
