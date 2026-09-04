@@ -19,6 +19,7 @@ type TargetChildLifecycle = {
 type VersionTuple = readonly [major: number, minor: number, patch: number];
 
 const MINIMUM_CODEX_VERSION: VersionTuple = [0, 145, 0];
+const MINIMUM_CODEX_ENVIRONMENT_VERSION: VersionTuple = [0, 147, 0];
 const CODEX_VERSION_PATTERN =
   /^codex-cli\s+(\d+)\.(\d+)\.(\d+)(?:[-+][^\s]+)?\s*$/mu;
 
@@ -250,14 +251,23 @@ export function supportsReviewedTargetVersion(
   );
 }
 
-/** V2 MCP approvals were validated separately from the legacy query profile. */
+/**
+ * V2 MCP support starts at a separately reviewed Codex baseline. Newer
+ * recognizable releases still have to pass the runtime isolation and MCP
+ * capability probes before AgentShare launches them.
+ */
 export function supportsReviewedEnvironmentTargetVersion(
   target: TargetAgent,
   versionOutput: string,
 ): boolean {
-  return target === "codex"
-    ? /^codex-cli 0\.147\.0\s*$/mu.test(versionOutput.trim())
-    : supportsReviewedTargetVersion(target, versionOutput);
+  if (target !== "codex") {
+    return supportsReviewedTargetVersion(target, versionOutput);
+  }
+  const version = parseCodexVersion(versionOutput);
+  return (
+    version !== undefined &&
+    compareVersions(version, MINIMUM_CODEX_ENVIRONMENT_VERSION) >= 0
+  );
 }
 
 async function assertSupportedTarget(
