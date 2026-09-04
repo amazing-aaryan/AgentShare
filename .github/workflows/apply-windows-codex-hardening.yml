@@ -1,0 +1,40 @@
+name: apply-windows-codex-hardening
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - fix/windows-codex-recipient-isolation
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fix/windows-codex-recipient-isolation
+      - name: Apply minimal capability flags
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'packages/cli/src/launchers.ts';
+          let text = fs.readFileSync(path, 'utf8');
+          const needle = `    "--config",\n    "features.apply_patch_freeform=false",\n    "--config",\n    "features.js_repl=false",`;
+          const replacement = `    "--config",\n    "features.apply_patch_freeform=false",\n    "--config",\n    "features.view_image=false",\n    "--config",\n    "features.request_permissions_tool=false",\n    "--config",\n    "agents.enabled=false",\n    "--config",\n    "features.js_repl=false",`;
+          if (!text.includes(needle)) throw new Error('expected codexArgs anchor not found');
+          text = text.replace(needle, replacement);
+          fs.writeFileSync(path, text);
+          NODE
+          rm .github/workflows/apply-windows-codex-hardening.yml
+      - name: Commit patch and remove helper
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/cli/src/launchers.ts .github/workflows/apply-windows-codex-hardening.yml
+          git commit -m "fix: disable local Codex recipient capabilities"
+          git push origin HEAD:fix/windows-codex-recipient-isolation
