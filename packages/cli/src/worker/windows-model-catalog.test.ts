@@ -27,7 +27,9 @@ function windowsVersionReviewer(): SupportsReviewedNativeWindowsCodexVersion {
     }
   ).supportsReviewedNativeWindowsCodexVersion;
   if (typeof candidate !== "function") {
-    throw new Error("supportsReviewedNativeWindowsCodexVersion is not implemented");
+    throw new Error(
+      "supportsReviewedNativeWindowsCodexVersion is not implemented",
+    );
   }
   return candidate;
 }
