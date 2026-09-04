@@ -178,10 +178,10 @@ export function codexEnvironmentArgs(
   const promptMarker = base.at(-1) === "-" ? base.slice(0, -1) : base;
   const hardenedBase =
     platform === "win32"
-      ? removeCodexConfig(
-          promptMarker,
-          "permissions.agentshare-query.filesystem=",
-        )
+      ? removeCodexConfigs(promptMarker, [
+          "default_permissions=",
+          "permissions.agentshare-query.",
+        ])
       : promptMarker;
   const windowsOverrides =
     platform === "win32"
@@ -325,6 +325,8 @@ function windowsCodexEnvironmentOverrides(
   }
   return [
     "--config",
+    'default_permissions=":read-only"',
+    "--config",
     `model=${tomlString(WINDOWS_REVIEWED_CODEX_MODEL)}`,
     "--config",
     `model_catalog_json=${tomlString(modelCatalogPath)}`,
@@ -335,12 +337,14 @@ function windowsCodexEnvironmentOverrides(
   ];
 }
 
-function removeCodexConfig(args: string[], prefix: string): string[] {
+function removeCodexConfigs(args: string[], prefixes: string[]): string[] {
   const filtered: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     if (
       args[index] === "--config" &&
-      args[index + 1]?.startsWith(prefix) === true
+      prefixes.some(
+        (prefix) => args[index + 1]?.startsWith(prefix) === true,
+      )
     ) {
       index += 1;
       continue;
