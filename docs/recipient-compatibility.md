@@ -45,15 +45,46 @@ baseline, capability drift is checked at runtime, and known regressions can be
 blocked explicitly if evidence requires it.
 
 The v2 collaboration MCP runtime has a **separate minimum of Codex CLI 0.147.0**
-because 0.147.0 is the first reviewed native MCP approval baseline. It is not an
-exact-version allowlist. A recognizable Codex release at or above 0.147.0 must
-also pass the general `codex exec --help` isolation-control probe and the v2
+because 0.147.0 is the first reviewed native MCP approval baseline. On platforms
+whose reviewed launcher can preserve the split-read filesystem boundary, this is
+not an exact-version allowlist. A recognizable Codex release at or above 0.147.0
+must also pass the general `codex exec --help` isolation-control probe and the v2
 `codex mcp --help` client-capability probe before AgentShare launches it. The
 hardened read-only launcher configuration, explicit AgentShare MCP tool
 allowlist, and per-tool approval controls remain mandatory. If a newer release
 drops a required control or rejects that restrictive configuration, AgentShare
 fails closed rather than weakening isolation. Codex 0.145.x and 0.146.x remain
 eligible for the legacy query path but not for the v2 MCP collaboration path.
+
+#### Windows v2 recipient exception
+
+Windows currently has a narrower reviewed v2 policy because Codex CLI 0.152.1's
+unelevated restricted-token sandbox cannot enforce AgentShare's Linux/macOS
+split/deny-read filesystem policy directly. AgentShare therefore does **not**
+pretend that the cross-platform v2 floor alone proves Windows safety.
+
+The candidate Windows v2 profile is pinned to **Codex CLI 0.152.1** until a newer
+release receives its own tool-surface review. It uses Codex's built-in
+`:read-only` permission profile, which is root-readable but denies writes and
+keeps network restricted, and combines that OS boundary with an MCP-only model
+tool surface. AgentShare supplies a private empty authoritative model catalog so
+the explicit `gpt-5.6-sol` slug resolves through Codex fallback metadata without
+an apply-patch tool, and explicitly disables shell/unified-exec, view-image,
+shell snapshots, code-mode surfaces, multi-agent delegation, image generation,
+skill/plugin/app/hook/memory surfaces. The AgentShare MCP server remains
+required with the exact mode-specific enabled-tool list and per-tool approvals.
+
+This is a different confidentiality mechanism from the stronger Linux/macOS
+split-read profile: on Windows, host files may be readable to the OS sandbox but
+must have **no model-visible host-filesystem tool path**. Shared project/context
+access is intended to occur only through AgentShare MCP. Because that boundary
+depends on the exact reviewed Codex tool registry, Windows releases other than
+0.152.1 fail closed rather than inheriting the general forward-version policy.
+
+The Windows profile is still a **security candidate, not release evidence** until
+a native run proves both positive context recovery and the negative
+outside-project canary. Do not promote a stable release from unit/CI evidence
+alone.
 
 ### Claude Code
 
@@ -159,8 +190,24 @@ That result demonstrates a compatibility-policy bug rather than a relay,
 cryptography, bootstrap, or creator-publication failure. The fix keeps the v2
 reviewed floor at 0.147.0 while allowing newer recognizable Codex releases only
 when the existing runtime isolation and MCP capability probes continue to pass.
-A fresh native 0.152.1 end-to-end run is still required before this regression
-is considered closed for release evidence.
+
+A second native run used exact candidate
+`27d6537c774c5188e238d393944fda3085a97743` on Windows 11 Home build 26200,
+Node.js `24.14.0`, and Codex CLI `0.152.1`. It proved the version-policy fix:
+creator health, natural `$agentshare`, conversation + project review,
+publication, direct recipient link attachment, revocation, and post-revoke
+denial all passed, and the recipient was **not** rejected solely for being newer
+than 0.147.0. The run was nevertheless `PARTIAL`, not a release pass. The first
+recipient query failed closed with the Windows split-read sandbox refusal before
+a required completed AgentShare MCP receipt existed. Workspace/conversation
+canary recovery, outside-project isolation, proposal delivery/approval, and
+same-link refresh therefore remained unproven. No sandbox bypass was attempted.
+
+That PARTIAL run is the evidence motivating the exact-reviewed Windows 0.152.1
+MCP-only profile documented above and tracked in GitHub issue #14. A fresh native
+end-to-end run against the exact final candidate must show that the split-read
+startup failure is gone **and** prove the outside-project canary remains
+unavailable before the Windows regression can be closed for release evidence.
 
 ## Review procedure
 
@@ -175,6 +222,11 @@ For Codex compatibility changes:
    inherited environment.
 6. Add an explicit blocked version/range only when evidence demonstrates a
    regression that cannot be detected by the existing capability/runtime gates.
+7. For the Windows MCP-only v2 profile, additionally verify the exact reviewed
+   Codex version, absence of model-visible host filesystem/shell/delegation
+   tools, successful AgentShare MCP receipts, positive shared-context canaries,
+   a negative outside-project canary, proposal-only mutation, same-link refresh,
+   and revocation. Unit tests cannot substitute for this native check.
 
 For Claude Code, continue the exact-release review before adding a version to
 the reviewed allowlist: run the capability preflight, real filesystem/network
@@ -218,12 +270,12 @@ versioned report, independent candidate manifest, original published archive,
 and local hashed evidence attachments. It performs offline validation only.
 
 The `codex-only-v1` profile is frozen historical evidence and is **not**
-broadened by the forward-compatibility patch. A stable candidate that includes
-the newer compatibility behavior must use a new immutable package and a newly
-versioned release-evidence profile rather than reinterpreting the existing
-v0.3.0 archive or changing the meaning of `codex-only-v1`. The exact current
-Codex version used for that new profile should be recorded by the successful
-native end-to-end run.
+broadened by the forward-compatibility or Windows isolation patches. A stable
+candidate that includes the newer behavior must use a new immutable package and
+a newly versioned release-evidence profile rather than reinterpreting the
+existing v0.3.0 archive or changing the meaning of `codex-only-v1`. The exact
+current Codex version and platform isolation profile used for that new evidence
+must be recorded by the successful native end-to-end run.
 
 See [v0.3.0 release evidence contract](release-v0.3.0.md) for the frozen
 inventory, exact report fields, commands, and outstanding real-flow integration.
