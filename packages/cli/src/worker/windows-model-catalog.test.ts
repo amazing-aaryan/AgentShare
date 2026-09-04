@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import * as environmentLauncher from "./environment-launcher.js";
+import * as windowsIsolation from "./windows-codex-isolation.js";
 
 type HardenCodexModelsCache = (
   value: unknown,
   reviewedClientVersion: string,
 ) => unknown;
+type SupportsReviewedNativeWindowsCodexVersion = (output: string) => boolean;
 
 function hardener(): HardenCodexModelsCache {
   const candidate = (
@@ -18,7 +20,26 @@ function hardener(): HardenCodexModelsCache {
   return candidate;
 }
 
+function windowsVersionReviewer(): SupportsReviewedNativeWindowsCodexVersion {
+  const candidate = (
+    windowsIsolation as unknown as {
+      supportsReviewedNativeWindowsCodexVersion?: SupportsReviewedNativeWindowsCodexVersion;
+    }
+  ).supportsReviewedNativeWindowsCodexVersion;
+  if (typeof candidate !== "function") {
+    throw new Error("supportsReviewedNativeWindowsCodexVersion is not implemented");
+  }
+  return candidate;
+}
+
 describe("Windows Codex model catalog isolation", () => {
+  it("accepts only the exact reviewed native Windows Codex version", () => {
+    expect(windowsVersionReviewer()("codex-cli 0.152.1")).toBe(true);
+    expect(windowsVersionReviewer()("codex-cli 0.153.0")).toBe(false);
+    expect(windowsVersionReviewer()("codex-cli 0.152.1-beta.1")).toBe(false);
+    expect(windowsVersionReviewer()("0.152.1")).toBe(false);
+  });
+
   it("preserves model identity while removing local tool capabilities", () => {
     const input = {
       fetched_at: "2026-09-04T00:00:00Z",
