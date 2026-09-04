@@ -48,8 +48,8 @@ The v2 collaboration MCP runtime has a **separate minimum of Codex CLI 0.147.0**
 because 0.147.0 is the first reviewed native MCP approval baseline. On platforms
 whose reviewed launcher can preserve the split-read filesystem boundary, this is
 not an exact-version allowlist. A recognizable Codex release at or above 0.147.0
-must also pass the general `codex exec --help` isolation-control probe and the v2
-`codex mcp --help` client-capability probe before AgentShare launches it. The
+must also pass the general `codex exec --help` isolation-control probe and the
+v2 `codex mcp --help` client-capability probe before AgentShare launches it. The
 hardened read-only launcher configuration, explicit AgentShare MCP tool
 allowlist, and per-tool approval controls remain mandatory. If a newer release
 drops a required control or rejects that restrictive configuration, AgentShare
@@ -63,8 +63,8 @@ unelevated restricted-token sandbox cannot enforce AgentShare's Linux/macOS
 split/deny-read filesystem policy directly. AgentShare therefore does **not**
 pretend that the cross-platform v2 floor alone proves Windows safety.
 
-The candidate Windows v2 profile is pinned to **Codex CLI 0.152.1** until a newer
-release receives its own tool-surface review. It uses Codex's built-in
+The candidate Windows v2 profile is pinned to **Codex CLI 0.152.1** until a
+newer release receives its own tool-surface review. It uses Codex's built-in
 `:read-only` permission profile, which is root-readable but denies writes and
 keeps network restricted, and combines that OS boundary with an MCP-only model
 tool surface. AgentShare supplies a private empty authoritative model catalog so
@@ -81,8 +81,8 @@ access is intended to occur only through AgentShare MCP. Because that boundary
 depends on the exact reviewed Codex tool registry, Windows releases other than
 0.152.1 fail closed rather than inheriting the general forward-version policy.
 
-The Windows profile is still a **security candidate, not release evidence** until
-a native run proves both positive context recovery and the negative
+The Windows profile is still a **security candidate, not release evidence**
+until a native run proves both positive context recovery and the negative
 outside-project canary. Do not promote a stable release from unit/CI evidence
 alone.
 
@@ -204,10 +204,11 @@ canary recovery, outside-project isolation, proposal delivery/approval, and
 same-link refresh therefore remained unproven. No sandbox bypass was attempted.
 
 That PARTIAL run is the evidence motivating the exact-reviewed Windows 0.152.1
-MCP-only profile documented above and tracked in GitHub issue #14. A fresh native
-end-to-end run against the exact final candidate must show that the split-read
-startup failure is gone **and** prove the outside-project canary remains
-unavailable before the Windows regression can be closed for release evidence.
+MCP-only profile documented above and tracked in GitHub issue #14. A fresh
+native end-to-end run against the exact final candidate must show that the
+split-read startup failure is gone **and** prove the outside-project canary
+remains unavailable before the Windows regression can be closed for release
+evidence.
 
 ## Review procedure
 

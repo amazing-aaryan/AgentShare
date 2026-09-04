@@ -156,8 +156,8 @@ OS isolation with restricted network; an AgentShare-private empty model catalog
 forces the explicit `gpt-5.6-sol` slug through fallback metadata without an
 apply-patch tool; shell, unified execution, view-image, shell snapshots,
 code-mode surfaces, multi-agent delegation, image generation, and local
-skill/plugin/app/hook/memory surfaces are disabled; and the AgentShare MCP server
-is required with the exact mode-specific enabled-tool list and per-tool
+skill/plugin/app/hook/memory surfaces are disabled; and the AgentShare MCP
+server is required with the exact mode-specific enabled-tool list and per-tool
 approvals. Linux/macOS keep the stronger split-read filesystem-denial profile.
 
 That Windows profile is pinned to **Codex CLI 0.152.1** until a newer Codex tool
@@ -165,8 +165,8 @@ registry is independently reviewed. A stable promotion must not broaden the pin
 merely because a newer version passes the general version parser or MCP help
 probe.
 
-Before any release candidate containing the Windows profile can become stable,
-a fresh native run against the exact candidate must prove all of these together:
+Before any release candidate containing the Windows profile can become stable, a
+fresh native run against the exact candidate must prove all of these together:
 
 - the Windows split-read startup error no longer occurs;
 - both workspace-only and conversation-only shared canaries are recovered
@@ -195,8 +195,8 @@ isolation profile must be the exact versions used by the successful
 creator-to-recipient run. Before promotion, complete the real terminal and
 native chat creation paths through actual MCP read/proposal/inbox/approval/
 refresh behavior, isolation, revocation, cleanup, and explicit creator approval.
-A version-preflight success or source-checkout run alone is not published-artifact
-release evidence.
+A version-preflight success or source-checkout run alone is not
+published-artifact release evidence.
 
 Claude live execution remains outside the v0.3 collaboration stable-promotion
 profile. This narrows release evidence; it does not remove the existing Claude
