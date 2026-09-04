@@ -342,9 +342,7 @@ function removeCodexConfigs(args: string[], prefixes: string[]): string[] {
   for (let index = 0; index < args.length; index += 1) {
     if (
       args[index] === "--config" &&
-      prefixes.some(
-        (prefix) => args[index + 1]?.startsWith(prefix) === true,
-      )
+      prefixes.some((prefix) => args[index + 1]?.startsWith(prefix) === true)
     ) {
       index += 1;
       continue;
