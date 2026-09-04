@@ -43,9 +43,9 @@ describe("Codex recipient capability isolation", () => {
     );
     expect(args).toContain(`model_catalog_json=${JSON.stringify(catalog)}`);
     expect(args).toContain("mcp_servers.agentshare.required=true");
-    expect(args.some((arg) => arg.includes("mcp_servers.agentshare.enabled_tools="))).toBe(
-      true,
-    );
+    expect(
+      args.some((arg) => arg.includes("mcp_servers.agentshare.enabled_tools=")),
+    ).toBe(true);
   });
 
   it("retains the stronger split-read boundary by default", () => {
