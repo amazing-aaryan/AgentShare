@@ -140,22 +140,63 @@ Recipient isolation evidence follows the surface changed by the release:
   recorded real-host isolation evidence, and the release record must say so
   explicitly.
 
+The current Codex branch changes Windows launcher/sandbox authority, so it falls
+under the first rule. The native PARTIAL run against candidate
+`27d6537c774c5188e238d393944fda3085a97743` is useful regression evidence but is
+**not promotable**: creator publication, direct recipient attachment, and
+revocation passed, while the first recipient query failed closed because Codex
+0.152.1's unelevated Windows sandbox could not enforce the requested split-read
+filesystem profile. Context recovery, negative outside-project isolation,
+proposal/approval, and same-link refresh therefore remained unproven.
+
+For the reviewed Windows 11 build 26200 / Node 24.14.0 / Codex CLI 0.152.1
+candidate, AgentShare now uses a Windows-specific MCP-only recipient profile:
+Codex's built-in `:read-only` permission profile supplies root-readable/no-write
+OS isolation with restricted network; an AgentShare-private empty model catalog
+forces the explicit `gpt-5.6-sol` slug through fallback metadata without an
+apply-patch tool; shell, unified execution, view-image, shell snapshots,
+code-mode surfaces, multi-agent delegation, image generation, and local
+skill/plugin/app/hook/memory surfaces are disabled; and the AgentShare MCP server
+is required with the exact mode-specific enabled-tool list and per-tool
+approvals. Linux/macOS keep the stronger split-read filesystem-denial profile.
+
+That Windows profile is pinned to **Codex CLI 0.152.1** until a newer Codex tool
+registry is independently reviewed. A stable promotion must not broaden the pin
+merely because a newer version passes the general version parser or MCP help
+probe.
+
+Before any release candidate containing the Windows profile can become stable,
+a fresh native run against the exact candidate must prove all of these together:
+
+- the Windows split-read startup error no longer occurs;
+- both workspace-only and conversation-only shared canaries are recovered
+  through AgentShare;
+- an outside-project canary remains unavailable to the recipient;
+- no model-visible host filesystem/shell/delegation path is exposed;
+- recipient mutation occurs only as an AgentShare proposal;
+- the creator receives and explicitly approves that proposal;
+- the same recipient environment sees the approved revision without a new link;
+- revocation denies later access;
+- capability links, keys, and tokens remain absent from public evidence.
+
+GitHub issue #14 tracks this native Windows acceptance gate. CI and argument
+construction are necessary but cannot substitute for the real-host canary test.
+
 The v0.3.0 `codex-only-v1` contract in
 [`../release-v0.3.0.md`](../release-v0.3.0.md) is frozen historical evidence for
 AgentShare `0.3.0` with its exact reviewed runtime, including Codex CLI
-`0.147.0`. Do not reinterpret that profile to cover a newer Codex release or a
-package that contains post-v0.3.0 fixes.
+`0.147.0`. Do not reinterpret that profile to cover a newer Codex release, the
+Windows MCP-only profile, or a package that contains post-v0.3.0 fixes.
 
-A stable candidate that includes the Codex v2 forward-compatibility patch must
-be staged as a **new immutable package with a new release-evidence profile**.
-Its native Codex version is the exact current version used by the successful
-creator-to-recipient run, while the product compatibility policy remains the
-reviewed v2 floor plus runtime capability checks. Before promotion, freshly
-prove that the current Codex passes the isolation-control and MCP preflights and
-complete the real terminal and native chat creation paths through actual MCP
-read/proposal/inbox/approval/refresh behavior, isolation, revocation, cleanup,
-and explicit creator approval. A version-preflight success alone is not release
-evidence.
+A stable candidate that includes the Codex v2 forward-compatibility and Windows
+isolation patches must be staged as a **new immutable package with a new
+release-evidence profile**. Its native Codex version and platform-specific
+isolation profile must be the exact versions used by the successful
+creator-to-recipient run. Before promotion, complete the real terminal and
+native chat creation paths through actual MCP read/proposal/inbox/approval/
+refresh behavior, isolation, revocation, cleanup, and explicit creator approval.
+A version-preflight success or source-checkout run alone is not published-artifact
+release evidence.
 
 Claude live execution remains outside the v0.3 collaboration stable-promotion
 profile. This narrows release evidence; it does not remove the existing Claude
