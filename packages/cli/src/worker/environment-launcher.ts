@@ -17,6 +17,7 @@ import {
 } from "../launchers.js";
 import { sanitizeTerminalText } from "../terminal.js";
 import { ensurePrivateDirectory } from "../environment/private-store.js";
+export { hardenCodexModelsCache } from "./windows-codex-isolation.js";
 import {
   environmentToolNames,
   hasRequiredCompletion,
