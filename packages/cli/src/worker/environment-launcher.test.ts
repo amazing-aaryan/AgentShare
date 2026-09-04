@@ -72,13 +72,12 @@ describe("environment worker launcher", () => {
   });
 
   it("fails closed for a newer Codex when MCP client support disappears", async () => {
-    captureProcessMock.mockImplementation(
-      (_command: string, args: string[]) =>
-        Promise.resolve(
-          args.includes("--version")
-            ? "codex-cli 0.152.1"
-            : "usage: codex protocol configuration",
-        ),
+    captureProcessMock.mockImplementation((_command: string, args: string[]) =>
+      Promise.resolve(
+        args.includes("--version")
+          ? "codex-cli 0.152.1"
+          : "usage: codex protocol configuration",
+      ),
     );
 
     await expect(

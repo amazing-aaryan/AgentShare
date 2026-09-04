@@ -142,13 +142,13 @@ Recipient isolation evidence follows the surface changed by the release:
 
 The v0.3.0 `codex-only-v1` contract in
 [`../release-v0.3.0.md`](../release-v0.3.0.md) is frozen historical evidence for
-AgentShare `0.3.0` with its exact reviewed runtime, including Codex CLI `0.147.0`.
-Do not reinterpret that profile to cover a newer Codex release or a package that
-contains post-v0.3.0 fixes.
+AgentShare `0.3.0` with its exact reviewed runtime, including Codex CLI
+`0.147.0`. Do not reinterpret that profile to cover a newer Codex release or a
+package that contains post-v0.3.0 fixes.
 
 A stable candidate that includes the Codex v2 forward-compatibility patch must
-be staged as a **new immutable package with a new release-evidence profile**. Its
-native Codex version is the exact current version used by the successful
+be staged as a **new immutable package with a new release-evidence profile**.
+Its native Codex version is the exact current version used by the successful
 creator-to-recipient run, while the product compatibility policy remains the
 reviewed v2 floor plus runtime capability checks. Before promotion, freshly
 prove that the current Codex passes the isolation-control and MCP preflights and

@@ -49,11 +49,11 @@ because 0.147.0 is the first reviewed native MCP approval baseline. It is not an
 exact-version allowlist. A recognizable Codex release at or above 0.147.0 must
 also pass the general `codex exec --help` isolation-control probe and the v2
 `codex mcp --help` client-capability probe before AgentShare launches it. The
-hardened read-only launcher configuration, explicit AgentShare MCP tool allowlist,
-and per-tool approval controls remain mandatory. If a newer release drops a
-required control or rejects that restrictive configuration, AgentShare fails
-closed rather than weakening isolation. Codex 0.145.x and 0.146.x remain eligible
-for the legacy query path but not for the v2 MCP collaboration path.
+hardened read-only launcher configuration, explicit AgentShare MCP tool
+allowlist, and per-tool approval controls remain mandatory. If a newer release
+drops a required control or rejects that restrictive configuration, AgentShare
+fails closed rather than weakening isolation. Codex 0.145.x and 0.146.x remain
+eligible for the legacy query path but not for the v2 MCP collaboration path.
 
 ### Claude Code
 
@@ -149,18 +149,18 @@ review evidence and by authenticated release/security checks when those are run.
 ## 2026-09-04 v2 forward-compatibility regression
 
 A native Windows 11 Home retest used Node.js `24.14.0`, Codex CLI `0.152.1`, and
-AgentShare master `4dbe766c0eeed301e84b71453f22a6eb49cf3889`. The creator-side natural
-`$agentshare` flow, conversation + project review, publication, capability-link
-creation, and recipient bootstrap all succeeded. The first recipient context
-query then failed before model execution because the v2 preflight still required
-exactly Codex `0.147.0`.
+AgentShare master `4dbe766c0eeed301e84b71453f22a6eb49cf3889`. The creator-side
+natural `$agentshare` flow, conversation + project review, publication,
+capability-link creation, and recipient bootstrap all succeeded. The first
+recipient context query then failed before model execution because the v2
+preflight still required exactly Codex `0.147.0`.
 
 That result demonstrates a compatibility-policy bug rather than a relay,
 cryptography, bootstrap, or creator-publication failure. The fix keeps the v2
 reviewed floor at 0.147.0 while allowing newer recognizable Codex releases only
 when the existing runtime isolation and MCP capability probes continue to pass.
-A fresh native 0.152.1 end-to-end run is still required before this regression is
-considered closed for release evidence.
+A fresh native 0.152.1 end-to-end run is still required before this regression
+is considered closed for release evidence.
 
 ## Review procedure
 
@@ -217,12 +217,13 @@ Those legacy source/launcher suites, including partial live diagnostics, are
 versioned report, independent candidate manifest, original published archive,
 and local hashed evidence attachments. It performs offline validation only.
 
-The `codex-only-v1` profile is frozen historical evidence and is **not** broadened
-by the forward-compatibility patch. A stable candidate that includes the newer
-compatibility behavior must use a new immutable package and a newly versioned
-release-evidence profile rather than reinterpreting the existing v0.3.0 archive
-or changing the meaning of `codex-only-v1`. The exact current Codex version used
-for that new profile should be recorded by the successful native end-to-end run.
+The `codex-only-v1` profile is frozen historical evidence and is **not**
+broadened by the forward-compatibility patch. A stable candidate that includes
+the newer compatibility behavior must use a new immutable package and a newly
+versioned release-evidence profile rather than reinterpreting the existing
+v0.3.0 archive or changing the meaning of `codex-only-v1`. The exact current
+Codex version used for that new profile should be recorded by the successful
+native end-to-end run.
 
 See [v0.3.0 release evidence contract](release-v0.3.0.md) for the frozen
 inventory, exact report fields, commands, and outstanding real-flow integration.
