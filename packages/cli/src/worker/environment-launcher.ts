@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   captureProcess,
@@ -17,6 +17,7 @@ import {
 } from "../launchers.js";
 import { sanitizeTerminalText } from "../terminal.js";
 import { ensurePrivateDirectory } from "../environment/private-store.js";
+import { prepareNativeWindowsCodexIsolation } from "./windows-codex-isolation.js";
 export { hardenCodexModelsCache } from "./windows-codex-isolation.js";
 import {
   environmentToolNames,
@@ -58,12 +59,45 @@ export async function runEnvironmentTarget(
     environmentId,
     mode,
   };
-  const runtimeOptions = { ...options, mode, receiptChannel };
   try {
     await ensurePrivateDirectory(receiptDirectory);
     await verifyTarget(target);
     const executable = resolveAgentExecutable(target);
-    await verifyEnvironmentMcpSupport(target, executable);
+    const version = await verifyEnvironmentMcpSupport(target, executable);
+    const nativeIsolation =
+      target === "codex" && process.platform === "win32"
+        ? await prepareNativeWindowsCodexIsolation(
+            process.platform,
+            version,
+            process.env,
+            homedir(),
+            receiptDirectory,
+          )
+        : undefined;
+    // Runtime authority is selected here, never by untrusted caller options.
+    // Native Windows cannot enforce Codex's split-read filesystem profile.
+    // Its exact-reviewed replacement must be prepared successfully before spawn.
+    const runtimeOptions: EnvironmentRuntimeOptions = {
+      ...(options.statePath === undefined
+        ? {}
+        : { statePath: options.statePath }),
+      ...(options.cacheRoot === undefined
+        ? {}
+        : { cacheRoot: options.cacheRoot }),
+      mode,
+      receiptChannel,
+      ...(nativeIsolation === undefined
+        ? {}
+        : {
+            codexModelCatalogPath: nativeIsolation.codexModelCatalogPath,
+            codexSplitReadBoundary: nativeIsolation.codexSplitReadBoundary,
+          }),
+    };
+    const environment = safeEnvironment();
+    if (nativeIsolation !== undefined) {
+      // Metadata and authentication must use the same canonical provider home.
+      environment.CODEX_HOME = nativeIsolation.codexHome;
+    }
     const cliPath = process.argv[1];
     if (cliPath === undefined)
       throw new Error("AgentShare CLI entrypoint is unavailable");
@@ -75,7 +109,7 @@ export async function runEnvironmentTarget(
             process.execPath,
             cliPath,
             runtimeOptions,
-            await discoverUserSkills(),
+            await discoverUserSkills(homedir(), nativeIsolation?.codexHome),
           )
         : claudeEnvironmentArgs(
             environmentId,
@@ -88,7 +122,7 @@ export async function runEnvironmentTarget(
       [...executable.prefixArgs, ...args],
       {
         cwd: workspace,
-        env: safeEnvironment(),
+        env: environment,
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       },
@@ -136,6 +170,14 @@ export function codexEnvironmentArgs(
   options: EnvironmentRuntimeOptions = {},
   disabledSkills: string[] = [],
 ): string[] {
+  if (
+    options.codexSplitReadBoundary === false &&
+    !options.codexModelCatalogPath?.trim()
+  ) {
+    throw new Error(
+      "Native Windows isolation requires a hardened model catalog",
+    );
+  }
   const base = codexArgs(workspace, disabledSkills);
   const promptMarker = base.at(-1) === "-" ? base.slice(0, -1) : base;
   const isolationArgs =
@@ -214,7 +256,7 @@ export function claudeEnvironmentArgs(
 async function verifyEnvironmentMcpSupport(
   target: TargetAgent,
   executable: { command: string; prefixArgs: string[] },
-): Promise<void> {
+): Promise<string> {
   const version = await captureProcess(executable.command, [
     ...executable.prefixArgs,
     "--version",
@@ -238,7 +280,7 @@ async function verifyEnvironmentMcpSupport(
         );
       }
     }
-    return;
+    return version;
   }
   const help = await captureProcess(executable.command, [
     ...executable.prefixArgs,
@@ -250,6 +292,7 @@ async function verifyEnvironmentMcpSupport(
       "codex no longer advertises MCP client support; refusing to weaken AgentShare isolation",
     );
   }
+  return version;
 }
 
 function internalMcpArgs(

@@ -28,7 +28,9 @@
     "test:release": "node scripts/test-release.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false",
-    "start:relay": "npm run start --workspace @agentshare/relay"
+    "start:relay": "npm run start --workspace @agentshare/relay",
+    "test:release-tools": "node --test scripts/*.test.mjs",
+    "test:deployment:smoke": "node scripts/check-deployment.mjs smoke"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260808.1",

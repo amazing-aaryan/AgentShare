@@ -34,6 +34,12 @@ beforeEach(() => {
   );
 });
 
+// These are generic process/MCP tests; native preparation is covered separately.
+vi.mock("./windows-codex-isolation.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./windows-codex-isolation.js")>()),
+  prepareNativeWindowsCodexIsolation: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe("environment worker launcher", () => {
   it("allows a newer Codex through the v2 preflight when MCP support is still advertised", async () => {
     const child = Object.assign(new EventEmitter(), {

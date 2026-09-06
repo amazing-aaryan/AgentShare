@@ -14,6 +14,7 @@ export type HardenedCodexModelCatalog = {
 };
 
 export type NativeWindowsCodexIsolation = {
+  codexHome: string;
   codexModelCatalogPath: string;
   codexSplitReadBoundary: false;
 };
@@ -43,6 +44,7 @@ export async function prepareNativeWindowsCodexIsolation(
     outputDirectory,
   );
   return {
+    codexHome,
     codexModelCatalogPath,
     codexSplitReadBoundary: false,
   };

@@ -51,6 +51,7 @@ npm run format:check
 npm run lint
 npm run build
 npm run test:coverage
+npm run test:release-tools
 npm run test:conformance
 npm run test:package
 npm run test:edge-runtime
@@ -70,6 +71,47 @@ evidence passes; the AgentShare updater ignores prereleases.
 
 Record the staged asset byte size and SHA-256 before deployment. Do not replace
 or mutate the asset after the Worker has been verified against it.
+
+## Protected official workflow
+
+Use the manually dispatched `deploy-cloudflare` workflow from **master** for
+official production changes. It checks out the supplied full candidate SHA and
+requires it to be an ancestor of master, with the latest exact-SHA push CI run
+and all six matrix jobs successful. The CLI, v1 handoff and v2 bootstrap pins
+must agree. A published immutable release tag must resolve to that same SHA; the
+package asset's recorded metadata **and downloaded bytes** must match the
+independently recorded size and SHA-256. A prerelease is allowed for live
+testing; this workflow does not authorize stable promotion.
+
+Before dispatch, a repository administrator must configure the GitHub
+environment named `production` with at least one required reviewer and a custom
+deployment branch policy containing **only the branch `master`**, not tags or
+wildcards. Configure scoped `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
+secrets there. Merely referring to `environment: production` in YAML does not
+create protection; the preflight reads and rejects absent review/branch
+policies. No secret values should be copied into source, workflow inputs,
+reports or chat.
+
+Inputs are `candidate_sha`, `package_sha256`, `package_size_bytes`, and explicit
+`deploy_relay` / `deploy_handoff` booleans. Do not deploy the relay for a
+handoff/package-only patch. The workflow repeats build, tests, audit and both
+Wrangler dry-runs before reaching credentials or deployment steps. Workflow
+concurrency prevents overlapping deployments; cancellation does not interrupt a
+live deployment automatically.
+
+After deployment, `npm run test:deployment:smoke` checks the v1/v2 handoff
+security headers, exact bootstrap schema/package pin and the relay's v2 OPTIONS
+route. These bounded GET/OPTIONS requests use random non-secret IDs and create
+no stored shares. They do **not** test authenticated agents or the Durable
+Object data lifecycle. Complete disposable v1/v2 and native acceptance tests
+remain required. A failed smoke check leaves the job failed: inspect Worker
+versions and roll back only the changed Worker after reviewing storage
+compatibility. Record the exact returned Worker version and deployment IDs in
+the release evidence.
+
+The direct Wrangler commands below are for an explicitly reviewed manual
+recovery or self-hosting path; they bypass the official workflow's automated
+gates and do not themselves constitute public-release sign-off.
 
 ## Deployment Order
 
@@ -148,11 +190,14 @@ package that contains post-v0.3.0 fixes.
 
 A stable candidate that includes the Codex v2 forward-compatibility patch must
 be staged as a **new immutable package with a new release-evidence profile**.
-Its native Codex version is the exact current version used by the successful
-creator-to-recipient run, while the product compatibility policy remains the
-reviewed v2 floor plus runtime capability checks. Before promotion, freshly
-prove that the current Codex passes the isolation-control and MCP preflights and
-complete the real terminal and native chat creation paths through actual MCP
+The current candidate is 0.3.1 with
+[`codex-native-windows-v2`](../release-v0.3.1.md); its real-host results must be
+collected rather than inferred from the historical profile. Its native Codex
+version is the exact current version used by the successful creator-to-recipient
+run, while the product compatibility policy remains the reviewed v2 floor plus
+runtime capability checks. Before promotion, freshly prove that the current
+Codex passes the isolation-control and MCP preflights and complete the real
+terminal and native chat creation paths through actual MCP
 read/proposal/inbox/approval/refresh behavior, isolation, revocation, cleanup,
 and explicit creator approval. A version-preflight success alone is not release
 evidence.

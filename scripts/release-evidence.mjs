@@ -65,6 +65,56 @@ export const REQUIRED_CHECK_IDS = Object.freeze(
   ),
 );
 
+// Historical exports above remain frozen. Never widen an existing profile.
+export const NATIVE_WINDOWS_PROFILE = "codex-native-windows-v2";
+const NATIVE_OBSERVATIONS = Object.freeze({
+  ...REQUIRED_OBSERVATIONS,
+  create: Object.freeze({
+    ...REQUIRED_OBSERVATIONS.create,
+    unpublishedBeforeCreatorApproval: true,
+  }),
+  bootstrap: Object.freeze({
+    ...REQUIRED_OBSERVATIONS.bootstrap,
+    installedVersion: "0.3.1",
+  }),
+  read: Object.freeze({
+    ...REQUIRED_OBSERVATIONS.read,
+    mcpReceiptVerified: true,
+    workspaceCanaryRecovered: true,
+    conversationCanaryRecovered: true,
+    decisionReasonRecovered: true,
+    taskStateRecovered: true,
+  }),
+  isolation: Object.freeze({
+    ...REQUIRED_OBSERVATIONS.isolation,
+    outsideWorkspaceReads: 0,
+    toolInventoryReviewed: true,
+    receiptForgeryAttemptsRejected: true,
+  }),
+});
+const PROFILES = new Map([
+  [
+    PROFILE,
+    Object.freeze({
+      version: "0.3.0",
+      runtime: RUNTIME,
+      observations: REQUIRED_OBSERVATIONS,
+    }),
+  ],
+  [
+    NATIVE_WINDOWS_PROFILE,
+    Object.freeze({
+      version: "0.3.1",
+      runtime: Object.freeze({ ...RUNTIME, agentVersion: "0.152.1" }),
+      observations: NATIVE_OBSERVATIONS,
+    }),
+  ],
+]);
+function releaseProfile(name) {
+  requireThat(PROFILES.has(name), "unknown or missing explicit --profile");
+  return PROFILES.get(name);
+}
+
 function requireThat(condition, message) {
   if (!condition) throw new Error(`Release evidence rejected: ${message}`);
 }
@@ -137,14 +187,14 @@ function httpsUrl(value, label, originOnly = false) {
   );
 }
 
-function artifact(value) {
+function artifact(value, version) {
   fields(
     value,
     ["name", "version", "url", "sha256", "sizeBytes", "commit"],
     "artifact",
   );
   same(value.name, "agentshare", "artifact.name");
-  same(value.version, "0.3.0", "artifact.version");
+  same(value.version, version, "artifact.version");
   httpsUrl(value.url, "artifact.url");
   digest(value.sha256, "artifact.sha256");
   digest(value.commit, "artifact.commit", 40);
@@ -202,15 +252,16 @@ export function validateCandidate(candidate) {
     "candidate",
   );
   same(candidate.schemaVersion, CANDIDATE_VERSION, "candidate.schemaVersion");
-  same(candidate.profile, PROFILE, "candidate.profile");
+  const definition = releaseProfile(candidate.profile);
   token(candidate.runId, "candidate.runId");
-  artifact(candidate.artifact);
+  artifact(candidate.artifact, definition.version);
   workers(candidate.workers);
+  return definition;
 }
 
 /** Structural validation only. File verification is mandatory at the CLI boundary. */
 export function validateReleaseEvidence(report, candidate) {
-  validateCandidate(candidate);
+  const definition = validateCandidate(candidate);
   fields(
     report,
     [
@@ -234,7 +285,7 @@ export function validateReleaseEvidence(report, candidate) {
     "report",
   );
   same(report.schemaVersion, SCHEMA_VERSION, "report.schemaVersion");
-  same(report.profile, PROFILE, "report.profile");
+  same(report.profile, candidate.profile, "report.profile");
   same(
     report.evidenceKind,
     "published-artifact-full-v2",
@@ -242,7 +293,7 @@ export function validateReleaseEvidence(report, candidate) {
   );
   for (const key of ["runId", "artifact", "workers"])
     same(report[key], candidate[key], `report.${key}`);
-  same(report.runtime, RUNTIME, "report.runtime");
+  same(report.runtime, definition.runtime, "report.runtime");
   fields(report.harness, ["id", "version", "commit"], "harness");
   token(report.harness.id, "harness.id");
   token(report.harness.version, "harness.version");
@@ -393,7 +444,7 @@ export function validateReleaseEvidence(report, candidate) {
     same(check.signal, null, `${id}.signal`);
     same(
       check.observations,
-      REQUIRED_OBSERVATIONS[stage],
+      definition.observations[stage],
       `${id}.observations`,
     );
     const checkStart = timestamp(check.startedAt, `${id}.startedAt`);
@@ -448,7 +499,7 @@ export function validateReleaseEvidence(report, candidate) {
       );
   }
   return {
-    profile: PROFILE,
+    profile: candidate.profile,
     runId: report.runId,
     checks: REQUIRED_CHECK_IDS.length,
   };
@@ -482,8 +533,11 @@ export function verifyReleaseEvidenceFiles({
   evidence,
   candidate,
   artifact: artifactPath,
+  profile,
 }) {
   const expected = readJson(candidate);
+  if (profile !== undefined)
+    same(expected.profile, profile, "explicit --profile");
   const report = readJson(evidence);
   const result = validateReleaseEvidence(report, expected);
   verifyBytes(artifactPath, expected.artifact, "published artifact");
@@ -527,7 +581,7 @@ export function runEvidenceCli(args) {
     );
     options[key] = args[index + 1];
   }
-  same(options.profile, PROFILE, "explicit --profile");
+  releaseProfile(options.profile);
   for (const key of ["evidence", "candidate", "artifact"])
     requireThat(options[key], `--${key} required`);
   return verifyReleaseEvidenceFiles(options);

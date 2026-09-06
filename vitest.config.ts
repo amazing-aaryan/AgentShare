@@ -8,7 +8,7 @@ export default defineConfig({
       enabled: false,
       provider: "v8",
       reporter: ["text", "json-summary"],
-      include: ["packages/*/src/*.ts", "apps/*/src/*.ts"],
+      include: ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts"],
       exclude: ["**/src/bin.ts", "**/src/start.ts"],
       thresholds: {
         branches: 50,

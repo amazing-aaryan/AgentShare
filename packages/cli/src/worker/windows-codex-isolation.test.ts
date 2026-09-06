@@ -207,6 +207,7 @@ describe("native Windows Codex catalog preparation", () => {
       output,
     );
     expect(result).toEqual({
+      codexHome,
       codexModelCatalogPath: join(output, "codex-model-catalog.json"),
       codexSplitReadBoundary: false,
     });

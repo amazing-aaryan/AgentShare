@@ -435,11 +435,15 @@ function displayTargetOutput(output: string): string {
   return sanitizeTerminalText(output).trim().slice(0, 512) || "unknown";
 }
 
-export async function discoverUserSkills(home = homedir()): Promise<string[]> {
-  const roots = [
+export async function discoverUserSkills(
+  home = homedir(),
+  codexHome = join(home, ".codex"),
+): Promise<string[]> {
+  const roots = new Set([
     join(home, ".codex", "skills"),
     join(home, ".agents", "skills"),
-  ];
+    join(codexHome, "skills"),
+  ]);
   const found: string[] = [];
   for (const root of roots) found.push(...(await findSkillFiles(root)));
   return found.sort((a, b) => a.localeCompare(b, "en"));

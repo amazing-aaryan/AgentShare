@@ -228,3 +228,19 @@ native end-to-end run.
 See [v0.3.0 release evidence contract](release-v0.3.0.md) for the frozen
 inventory, exact report fields, commands, and outstanding real-flow integration.
 A passing contract fixture is not a recipient compatibility result.
+
+## v0.3.1 candidate runtime and acceptance
+
+The recipient runtime now calls native Windows isolation preparation before
+spawning Codex, retains its canonical provider home, and disables user skills in
+both normal and custom Codex homes. Caller options cannot remove Linux/macOS
+read restrictions. Native setup failures stop execution and temporary private
+catalog/receipt files are cleaned up. A process exit of zero without the
+required MCP receipt still fails.
+
+The new [`codex-native-windows-v2`](release-v0.3.1.md) profile is separately
+frozen for AgentShare 0.3.1 / Codex 0.152.1 and requires native terminal/chat
+evidence, canary continuity and actual host read/write/network attempts. Its
+existence and unit-test coverage are not a claim that the exact native
+acceptance run passed. The Windows restricted-tool profile is not an OS-enforced
+read-deny sandbox.
