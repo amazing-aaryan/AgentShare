@@ -233,7 +233,9 @@ describe("v2 share command", () => {
     );
     expect(relocated.url).toBe(first.url);
     // Three publications plus a cancelled relocation exercise real Windows ACL helpers.
-  }, 60_000);
+    // Under coverage this has ranged from ~49s to >60s on the same Windows runner image,
+    // so keep a test-local budget rather than weakening production timeouts.
+  }, 120_000);
 
   it("creates a fresh environment and applies an explicit ttl override", async () => {
     const root = await fixture();
