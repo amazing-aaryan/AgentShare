@@ -756,3 +756,93 @@ test("legacy default retains both-agent selection and propagates child failure",
     assert.match(partial.stderr, /always runs both agents/);
   });
 });
+
+function nativeFixture() {
+  const data = fixture();
+  data.candidate.profile = "codex-native-windows-v2";
+  data.report.profile = data.candidate.profile;
+  data.candidate.artifact.version = "0.3.1";
+  data.candidate.artifact.url =
+    "https://github.com/amazing-aaryan/AgentShare/releases/download/v0.3.1/agentshare-0.3.1.tgz";
+  data.report.artifact = structuredClone(data.candidate.artifact);
+  data.report.runtime.agentVersion = "0.152.1";
+  for (const check of data.report.checks) {
+    const stage = check.id.split(".")[1];
+    if (stage === "create")
+      check.observations.unpublishedBeforeCreatorApproval = true;
+    if (stage === "bootstrap") check.observations.installedVersion = "0.3.1";
+    if (stage === "read")
+      Object.assign(check.observations, {
+        mcpReceiptVerified: true,
+        workspaceCanaryRecovered: true,
+        conversationCanaryRecovered: true,
+        decisionReasonRecovered: true,
+        taskStateRecovered: true,
+      });
+    if (stage === "isolation")
+      Object.assign(check.observations, {
+        outsideWorkspaceReads: 0,
+        toolInventoryReviewed: true,
+        receiptForgeryAttemptsRejected: true,
+      });
+  }
+  return data;
+}
+
+test("new native Windows contract accepts only the new immutable package and reviewed runtime", () => {
+  const { report, candidate } = nativeFixture();
+  assert.deepEqual(validateReleaseEvidence(report, candidate), {
+    profile: "codex-native-windows-v2",
+    runId: "fixture-run-1",
+    checks: 18,
+  });
+  for (const version of ["0.147.0", "0.152.2"]) {
+    const changed = structuredClone(report);
+    changed.runtime.agentVersion = version;
+    assert.throws(() => validateReleaseEvidence(changed, candidate));
+  }
+  const changed = structuredClone(candidate);
+  changed.artifact.version = "0.3.0";
+  assert.throws(() => validateReleaseEvidence(report, changed));
+});
+
+for (const [stage, field] of [
+  ["create", "unpublishedBeforeCreatorApproval"],
+  ["read", "mcpReceiptVerified"],
+  ["read", "workspaceCanaryRecovered"],
+  ["read", "conversationCanaryRecovered"],
+  ["read", "decisionReasonRecovered"],
+  ["read", "taskStateRecovered"],
+  ["isolation", "outsideWorkspaceReads"],
+  ["isolation", "toolInventoryReviewed"],
+  ["isolation", "receiptForgeryAttemptsRejected"],
+])
+  test(`native Windows contract rejects absent ${field}`, () => {
+    const { report, candidate } = nativeFixture();
+    delete report.checks.find((check) => check.id === `chat.${stage}`)
+      .observations[field];
+    assert.throws(() => validateReleaseEvidence(report, candidate));
+  });
+
+test("explicit profile cannot be silently substituted and native evidence still cannot auto-promote", () => {
+  onDisk(({ paths, root }) => {
+    const { report, candidate } = nativeFixture();
+    writeFileSync(paths.evidence, JSON.stringify(report));
+    writeFileSync(paths.candidate, JSON.stringify(candidate));
+    writeFileSync(join(root, "transcript.log"), transcript);
+    const args = [
+      "--candidate",
+      paths.candidate,
+      "--evidence",
+      paths.evidence,
+      "--artifact",
+      paths.artifact,
+    ];
+    assert.throws(() => runEvidenceCli(["--profile", PROFILE, ...args]));
+    assert.equal(
+      runEvidenceCli(["--profile", "codex-native-windows-v2", ...args])
+        .promotable,
+      false,
+    );
+  });
+});

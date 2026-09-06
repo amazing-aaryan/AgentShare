@@ -71,7 +71,7 @@ afterEach(() => {
 });
 
 describe("target process lifecycle", () => {
-  it("pins v2 Codex MCP to 0.147.0 without changing general Codex support", () => {
+  it("keeps the v2 Codex floor at 0.147.0 while allowing newer recognizable releases", () => {
     for (const version of ["0.145.0", "0.146.0"]) {
       expect(
         supportsReviewedTargetVersion("codex", `codex-cli ${version}`),
@@ -87,8 +87,14 @@ describe("target process lifecycle", () => {
       supportsReviewedEnvironmentTargetVersion("codex", "codex-cli 0.147.0"),
     ).toBe(true);
     expect(
-      supportsReviewedEnvironmentTargetVersion("codex", "codex-cli 0.148.0"),
-    ).toBe(false);
+      supportsReviewedEnvironmentTargetVersion("codex", "codex-cli 0.152.1"),
+    ).toBe(true);
+    expect(
+      supportsReviewedEnvironmentTargetVersion(
+        "codex",
+        "codex-cli 99.4.7-beta.1",
+      ),
+    ).toBe(true);
   });
 
   it("allows capability-compatible Codex releases while keeping Claude reviewed", () => {

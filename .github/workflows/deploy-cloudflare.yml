@@ -2,9 +2,33 @@ name: deploy-cloudflare
 
 on:
   workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact 40-character commit already merged into master
+        required: true
+        type: string
+      package_sha256:
+        description:
+          Independently recorded SHA-256 of the immutable staged package
+        required: true
+        type: string
+      package_size_bytes:
+        description: Independently recorded staged package byte size
+        required: true
+        type: string
+      deploy_relay:
+        description:
+          Deploy changed relay code/bindings (preserves existing migrations)
+        type: boolean
+        default: false
+      deploy_handoff:
+        description: Deploy changed handoff page/bootstrap pin
+        type: boolean
+        default: true
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: agentshare-cloudflare-production
@@ -12,9 +36,23 @@ concurrency:
 
 jobs:
   deploy:
+    if:
+      github.ref == 'refs/heads/master' && (inputs.deploy_relay ||
+      inputs.deploy_handoff)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
     steps:
+      - name: Validate checkout identifier
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: '[[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]]'
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -27,18 +65,44 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:coverage
+      - run: npm run test:release-tools
       - run: npm run test:conformance
       - run: npm run test:package
       - run: npm run test:edge-runtime
+      - run: npm audit --audit-level=high
+      - run:
+          npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
+      - run: npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
+
+      - name: Verify candidate CI, protected environment and immutable package
+        run: node scripts/check-deployment.mjs preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AGENTSHARE_CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          AGENTSHARE_PACKAGE_SHA256: ${{ inputs.package_sha256 }}
+          AGENTSHARE_PACKAGE_SIZE: ${{ inputs.package_size_bytes }}
+
+      - name: Check deployment credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing Cloudflare API token"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing Cloudflare account ID"; exit 1; }
 
       - name: Deploy relay
+        if: inputs.deploy_relay
         run: npx wrangler deploy --config apps/edge-relay/wrangler.jsonc
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy handoff
+        if: inputs.deploy_handoff
         run: npx wrangler deploy --config apps/handoff/wrangler.jsonc
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify public handoff, bootstrap and relay routing
+        run: node scripts/check-deployment.mjs smoke

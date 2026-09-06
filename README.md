@@ -30,12 +30,13 @@ Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 > regulated data, or other high-risk material. Review the final normalized text,
 > included files, exclusions, and redactions before publication.
 
-> [!NOTE] This repository contains the v0.3 collaborative-environment candidate.
-> It is not a stable public v0.3 release until the immutable package, live
-> Cloudflare deployment, and the authenticated Codex `codex-only-v1` release
-> profile in the [deployment runbook](docs/operations/cloudflare-deployment.md)
-> pass. Claude live execution is not a v0.3 stable-promotion gate. Until then,
-> use the current stable GitHub release for production installation.
+> [!NOTE] This repository contains the **v0.3.1 release candidate**. The native
+> Windows Codex 0.152.1 integration still requires fresh authenticated
+> acceptance under [`codex-native-windows-v2`](docs/release-v0.3.1.md). Green CI
+> or a deployed Worker alone is not stable sign-off. The historical v0.3.0
+> evidence profile remains unchanged. Use the current stable GitHub release
+> rather than candidate source for ordinary installation, and keep the
+> public-beta data warning above.
 
 ## Principles
 

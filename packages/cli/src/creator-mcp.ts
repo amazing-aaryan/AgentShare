@@ -1,3 +1,4 @@
+import { AGENTSHARE_VERSION } from "./version.js";
 import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
 import { isAbsolute } from "node:path";
@@ -555,7 +556,10 @@ export async function runCreatorMcpServer(
             typeof params.protocolVersion === "string"
               ? params.protocolVersion
               : "2025-06-18",
-          serverInfo: { name: "agentshare-creator", version: "0.3.0" },
+          serverInfo: {
+            name: "agentshare-creator",
+            version: AGENTSHARE_VERSION,
+          },
           capabilities: { tools: {} },
           instructions:
             "Explicit user sharing only. Resolve the exact current thread, prepare, show review, then commit. Commit requires native human form approval; never impersonate consent. Do not inspect private state or raw transcript storage.",

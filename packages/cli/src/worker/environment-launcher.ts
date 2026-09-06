@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   captureProcess,
@@ -17,6 +17,8 @@ import {
 } from "../launchers.js";
 import { sanitizeTerminalText } from "../terminal.js";
 import { ensurePrivateDirectory } from "../environment/private-store.js";
+import { prepareNativeWindowsCodexIsolation } from "./windows-codex-isolation.js";
+export { hardenCodexModelsCache } from "./windows-codex-isolation.js";
 import {
   environmentToolNames,
   hasRequiredCompletion,
@@ -31,6 +33,8 @@ export type EnvironmentRuntimeOptions = {
   cacheRoot?: string;
   mode?: EnvironmentMode;
   receiptChannel?: ReceiptChannel;
+  codexModelCatalogPath?: string;
+  codexSplitReadBoundary?: boolean;
 };
 export type EnvironmentTargetResult = TargetResult & {
   receipts?: McpCompletionReceipt[];
@@ -55,12 +59,45 @@ export async function runEnvironmentTarget(
     environmentId,
     mode,
   };
-  const runtimeOptions = { ...options, mode, receiptChannel };
   try {
     await ensurePrivateDirectory(receiptDirectory);
     await verifyTarget(target);
     const executable = resolveAgentExecutable(target);
-    await verifyEnvironmentMcpSupport(target, executable);
+    const version = await verifyEnvironmentMcpSupport(target, executable);
+    const nativeIsolation =
+      target === "codex" && process.platform === "win32"
+        ? await prepareNativeWindowsCodexIsolation(
+            process.platform,
+            version,
+            process.env,
+            homedir(),
+            receiptDirectory,
+          )
+        : undefined;
+    // Runtime authority is selected here, never by untrusted caller options.
+    // Native Windows cannot enforce Codex's split-read filesystem profile.
+    // Its exact-reviewed replacement must be prepared successfully before spawn.
+    const runtimeOptions: EnvironmentRuntimeOptions = {
+      ...(options.statePath === undefined
+        ? {}
+        : { statePath: options.statePath }),
+      ...(options.cacheRoot === undefined
+        ? {}
+        : { cacheRoot: options.cacheRoot }),
+      mode,
+      receiptChannel,
+      ...(nativeIsolation === undefined
+        ? {}
+        : {
+            codexModelCatalogPath: nativeIsolation.codexModelCatalogPath,
+            codexSplitReadBoundary: nativeIsolation.codexSplitReadBoundary,
+          }),
+    };
+    const environment = safeEnvironment();
+    if (nativeIsolation !== undefined) {
+      // Metadata and authentication must use the same canonical provider home.
+      environment.CODEX_HOME = nativeIsolation.codexHome;
+    }
     const cliPath = process.argv[1];
     if (cliPath === undefined)
       throw new Error("AgentShare CLI entrypoint is unavailable");
@@ -72,7 +109,7 @@ export async function runEnvironmentTarget(
             process.execPath,
             cliPath,
             runtimeOptions,
-            await discoverUserSkills(),
+            await discoverUserSkills(homedir(), nativeIsolation?.codexHome),
           )
         : claudeEnvironmentArgs(
             environmentId,
@@ -85,7 +122,7 @@ export async function runEnvironmentTarget(
       [...executable.prefixArgs, ...args],
       {
         cwd: workspace,
-        env: safeEnvironment(),
+        env: environment,
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       },
@@ -133,11 +170,29 @@ export function codexEnvironmentArgs(
   options: EnvironmentRuntimeOptions = {},
   disabledSkills: string[] = [],
 ): string[] {
+  if (
+    options.codexSplitReadBoundary === false &&
+    !options.codexModelCatalogPath?.trim()
+  ) {
+    throw new Error(
+      "Native Windows isolation requires a hardened model catalog",
+    );
+  }
   const base = codexArgs(workspace, disabledSkills);
   const promptMarker = base.at(-1) === "-" ? base.slice(0, -1) : base;
+  const isolationArgs =
+    options.codexSplitReadBoundary === false
+      ? withoutCodexSplitReadPermissionProfile(promptMarker)
+      : promptMarker;
   const mcpArgs = internalMcpArgs(environmentId, options);
   return [
-    ...promptMarker,
+    ...isolationArgs,
+    ...(options.codexModelCatalogPath === undefined
+      ? []
+      : [
+          "--config",
+          `model_catalog_json=${tomlString(options.codexModelCatalogPath)}`,
+        ]),
     "--config",
     `mcp_servers.agentshare.command=${tomlString(nodeCommand)}`,
     "--config",
@@ -150,8 +205,9 @@ export function codexEnvironmentArgs(
     "mcp_servers.agentshare.required=true",
     "--config",
     `mcp_servers.agentshare.enabled_tools=${JSON.stringify(environmentToolNames(options.mode ?? "ask"))}`,
-    // Schema verified against openai/codex rust-v0.147.0. Do not change the
-    // global approval policy or server-wide default to make these calls work.
+    // Baseline schema reviewed against openai/codex rust-v0.147.0. Do not
+    // change the global approval policy or server-wide default to make these
+    // calls work on a newer release.
     ...environmentToolNames(options.mode ?? "ask").flatMap((name) => [
       "--config",
       `mcp_servers.agentshare.tools.${name}.approval_mode="approve"`,
@@ -200,14 +256,16 @@ export function claudeEnvironmentArgs(
 async function verifyEnvironmentMcpSupport(
   target: TargetAgent,
   executable: { command: string; prefixArgs: string[] },
-): Promise<void> {
+): Promise<string> {
   const version = await captureProcess(executable.command, [
     ...executable.prefixArgs,
     "--version",
   ]);
   if (!supportsReviewedEnvironmentTargetVersion(target, version)) {
     throw new Error(
-      `${target} has not passed AgentShare v2 MCP review; Codex v2 requires 0.147.0. Legacy query compatibility does not establish v2 compatibility.`,
+      target === "codex"
+        ? "codex has not passed AgentShare v2 MCP preflight; Codex v2 requires a recognizable Codex CLI >= 0.147.0 plus the required runtime isolation and MCP controls."
+        : `${target} has not passed AgentShare v2 MCP review; install a reviewed ${target} version.`,
     );
   }
   if (target === "claude") {
@@ -222,7 +280,7 @@ async function verifyEnvironmentMcpSupport(
         );
       }
     }
-    return;
+    return version;
   }
   const help = await captureProcess(executable.command, [
     ...executable.prefixArgs,
@@ -234,6 +292,7 @@ async function verifyEnvironmentMcpSupport(
       "codex no longer advertises MCP client support; refusing to weaken AgentShare isolation",
     );
   }
+  return version;
 }
 
 function internalMcpArgs(
@@ -251,6 +310,25 @@ function internalMcpArgs(
       ? []
       : ["--cache-root", options.cacheRoot]),
   ];
+}
+
+function withoutCodexSplitReadPermissionProfile(args: string[]): string[] {
+  const blocked = new Set([
+    'default_permissions="agentshare-query"',
+    'permissions.agentshare-query.filesystem={":minimal"="deny",":workspace_roots"="deny"}',
+    "permissions.agentshare-query.network.enabled=false",
+  ]);
+  const result: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    const next = args[index + 1];
+    if (value === "--config" && next !== undefined && blocked.has(next)) {
+      index += 1;
+      continue;
+    }
+    if (value !== undefined) result.push(value);
+  }
+  return result;
 }
 
 function tomlString(value: string): string {

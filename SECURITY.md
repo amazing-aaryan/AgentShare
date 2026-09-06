@@ -132,6 +132,18 @@ compromise of the canonical release account could therefore publish malicious
 code under a valid stable tag; explicit user invocation limits installation but
 does not remove that supply-chain risk. See ADR 0004 for the decision record.
 
+## Native Windows v0.3.1 candidate boundary
+
+The Codex 0.152.1 candidate replaces the unsupported native Windows split-read
+profile with a privately generated restricted model/tool catalog and read-only
+sandbox. This is **not equivalent to an OS-level denial of reads**. It requires
+fresh actual tool-inventory and hostile host-read/write/network validation plus
+authenticated MCP completion evidence before stable promotion. Setup failures,
+unreviewed native versions and invalid/stale metadata fail closed. Linux/macOS
+retain their split-read profile. See
+[the new acceptance contract](docs/release-v0.3.1.md); passing unit tests does
+not satisfy it.
+
 ## Local Residual Risks
 
 - The local relay is volatile, process-local, and not production hardened.

@@ -19,6 +19,7 @@ type TargetChildLifecycle = {
 type VersionTuple = readonly [major: number, minor: number, patch: number];
 
 const MINIMUM_CODEX_VERSION: VersionTuple = [0, 145, 0];
+const MINIMUM_CODEX_ENVIRONMENT_VERSION: VersionTuple = [0, 147, 0];
 const CODEX_VERSION_PATTERN =
   /^codex-cli\s+(\d+)\.(\d+)\.(\d+)(?:[-+][^\s]+)?\s*$/mu;
 
@@ -90,6 +91,12 @@ export function codexArgs(
     "features.unified_exec=false",
     "--config",
     "features.apply_patch_freeform=false",
+    "--config",
+    "features.view_image=false",
+    "--config",
+    "features.request_permissions_tool=false",
+    "--config",
+    "agents.enabled=false",
     "--config",
     "features.js_repl=false",
     "--config",
@@ -250,14 +257,23 @@ export function supportsReviewedTargetVersion(
   );
 }
 
-/** V2 MCP approvals were validated separately from the legacy query profile. */
+/**
+ * V2 MCP support starts at a separately reviewed Codex baseline. Newer
+ * recognizable releases still have to pass the runtime isolation and MCP
+ * capability probes before AgentShare launches them.
+ */
 export function supportsReviewedEnvironmentTargetVersion(
   target: TargetAgent,
   versionOutput: string,
 ): boolean {
-  return target === "codex"
-    ? /^codex-cli 0\.147\.0\s*$/mu.test(versionOutput.trim())
-    : supportsReviewedTargetVersion(target, versionOutput);
+  if (target !== "codex") {
+    return supportsReviewedTargetVersion(target, versionOutput);
+  }
+  const version = parseCodexVersion(versionOutput);
+  return (
+    version !== undefined &&
+    compareVersions(version, MINIMUM_CODEX_ENVIRONMENT_VERSION) >= 0
+  );
 }
 
 async function assertSupportedTarget(
@@ -419,11 +435,15 @@ function displayTargetOutput(output: string): string {
   return sanitizeTerminalText(output).trim().slice(0, 512) || "unknown";
 }
 
-export async function discoverUserSkills(home = homedir()): Promise<string[]> {
-  const roots = [
+export async function discoverUserSkills(
+  home = homedir(),
+  codexHome = join(home, ".codex"),
+): Promise<string[]> {
+  const roots = new Set([
     join(home, ".codex", "skills"),
     join(home, ".agents", "skills"),
-  ];
+    join(codexHome, "skills"),
+  ]);
   const found: string[] = [];
   for (const root of roots) found.push(...(await findSkillFiles(root)));
   return found.sort((a, b) => a.localeCompare(b, "en"));

@@ -62,7 +62,7 @@ try {
   const archiveHash = createHash("sha256").update(archiveBytes).digest("hex");
   const retainedPath = resolve(
     "artifacts",
-    `agentshare-0.3.0-${archiveHash.slice(0, 12)}.tgz`,
+    `${archive.slice(0, -4)}-${archiveHash.slice(0, 12)}.tgz`,
   );
   await mkdir(resolve("artifacts"), { recursive: true });
   await copyFile(join(root, archive), retainedPath);
