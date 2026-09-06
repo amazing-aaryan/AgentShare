@@ -1,0 +1,182 @@
+name: stage-v0.3.1-prerelease-final
+
+on:
+  push:
+    branches:
+      - release/v0.3.1-stage-final
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: agentshare-v0.3.1-prerelease-stage-final
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    if: github.repository == 'amazing-aaryan/AgentShare'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CANDIDATE_SHA: 5ed0c26ed90426906382d534a2b95a964b14a504
+      MERGED_MASTER_SHA: d743745c40dfc189c33c073566851c6646f5d12c
+      MASTER_CI_RUN_ID: "34012568923"
+      RELEASE_TAG: v0.3.1
+      RELEASE_VERSION: 0.3.1
+      RELEASE_ASSET: agentshare-0.3.1.tgz
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verify merged master CI before staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${MASTER_CI_RUN_ID}")"
+          test "$(jq -r '.head_sha' <<<"${run}")" = "${MERGED_MASTER_SHA}"
+          test "$(jq -r '.event' <<<"${run}")" = "push"
+          test "$(jq -r '.path' <<<"${run}")" = ".github/workflows/ci.yml"
+          test "$(jq -r '.status' <<<"${run}")" = "completed"
+          test "$(jq -r '.conclusion' <<<"${run}")" = "success"
+
+          jobs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${MASTER_CI_RUN_ID}/jobs?per_page=100")"
+          actual="$(jq -r '.jobs[] | select(.status == "completed" and .conclusion == "success") | .name' <<<"${jobs}" | sort)"
+          expected="$(printf '%s\n' \
+            'verify (macos-latest, 22)' \
+            'verify (macos-latest, 24)' \
+            'verify (ubuntu-latest, 22)' \
+            'verify (ubuntu-latest, 24)' \
+            'verify (windows-latest, 22)' \
+            'verify (windows-latest, 24)' | sort)"
+          test "${actual}" = "${expected}"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact candidate is merged and release does not exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${CANDIDATE_SHA}"
+          git fetch origin master --depth=64
+          git merge-base --is-ancestor "${CANDIDATE_SHA}" origin/master
+          test "$(git rev-parse origin/master)" = "${MERGED_MASTER_SHA}"
+
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "::error::${RELEASE_TAG} already exists; immutable release bytes must never be replaced."
+            exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "::error::${RELEASE_TAG} tag already exists without the staged release. Review it manually before continuing."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Verify exact candidate source
+        run: |
+          npm ci
+          node scripts/check-repository-hygiene.mjs
+          npm run format:check
+          npm run lint
+          npm run build
+          npm run test:release-tools
+          npm run test:coverage
+          npm run test:conformance
+          npm run test:package
+          npm run test:edge-runtime
+          npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
+          npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
+          npm audit --audit-level=high
+
+      - name: Pack and verify exact release artifact
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release-out
+          npm pack ./packages/cli --pack-destination release-out >/dev/null
+          archive="release-out/${RELEASE_ASSET}"
+          test -f "${archive}"
+          test "$(node -p "require('./packages/cli/package.json').version")" = "${RELEASE_VERSION}"
+
+          prefix="${RUNNER_TEMP}/agentshare-v0.3.1-stage"
+          npm install --global --prefix "${prefix}" "./${archive}" >/dev/null
+          global_root="$(npm root --global --prefix "${prefix}")"
+          test "$(node "${global_root}/agentshare/dist/bin.js" --version)" = "${RELEASE_VERSION}"
+
+          sha256="$(sha256sum "${archive}" | awk '{print $1}')"
+          size="$(stat -c '%s' "${archive}")"
+          echo "sha256=${sha256}" >>"${GITHUB_OUTPUT}"
+          echo "size=${size}" >>"${GITHUB_OUTPUT}"
+          echo "PACKAGE_SHA256=${sha256}"
+          echo "PACKAGE_SIZE_BYTES=${size}"
+
+      - name: Publish immutable prerelease from exact package bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >release-notes.md <<'EOF'
+          ## AgentShare v0.3.1 candidate
+
+          Public-release candidate for the reviewed native Windows Codex 0.152.1 collaboration path and hardened deployment gates.
+
+          This remains a **prerelease** until the protected production deployment, public lifecycle checks, and the authenticated `codex-native-windows-v2` acceptance profile pass. Do not treat this prerelease as stable production attestation.
+
+          The v0.3.0 evidence contract remains frozen and is not reinterpreted for this package.
+          EOF
+
+          gh release create "${RELEASE_TAG}" "release-out/${RELEASE_ASSET}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${CANDIDATE_SHA}" \
+            --title "AgentShare v0.3.1 candidate" \
+            --notes-file release-notes.md \
+            --prerelease \
+            --latest=false
+
+      - name: Verify immutable release, tag, bytes and GitHub attestation
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json tagName,isDraft,isImmutable,isPrerelease,targetCommitish,assets,url)"
+          test "$(jq -r '.tagName' <<<"${metadata}")" = "${RELEASE_TAG}"
+          test "$(jq -r '.isDraft' <<<"${metadata}")" = "false"
+          test "$(jq -r '.isPrerelease' <<<"${metadata}")" = "true"
+          if [[ "$(jq -r '.isImmutable' <<<"${metadata}")" != "true" ]]; then
+            echo "::error::Release immutability is not enabled. The candidate must not be deployed."
+            gh release delete "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --cleanup-tag --yes || true
+            exit 1
+          fi
+          test "$(jq -r '.targetCommitish' <<<"${metadata}")" = "${CANDIDATE_SHA}"
+
+          ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+          test "$(jq -r '.object.type' <<<"${ref}")" = "commit"
+          test "$(jq -r '.object.sha' <<<"${ref}")" = "${CANDIDATE_SHA}"
+
+          api_release="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+          asset_count="$(jq --arg name "${RELEASE_ASSET}" '[.assets[] | select(.name == $name)] | length' <<<"${api_release}")"
+          test "${asset_count}" = "1"
+          test "$(jq -r --arg name "${RELEASE_ASSET}" '.assets[] | select(.name == $name) | .state' <<<"${api_release}")" = "uploaded"
+          test "$(jq -r --arg name "${RELEASE_ASSET}" '.assets[] | select(.name == $name) | .size' <<<"${api_release}")" = "${{ steps.package.outputs.size }}"
+          test "$(jq -r --arg name "${RELEASE_ASSET}" '.assets[] | select(.name == $name) | .digest' <<<"${api_release}")" = "sha256:${{ steps.package.outputs.sha256 }}"
+
+          mkdir release-download
+          gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "${RELEASE_ASSET}" --dir release-download
+          test "$(sha256sum "release-download/${RELEASE_ASSET}" | awk '{print $1}')" = "${{ steps.package.outputs.sha256 }}"
+          test "$(stat -c '%s' "release-download/${RELEASE_ASSET}")" = "${{ steps.package.outputs.size }}"
+
+          gh release verify "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}"
+          gh release verify-asset "${RELEASE_TAG}" "release-download/${RELEASE_ASSET}" --repo "${GITHUB_REPOSITORY}"
+
+          {
+            echo "### v0.3.1 immutable prerelease staged"
+            echo "- Candidate SHA: \`${CANDIDATE_SHA}\`"
+            echo "- Package SHA-256: \`${{ steps.package.outputs.sha256 }}\`"
+            echo "- Package bytes: \`${{ steps.package.outputs.size }}\`"
+            echo "- Status: prerelease only; no stable promotion or Worker deployment performed"
+          } >>"${GITHUB_STEP_SUMMARY}"
