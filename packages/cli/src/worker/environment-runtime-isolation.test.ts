@@ -25,15 +25,11 @@ vi.mock("../launchers.js", async (importOriginal) => ({
   waitForTargetClose: vi.fn().mockResolvedValue(0),
 }));
 vi.mock("./windows-codex-isolation.js", async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("./windows-codex-isolation.js")
-  >()),
+  ...(await importOriginal<typeof import("./windows-codex-isolation.js")>()),
   prepareNativeWindowsCodexIsolation: prepareMock,
 }));
 vi.mock("../environment/private-store.js", async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("../environment/private-store.js")
-  >()),
+  ...(await importOriginal<typeof import("../environment/private-store.js")>()),
   ensurePrivateDirectory: vi.fn().mockResolvedValue(undefined),
 }));
 
