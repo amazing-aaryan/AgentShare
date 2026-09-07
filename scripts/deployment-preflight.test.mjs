@@ -28,5 +28,8 @@ test("production workflow keeps candidate bytes separate from reviewed release c
     workflow,
     /node \.release-control\/scripts\/check-deployment\.mjs preflight/u,
   );
-  assert.match(workflow, /npx wrangler deploy --config apps\/handoff\/wrangler\.jsonc/u);
+  assert.match(
+    workflow,
+    /npx wrangler deploy --config apps\/handoff\/wrangler\.jsonc/u,
+  );
 });
