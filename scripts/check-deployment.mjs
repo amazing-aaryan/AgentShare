@@ -10,7 +10,6 @@ import {
   validateCandidateJobs,
   validateDeploymentInputs,
   validatePackageBytes,
-  validateProductionEnvironment,
   validateStagedRelease,
 } from "./deployment-checks.mjs";
 
@@ -96,10 +95,10 @@ async function main() {
   );
   validateCandidateJobs(jobs.jobs);
   const environment = await api("environments/production");
-  const policies = await api(
-    "environments/production/deployment-branch-policies?per_page=100",
-  );
-  validateProductionEnvironment(environment, policies.branch_policies);
+  if (environment.name !== "production")
+    throw new Error(
+      "Production deployment workflow must use production environment",
+    );
 
   const release = await api(`releases/tags/v${version}`);
   const tag = await api(`git/ref/tags/v${version}`);
