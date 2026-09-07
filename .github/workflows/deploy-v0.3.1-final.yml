@@ -62,14 +62,28 @@ jobs:
           npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
           npm audit --audit-level=high
 
-      - name:
-          Verify exact candidate CI, protected production policy, and immutable
-          package
+      - name: Check out reviewed release control separately
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: .release-control
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Build reviewed release control
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .release-control
+          npm ci
+          npm run build
+
+      - name: Verify exact candidate CI, production binding, and immutable package
         env:
           AGENTSHARE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
           AGENTSHARE_PACKAGE_SHA256: ${{ env.PACKAGE_SHA256 }}
           AGENTSHARE_PACKAGE_SIZE: ${{ env.PACKAGE_SIZE_BYTES }}
-        run: node scripts/check-deployment.mjs preflight
+        run: node .release-control/scripts/check-deployment.mjs preflight
 
       - name: Require Cloudflare credentials before any Worker write
         shell: bash
