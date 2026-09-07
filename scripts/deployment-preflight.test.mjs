@@ -48,10 +48,7 @@ test("production workflow resumes the proven handoff deployment without relying 
     workflow,
     /wrangler deployments list --config apps\/handoff\/wrangler\.jsonc --json/u,
   );
-  assert.match(
-    workflow,
-    /current_version.*RECOVERED_HANDOFF_VERSION_ID/su,
-  );
+  assert.match(workflow, /current_version.*RECOVERED_HANDOFF_VERSION_ID/su);
   assert.match(workflow, /skipping duplicate upload/u);
   assert.doesNotMatch(workflow, /WRANGLER_OUTPUT_FILE/u);
 });
