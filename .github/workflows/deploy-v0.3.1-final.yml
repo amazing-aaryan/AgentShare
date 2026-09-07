@@ -78,7 +78,8 @@ jobs:
           npm ci
           npm run build
 
-      - name: Verify exact candidate CI, production binding, and immutable package
+      - name:
+          Verify exact candidate CI, production binding, and immutable package
         env:
           AGENTSHARE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
           AGENTSHARE_PACKAGE_SHA256: ${{ env.PACKAGE_SHA256 }}
