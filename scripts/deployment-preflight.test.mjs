@@ -33,3 +33,22 @@ test("production workflow keeps candidate bytes separate from reviewed release c
     /npx wrangler deploy --config apps\/handoff\/wrangler\.jsonc/u,
   );
 });
+
+test("production workflow resumes the proven handoff deployment without relying on a Wrangler output file", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/deploy-v0.3.1-final.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    workflow,
+    /RECOVERED_HANDOFF_VERSION_ID: fee92509-418f-4ccc-a1a8-a63290b006d2/u,
+  );
+  assert.match(
+    workflow,
+    /wrangler deployments list --config apps\/handoff\/wrangler\.jsonc --json/u,
+  );
+  assert.match(workflow, /current_version.*RECOVERED_HANDOFF_VERSION_ID/su);
+  assert.match(workflow, /skipping duplicate upload/u);
+  assert.doesNotMatch(workflow, /WRANGLER_OUTPUT_FILE/u);
+});

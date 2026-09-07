@@ -26,6 +26,7 @@ jobs:
       CANDIDATE_SHA: 5ed0c26ed90426906382d534a2b95a964b14a504
       PACKAGE_SHA256: ae82ace5ccf0511f75fb878a1f984804fa3998927829a63b4e63d9f68afb35d0
       PACKAGE_SIZE_BYTES: "156264"
+      RECOVERED_HANDOFF_VERSION_ID: fee92509-418f-4ccc-a1a8-a63290b006d2
       AGENTSHARE_E2E_RELAY: https://agentshare-relay.carnation-vermicelli.workers.dev
       AGENTSHARE_E2E_HANDOFF: https://agentshare-handoff.carnation-vermicelli.workers.dev
       AGENTSHARE_NO_UPDATE_CHECK: "1"
@@ -107,20 +108,37 @@ jobs:
           echo "--- unchanged relay deployments ---"
           cat relay-deployments-before.json
 
-      - name: Deploy only changed handoff Worker
+      - name: Verify or deploy exact handoff Worker
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_OUTPUT_FILE:
-            ${{ runner.temp }}/agentshare-handoff-wrangler.ndjson
         run: |
           set -euo pipefail
-          npx wrangler deploy --config apps/handoff/wrangler.jsonc
-          echo "--- handoff Wrangler deploy record ---"
-          cat "${WRANGLER_OUTPUT_FILE}"
+          npx wrangler deployments list --config apps/handoff/wrangler.jsonc --json > handoff-deployments-current.json
+          current_version="$(jq -r '.[-1].versions | map(select(.percentage == 100)) | if length == 1 then .[0].version_id else empty end' handoff-deployments-current.json)"
+          test -n "${current_version}" || { echo "::error::Unable to resolve current handoff version"; exit 1; }
+
+          skipped_duplicate=false
+          if [[ "${current_version}" == "${RECOVERED_HANDOFF_VERSION_ID}" ]]; then
+            echo "Verified prior exact-candidate handoff deployment ${RECOVERED_HANDOFF_VERSION_ID}; skipping duplicate upload."
+            skipped_duplicate=true
+          else
+            echo "Current handoff version ${current_version} is not the recovered candidate version; deploying exact candidate."
+            npx wrangler deploy --config apps/handoff/wrangler.jsonc
+          fi
+
           npx wrangler deployments list --config apps/handoff/wrangler.jsonc --json > handoff-deployments-after.json
-          echo "--- handoff deployments after update ---"
+          current_after="$(jq -r '.[-1].versions | map(select(.percentage == 100)) | if length == 1 then .[0].version_id else empty end' handoff-deployments-after.json)"
+          deployment_after="$(jq -r '.[-1].id // empty' handoff-deployments-after.json)"
+          test -n "${current_after}" || { echo "::error::Unable to resolve post-check handoff version"; exit 1; }
+          test -n "${deployment_after}" || { echo "::error::Unable to resolve post-check handoff deployment"; exit 1; }
+          if [[ "${skipped_duplicate}" == "true" ]]; then
+            test "${current_after}" = "${RECOVERED_HANDOFF_VERSION_ID}" || { echo "::error::Handoff version changed during recovery verification"; exit 1; }
+          fi
+          echo "HANDOFF_DEPLOYMENT_ID=${deployment_after}"
+          echo "HANDOFF_VERSION_ID=${current_after}"
+          echo "--- handoff deployments after verification ---"
           cat handoff-deployments-after.json
 
       - name: Verify public handoff, bootstrap pin, and relay routing
@@ -150,7 +168,7 @@ jobs:
             echo "- Immutable package SHA-256: \`${PACKAGE_SHA256}\`"
             echo "- Immutable package bytes: \`${PACKAGE_SIZE_BYTES}\`"
             echo "- Relay: unchanged; current deployment inventory recorded above"
-            echo "- Handoff: deployed from exact candidate; deployment inventory recorded above"
+            echo "- Handoff: exact candidate deployment verified; deployment inventory recorded above"
             echo "- Public smoke: passed"
             echo "- Disposable public v1/v2 lifecycles: passed"
             echo "- Release remains immutable prerelease; stable promotion intentionally not performed"
