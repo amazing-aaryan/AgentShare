@@ -17,7 +17,8 @@ jobs:
   deploy-and-live-gate:
     if: >-
       github.repository == 'amazing-aaryan/AgentShare' &&
-      startsWith(github.event.head_commit.message, 'Merge v0.3.1 production deployment gate')
+      startsWith(github.event.head_commit.message, 'Merge v0.3.1 production
+      deployment gate')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
@@ -61,7 +62,9 @@ jobs:
           npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
           npm audit --audit-level=high
 
-      - name: Verify exact candidate CI, protected production policy, and immutable package
+      - name:
+          Verify exact candidate CI, protected production policy, and immutable
+          package
         env:
           AGENTSHARE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
           AGENTSHARE_PACKAGE_SHA256: ${{ env.PACKAGE_SHA256 }}
@@ -94,7 +97,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WRANGLER_OUTPUT_FILE: ${{ runner.temp }}/agentshare-handoff-wrangler.ndjson
+          WRANGLER_OUTPUT_FILE:
+            ${{ runner.temp }}/agentshare-handoff-wrangler.ndjson
         run: |
           set -euo pipefail
           npx wrangler deploy --config apps/handoff/wrangler.jsonc
@@ -109,8 +113,7 @@ jobs:
 
       - name: Run disposable public v1 and v2 lifecycles
         run: >-
-          npx vitest run
-          packages/cli/src/public-handoff.e2e.test.ts
+          npx vitest run packages/cli/src/public-handoff.e2e.test.ts
           packages/cli/src/environment/public-environment.e2e.test.ts
           --reporter=verbose
 
