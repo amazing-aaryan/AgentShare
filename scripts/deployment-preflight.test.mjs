@@ -14,3 +14,19 @@ test("production preflight binds the named environment without reviewer admin me
   assert.doesNotMatch(source, /deployment-branch-policies/u);
   assert.doesNotMatch(source, /validateProductionEnvironment/u);
 });
+
+test("production workflow keeps candidate bytes separate from reviewed release control", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/deploy-v0.3.1-final.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /ref: \$\{\{ env\.CANDIDATE_SHA \}\}/u);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/u);
+  assert.match(workflow, /path: \.release-control/u);
+  assert.match(
+    workflow,
+    /node \.release-control\/scripts\/check-deployment\.mjs preflight/u,
+  );
+  assert.match(workflow, /npx wrangler deploy --config apps\/handoff\/wrangler\.jsonc/u);
+});
