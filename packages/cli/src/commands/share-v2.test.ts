@@ -285,7 +285,9 @@ describe("v2 share command", () => {
     );
     expect(expiresAt).toBeGreaterThanOrEqual(before + 3_600_000);
     expect(expiresAt).toBeLessThanOrEqual(after + 3_600_000);
-  });
+    // Two publications exercise the same native Windows private-path/ACL helpers.
+    // This has crossed Vitest's 30s default under coverage without a product failure.
+  }, 60_000);
 
   it("publishes the reviewed retained bytes after workspace changes and uses cancel as the default", async () => {
     const root = await fixture();
