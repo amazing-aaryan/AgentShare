@@ -96,7 +96,9 @@ async function main() {
   validateCandidateJobs(jobs.jobs);
   const environment = await api("environments/production");
   if (environment.name !== "production")
-    throw new Error("Production deployment workflow must use production environment");
+    throw new Error(
+      "Production deployment workflow must use production environment",
+    );
 
   const release = await api(`releases/tags/v${version}`);
   const tag = await api(`git/ref/tags/v${version}`);
