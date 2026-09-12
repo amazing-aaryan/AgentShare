@@ -167,9 +167,7 @@ export function hardenCodexModelsCache(
   };
 }
 
-function reviewedNativeWindowsCodexVersion(
-  output: string,
-): string | undefined {
+function reviewedNativeWindowsCodexVersion(output: string): string | undefined {
   const match = STABLE_CODEX_VERSION_PATTERN.exec(output.trim());
   if (match === null) return undefined;
   const version: VersionTuple = [
