@@ -13,6 +13,7 @@ const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION_TUPLE: VersionTuple = [
   0, 152, 1,
 ];
 const STABLE_CODEX_VERSION_PATTERN = /^codex-cli\s+(\d+)\.(\d+)\.(\d+)\s*$/u;
+const STABLE_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/u;
 
 export type HardenedCodexModelCatalog = {
   models: JsonObject[];
@@ -38,8 +39,8 @@ export async function prepareNativeWindowsCodexIsolation(
   outputDirectory: string,
 ): Promise<NativeWindowsCodexIsolation | undefined> {
   if (platform !== "win32") return undefined;
-  const reviewedVersion = reviewedNativeWindowsCodexVersion(versionOutput);
-  if (reviewedVersion === undefined) {
+  const runningVersion = reviewedNativeWindowsCodexVersion(versionOutput);
+  if (runningVersion === undefined) {
     throw new Error(
       `Native Windows AgentShare recipient isolation requires stable Codex CLI >= ${MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION}; refusing older or unrecognized Windows Codex version`,
     );
@@ -48,7 +49,7 @@ export async function prepareNativeWindowsCodexIsolation(
   const codexModelCatalogPath = await prepareHardenedCodexModelCatalog(
     codexHome,
     outputDirectory,
-    reviewedVersion,
+    runningVersion,
   );
   return {
     codexHome,
@@ -92,7 +93,7 @@ export async function resolveCodexHome(
 export async function prepareHardenedCodexModelCatalog(
   codexHome: string,
   outputDirectory: string,
-  reviewedVersion = MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION,
+  runningVersion = MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION,
 ): Promise<string> {
   const cachePath = join(codexHome, "models_cache.json");
   let serialized: string;
@@ -112,7 +113,7 @@ export async function prepareHardenedCodexModelCatalog(
       "Codex models cache is invalid JSON; refresh Codex model metadata before retrying AgentShare",
     );
   }
-  const hardened = hardenCodexModelsCache(parsed, reviewedVersion);
+  const hardened = hardenCodexModelsCache(parsed, runningVersion);
 
   await ensurePrivateDirectory(outputDirectory);
   const outputPath = join(outputDirectory, "codex-model-catalog.json");
@@ -127,54 +128,92 @@ export async function prepareHardenedCodexModelCatalog(
 
 export function hardenCodexModelsCache(
   value: unknown,
-  reviewedClientVersion: string,
+  runningClientVersion: string,
 ): HardenedCodexModelCatalog {
   if (!isJsonObject(value)) {
     throw new Error("Codex models cache must be a JSON object");
   }
-  if (value.client_version !== reviewedClientVersion) {
+
+  const runningVersion = parseStableVersion(runningClientVersion);
+  if (runningVersion === undefined) {
     throw new Error(
-      `Codex models cache version must be ${reviewedClientVersion}; refusing stale or unreviewed model metadata`,
+      `running Codex version must be a stable version, got ${JSON.stringify(runningClientVersion)}`,
+    );
+  }
+  if (typeof value.client_version !== "string") {
+    throw new Error("Codex models cache client_version must be a stable version");
+  }
+  const cacheVersion = parseStableVersion(value.client_version);
+  if (cacheVersion === undefined) {
+    throw new Error("Codex models cache client_version must be a stable version");
+  }
+  if (compareVersions(cacheVersion, runningVersion) < 0) {
+    throw new Error(
+      `Codex models cache version ${value.client_version} is older than running Codex ${runningClientVersion}; refresh Codex model metadata before retrying AgentShare`,
     );
   }
   if (!Array.isArray(value.models) || value.models.length === 0) {
     throw new Error("Codex models cache must contain at least one model");
   }
 
-  return {
-    models: value.models.map((entry, index) => {
-      if (!isJsonObject(entry)) {
-        throw new Error(`Codex models cache entry ${index} must be an object`);
-      }
-      if (typeof entry.slug !== "string" || entry.slug.trim().length === 0) {
-        throw new Error(
-          `Codex models cache entry ${index} is missing a model slug`,
-        );
-      }
-      return {
-        ...entry,
-        shell_type: "disabled",
-        apply_patch_tool_type: null,
-        experimental_supported_tools: [],
-        supports_search_tool: false,
-        input_modalities: ["text"],
-        multi_agent_version: null,
-        include_skills_usage_instructions: false,
-        include_plugin_usage_instructions: false,
-        include_apps_usage_instructions: false,
-      };
-    }),
-  };
+  const models = value.models
+    .map((entry, index) => validateModelEntry(entry, index))
+    .filter((entry) => modelSupportsClient(entry, runningVersion))
+    .map((entry) => ({
+      ...entry,
+      shell_type: "disabled",
+      apply_patch_tool_type: null,
+      experimental_supported_tools: [],
+      supports_search_tool: false,
+      input_modalities: ["text"],
+      multi_agent_version: null,
+      tool_mode: null,
+      include_skills_usage_instructions: false,
+      include_plugin_usage_instructions: false,
+      include_apps_usage_instructions: false,
+    }));
+
+  if (models.length === 0) {
+    throw new Error(
+      `Codex models cache contains no models compatible with running Codex ${runningClientVersion}`,
+    );
+  }
+
+  return { models };
+}
+
+function validateModelEntry(entry: unknown, index: number): JsonObject {
+  if (!isJsonObject(entry)) {
+    throw new Error(`Codex models cache entry ${index} must be an object`);
+  }
+  if (typeof entry.slug !== "string" || entry.slug.trim().length === 0) {
+    throw new Error(`Codex models cache entry ${index} is missing a model slug`);
+  }
+  if (
+    entry.minimal_client_version !== undefined &&
+    parseClientVersionTuple(entry.minimal_client_version) === undefined
+  ) {
+    throw new Error(
+      `Codex models cache entry ${index} has invalid minimal_client_version`,
+    );
+  }
+  return entry;
+}
+
+function modelSupportsClient(
+  entry: JsonObject,
+  runningVersion: VersionTuple,
+): boolean {
+  if (entry.minimal_client_version === undefined) return true;
+  const minimum = parseClientVersionTuple(entry.minimal_client_version);
+  if (minimum === undefined) return false;
+  return compareVersions(minimum, runningVersion) <= 0;
 }
 
 function reviewedNativeWindowsCodexVersion(output: string): string | undefined {
   const match = STABLE_CODEX_VERSION_PATTERN.exec(output.trim());
   if (match === null) return undefined;
-  const version: VersionTuple = [
-    Number(match[1]),
-    Number(match[2]),
-    Number(match[3]),
-  ];
+  const version = versionTupleFromMatch(match);
   if (
     compareVersions(
       version,
@@ -184,6 +223,28 @@ function reviewedNativeWindowsCodexVersion(output: string): string | undefined {
     return undefined;
   }
   return `${version[0]}.${version[1]}.${version[2]}`;
+}
+
+function parseStableVersion(value: string): VersionTuple | undefined {
+  const match = STABLE_VERSION_PATTERN.exec(value);
+  return match === null ? undefined : versionTupleFromMatch(match);
+}
+
+function versionTupleFromMatch(match: RegExpExecArray): VersionTuple {
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function parseClientVersionTuple(value: unknown): VersionTuple | undefined {
+  if (
+    !Array.isArray(value) ||
+    value.length !== 3 ||
+    !value.every(
+      (part) => Number.isInteger(part) && typeof part === "number" && part >= 0,
+    )
+  ) {
+    return undefined;
+  }
+  return [value[0] as number, value[1] as number, value[2] as number];
 }
 
 function compareVersions(
