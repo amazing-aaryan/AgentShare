@@ -35,11 +35,13 @@ function windowsVersionReviewer(): SupportsReviewedNativeWindowsCodexVersion {
 }
 
 describe("Windows Codex model catalog isolation", () => {
-  it("accepts only the exact reviewed native Windows Codex version", () => {
+  it("accepts stable native Windows Codex releases at or above the reviewed baseline", () => {
     expect(windowsVersionReviewer()("codex-cli 0.152.1")).toBe(true);
-    expect(windowsVersionReviewer()("codex-cli 0.153.0")).toBe(false);
+    expect(windowsVersionReviewer()("codex-cli 0.153.4")).toBe(true);
+    expect(windowsVersionReviewer()("codex-cli 1.0.0")).toBe(true);
+    expect(windowsVersionReviewer()("codex-cli 0.152.0")).toBe(false);
     expect(windowsVersionReviewer()("codex-cli 0.152.1-beta.1")).toBe(false);
-    expect(windowsVersionReviewer()("0.152.1")).toBe(false);
+    expect(windowsVersionReviewer()("0.153.4")).toBe(false);
   });
 
   it("preserves model identity while removing local tool capabilities", () => {
