@@ -12,8 +12,7 @@ export const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION = "0.152.1";
 const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION_TUPLE: VersionTuple = [
   0, 152, 1,
 ];
-const STABLE_CODEX_VERSION_PATTERN =
-  /^codex-cli\s+(\d+)\.(\d+)\.(\d+)\s*$/u;
+const STABLE_CODEX_VERSION_PATTERN = /^codex-cli\s+(\d+)\.(\d+)\.(\d+)\s*$/u;
 
 export type HardenedCodexModelCatalog = {
   models: JsonObject[];
