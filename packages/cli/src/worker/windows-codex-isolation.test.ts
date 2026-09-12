@@ -214,10 +214,7 @@ describe("native Windows Codex catalog preparation", () => {
     );
     expect(result).toEqual({
       codexHome,
-      codexModelCatalogPath: join(
-        currentOutput,
-        "codex-model-catalog.json",
-      ),
+      codexModelCatalogPath: join(currentOutput, "codex-model-catalog.json"),
       codexSplitReadBoundary: false,
     });
   });
