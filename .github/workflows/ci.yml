@@ -25,6 +25,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      - if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        run: npx prettier packages/cli/src/worker/windows-codex-isolation.ts
       - run: node scripts/check-repository-hygiene.mjs
       - run: npm run format:check
       - run: npm run lint
