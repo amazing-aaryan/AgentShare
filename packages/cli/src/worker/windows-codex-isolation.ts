@@ -191,7 +191,9 @@ function validateModelEntry(entry: unknown, index: number): JsonObject {
     throw new Error(`Codex models cache entry ${index} must be an object`);
   }
   if (typeof entry.slug !== "string" || entry.slug.trim().length === 0) {
-    throw new Error(`Codex models cache entry ${index} is missing a model slug`);
+    throw new Error(
+      `Codex models cache entry ${index} is missing a model slug`,
+    );
   }
   if (
     entry.minimal_client_version !== undefined &&
