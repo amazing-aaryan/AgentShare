@@ -6,8 +6,14 @@ import {
 } from "../environment/private-store.js";
 
 type JsonObject = Record<string, unknown>;
+type VersionTuple = readonly [major: number, minor: number, patch: number];
 
-export const REVIEWED_NATIVE_WINDOWS_CODEX_VERSION = "0.152.1";
+export const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION = "0.152.1";
+const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION_TUPLE: VersionTuple = [
+  0, 152, 1,
+];
+const STABLE_CODEX_VERSION_PATTERN =
+  /^codex-cli\s+(\d+)\.(\d+)\.(\d+)\s*$/u;
 
 export type HardenedCodexModelCatalog = {
   models: JsonObject[];
@@ -22,7 +28,7 @@ export type NativeWindowsCodexIsolation = {
 export function supportsReviewedNativeWindowsCodexVersion(
   output: string,
 ): boolean {
-  return output.trim() === `codex-cli ${REVIEWED_NATIVE_WINDOWS_CODEX_VERSION}`;
+  return reviewedNativeWindowsCodexVersion(output) !== undefined;
 }
 
 export async function prepareNativeWindowsCodexIsolation(
@@ -33,15 +39,17 @@ export async function prepareNativeWindowsCodexIsolation(
   outputDirectory: string,
 ): Promise<NativeWindowsCodexIsolation | undefined> {
   if (platform !== "win32") return undefined;
-  if (!supportsReviewedNativeWindowsCodexVersion(versionOutput)) {
+  const reviewedVersion = reviewedNativeWindowsCodexVersion(versionOutput);
+  if (reviewedVersion === undefined) {
     throw new Error(
-      `Native Windows AgentShare recipient isolation is reviewed only for Codex CLI ${REVIEWED_NATIVE_WINDOWS_CODEX_VERSION}; refusing unreviewed Windows Codex version`,
+      `Native Windows AgentShare recipient isolation requires stable Codex CLI >= ${MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION}; refusing older or unrecognized Windows Codex version`,
     );
   }
   const codexHome = await resolveCodexHome(environment, defaultHome);
   const codexModelCatalogPath = await prepareHardenedCodexModelCatalog(
     codexHome,
     outputDirectory,
+    reviewedVersion,
   );
   return {
     codexHome,
@@ -85,7 +93,7 @@ export async function resolveCodexHome(
 export async function prepareHardenedCodexModelCatalog(
   codexHome: string,
   outputDirectory: string,
-  reviewedVersion = REVIEWED_NATIVE_WINDOWS_CODEX_VERSION,
+  reviewedVersion = MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION,
 ): Promise<string> {
   const cachePath = join(codexHome, "models_cache.json");
   let serialized: string;
@@ -158,6 +166,36 @@ export function hardenCodexModelsCache(
       };
     }),
   };
+}
+
+function reviewedNativeWindowsCodexVersion(
+  output: string,
+): string | undefined {
+  const match = STABLE_CODEX_VERSION_PATTERN.exec(output.trim());
+  if (match === null) return undefined;
+  const version: VersionTuple = [
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+  ];
+  if (
+    compareVersions(
+      version,
+      MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION_TUPLE,
+    ) < 0
+  ) {
+    return undefined;
+  }
+  return `${version[0]}.${version[1]}.${version[2]}`;
+}
+
+function compareVersions(
+  [leftMajor, leftMinor, leftPatch]: VersionTuple,
+  [rightMajor, rightMinor, rightPatch]: VersionTuple,
+): number {
+  if (leftMajor !== rightMajor) return leftMajor - rightMajor;
+  if (leftMinor !== rightMinor) return leftMinor - rightMinor;
+  return leftPatch - rightPatch;
 }
 
 function isJsonObject(value: unknown): value is JsonObject {
