@@ -82,12 +82,15 @@ async function temporaryRoot(): Promise<string> {
   return root;
 }
 
-async function writeReviewedCache(codexHome: string): Promise<void> {
+async function writeReviewedCache(
+  codexHome: string,
+  clientVersion = "0.152.1",
+): Promise<void> {
   await mkdir(codexHome, { recursive: true });
   await writeFile(
     join(codexHome, "models_cache.json"),
     JSON.stringify({
-      client_version: "0.152.1",
+      client_version: clientVersion,
       models: [
         {
           slug: "gpt-5.6-codex",
@@ -140,14 +143,7 @@ describe("native Windows Codex catalog preparation", () => {
       "Codex models cache is invalid JSON",
     );
 
-    await writeFile(
-      join(codexHome, "models_cache.json"),
-      JSON.stringify({
-        client_version: "0.153.0",
-        models: [{ slug: "model" }],
-      }),
-      "utf8",
-    );
+    await writeReviewedCache(codexHome, "0.153.0");
     await expect(prepareCatalog()(codexHome, output)).rejects.toThrow(
       "Codex models cache version must be 0.152.1",
     );
@@ -170,7 +166,7 @@ describe("native Windows Codex catalog preparation", () => {
     ).rejects.toThrow("CODEX_HOME points to");
   });
 
-  it("applies the reviewed tool-isolation profile only on native Windows", async () => {
+  it("applies the Windows profile to supported releases and pins catalog metadata to the actual runtime", async () => {
     const root = await temporaryRoot();
     const defaultHome = join(root, "home");
     const codexHome = join(defaultHome, ".codex");
@@ -190,25 +186,38 @@ describe("native Windows Codex catalog preparation", () => {
     await expect(
       prepareNativeIsolation()(
         "win32",
-        "codex-cli 0.153.0",
+        "codex-cli 0.152.0",
         {},
         defaultHome,
         output,
       ),
-    ).rejects.toThrow(
-      "Native Windows AgentShare recipient isolation is reviewed only for Codex CLI 0.152.1",
-    );
+    ).rejects.toThrow("Codex CLI >= 0.152.1");
 
+    await expect(
+      prepareNativeIsolation()(
+        "win32",
+        "codex-cli 0.153.4",
+        {},
+        defaultHome,
+        output,
+      ),
+    ).rejects.toThrow("Codex models cache version must be 0.153.4");
+
+    await writeReviewedCache(codexHome, "0.153.4");
+    const currentOutput = join(root, "private-output-current");
     const result = await prepareNativeIsolation()(
       "win32",
-      "codex-cli 0.152.1",
+      "codex-cli 0.153.4",
       {},
       defaultHome,
-      output,
+      currentOutput,
     );
     expect(result).toEqual({
       codexHome,
-      codexModelCatalogPath: join(output, "codex-model-catalog.json"),
+      codexModelCatalogPath: join(
+        currentOutput,
+        "codex-model-catalog.json",
+      ),
       codexSplitReadBoundary: false,
     });
   });
