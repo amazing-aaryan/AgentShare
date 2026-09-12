@@ -55,6 +55,15 @@ drops a required control or rejects that restrictive configuration, AgentShare
 fails closed rather than weakening isolation. Codex 0.145.x and 0.146.x remain
 eligible for the legacy query path but not for the v2 MCP collaboration path.
 
+Native Windows v2 recipients add another fail-closed gate. Stable Codex CLI
+releases at or above **0.152.1** may use the reviewed Windows restricted-tool
+profile only after the general `exec` and v2 MCP capability probes pass. The
+hardened model catalog must come from `models_cache.json` for the exact running
+Codex version; stale or mismatched metadata is rejected. This runtime policy is
+forward-compatible, but it does not rewrite frozen release evidence: the
+`codex-native-windows-v2` profile for AgentShare 0.3.1 remains pinned to Codex
+0.152.1.
+
 ### Claude Code
 
 Claude Code remains on the exact-reviewed release policy for now. An unreviewed
