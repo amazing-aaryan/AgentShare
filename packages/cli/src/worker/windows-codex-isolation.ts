@@ -141,11 +141,15 @@ export function hardenCodexModelsCache(
     );
   }
   if (typeof value.client_version !== "string") {
-    throw new Error("Codex models cache client_version must be a stable version");
+    throw new Error(
+      "Codex models cache client_version must be a stable version",
+    );
   }
   const cacheVersion = parseStableVersion(value.client_version);
   if (cacheVersion === undefined) {
-    throw new Error("Codex models cache client_version must be a stable version");
+    throw new Error(
+      "Codex models cache client_version must be a stable version",
+    );
   }
   if (compareVersions(cacheVersion, runningVersion) < 0) {
     throw new Error(
