@@ -92,7 +92,7 @@ jobs:
           echo "size=${size}" >> "${GITHUB_OUTPUT}"
 
           prefix="${RUNNER_TEMP}/agentshare-v032-prefix"
-          npm install --global --prefix "${prefix}" "${asset}"
+          npm install --global --prefix "${prefix}" "$(pwd)/${asset}"
           cli_root="$(npm root --global --prefix "${prefix}")"
           test "$(node "${cli_root}/agentshare/dist/bin.js" --version)" = "${RELEASE_VERSION}"
 
