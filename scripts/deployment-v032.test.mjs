@@ -30,20 +30,34 @@ test("v0.3.2 production gate keeps immutable candidate bytes separate from revie
   );
 });
 
-test("v0.3.2 production gate deploys the changed handoff and keeps the relay unchanged", async () => {
+test("v0.3.2 deployment recovery is retry-safe", async () => {
   const workflow = await workflowSource();
 
+  assert.match(
+    workflow,
+    /RECOVERED_HANDOFF_VERSION_ID: 0c22cb46-524d-4958-9606-d072640db03f/u,
+  );
   assert.match(
     workflow,
     /wrangler deployments list --config apps\/edge-relay\/wrangler\.jsonc --json/u,
   );
   assert.match(
     workflow,
+    /wrangler deployments list --config apps\/handoff\/wrangler\.jsonc --json/u,
+  );
+  assert.match(workflow, /current_version.*RECOVERED_HANDOFF_VERSION_ID/su);
+  assert.match(workflow, /skipping duplicate upload/u);
+  assert.match(
+    workflow,
     /npx wrangler deploy --config apps\/handoff\/wrangler\.jsonc/u,
   );
-  assert.doesNotMatch(workflow, /RECOVERED_HANDOFF_VERSION_ID/u);
-  assert.doesNotMatch(workflow, /skipping duplicate upload/u);
+  assert.match(workflow, /for attempt in \$\(seq 1 12\); do/u);
   assert.match(workflow, /node scripts\/check-deployment\.mjs smoke/u);
+  assert.match(workflow, /sleep 5/u);
+  assert.match(
+    workflow,
+    /Public smoke did not converge after propagation retries/u,
+  );
   assert.match(workflow, /packages\/cli\/src\/public-handoff\.e2e\.test\.ts/u);
   assert.match(
     workflow,
