@@ -526,3 +526,14 @@ Built-in fs interception remains runtime-specific on hosted macOS; deterministic
 seams preserve coverage of both rollback outcomes. **Impact:** Both rollback
 cases pass locally; prior production code restored unchanged. CI must rerun on
 this test-only fix.
+
+## [2026-09-13 14:29] Isolate native Windows recipient Codex home
+
+**Decision:** Keep canonical Codex home read-only for metadata validation, copy
+only `auth.json` into a temporary private runtime home, and point native
+recipients at that home. **Why:** Codex startup can refresh `models_cache.json`
+even when AgentShare supplies a hardened catalog; the acceptance contract
+requires canonical metadata to remain byte-identical. **Impact:** Native
+recipient startup writes are confined to disposable runtime state; user skills
+continue to be discovered from the canonical home and disabled by launcher
+config. Focused regression suite passes 15/15.

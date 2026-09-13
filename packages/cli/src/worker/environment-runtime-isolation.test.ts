@@ -35,7 +35,8 @@ vi.mock("../environment/private-store.js", async (importOriginal) => ({
 
 const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
 const catalog = "C:\\synthetic\\private\\codex-model-catalog.json";
-const codexHome = "C:\\synthetic\\Codex home";
+const canonicalCodexHome = "C:\\synthetic\\Codex home";
+const privateCodexHome = "C:\\synthetic\\private\\Codex home";
 
 function platform(value: NodeJS.Platform): void {
   Object.defineProperty(process, "platform", { value, configurable: true });
@@ -47,7 +48,8 @@ beforeEach(() => {
   prepareMock.mockReset();
   captureMock.mockReset();
   prepareMock.mockResolvedValue({
-    codexHome,
+    canonicalCodexHome,
+    codexHome: privateCodexHome,
     codexModelCatalogPath: catalog,
     codexSplitReadBoundary: false,
   });
@@ -89,7 +91,7 @@ describe("recipient runtime isolation selection", () => {
       cwd: string;
       env: Record<string, string>;
     };
-    expect(options.env.CODEX_HOME).toBe(codexHome);
+    expect(options.env.CODEX_HOME).toBe(privateCodexHome);
     expect(options.env).not.toHaveProperty("AGENTSHARE_MCP_RECEIPT_PATH");
     expect(options.env).not.toHaveProperty("AGENTSHARE_MCP_RUN_ID");
     expect(existsSync(options.cwd)).toBe(false);

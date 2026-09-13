@@ -95,7 +95,8 @@ export async function runEnvironmentTarget(
     };
     const environment = safeEnvironment();
     if (nativeIsolation !== undefined) {
-      // Metadata and authentication must use the same canonical provider home.
+      // The private runtime home contains only copied authentication state;
+      // canonical model metadata was read and hardened before this point.
       environment.CODEX_HOME = nativeIsolation.codexHome;
     }
     const cliPath = process.argv[1];
@@ -109,7 +110,10 @@ export async function runEnvironmentTarget(
             process.execPath,
             cliPath,
             runtimeOptions,
-            await discoverUserSkills(homedir(), nativeIsolation?.codexHome),
+            await discoverUserSkills(
+              homedir(),
+              nativeIsolation?.canonicalCodexHome,
+            ),
           )
         : claudeEnvironmentArgs(
             environmentId,
