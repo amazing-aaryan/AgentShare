@@ -548,3 +548,23 @@ longer writes canonical model metadata. **Impact:** Package handoff passed 7/7
 stages; Vitest passed 345/345 with 8 opt-in skips; release tools passed 109/109;
 lint, format, build, and real private-home startup passed. Immutable published
 v0.3.2 acceptance evidence remains incomplete and cannot be fabricated.
+
+## [2026-09-13 15:20] Isolate Codex compatibility preflight from canonical home
+
+**Decision:** Route native Windows Codex version/help probes through a private
+temporary `CODEX_HOME`, and accept the exact version line when Codex emits its
+Temp PATH-alias warning on stderr. **Why:** Preflight ran before private
+isolation and could rewrite canonical `models_cache.json`; redirecting it
+exposed a benign warning that otherwise caused false rejection of supported
+Codex 0.153.4. **Impact:** Added trusted environment overrides and regression
+coverage; full suite passes 346/346 with 8 intentional skips.
+
+## [2026-09-13 15:25] Separate desktop Codex cache refresh from AgentShare writes
+
+**Decision:** Treat canonical-cache changes during long acceptance windows as
+external host activity unless a bounded AgentShare probe/child reproduces them.
+**Why:** Isolated probes leave canonical bytes unchanged, while a 35-second
+no-AgentShare idle control changes the cache hash; restoring or editing
+canonical metadata would violate the acceptance boundary. **Impact:** AgentShare
+child lifecycle passes packaged 7-stage diagnostic; exact v0.3.2 acceptance
+remains blocked by host-level cache churn and missing native-chat evidence.
