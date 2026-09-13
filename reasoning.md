@@ -647,3 +647,13 @@ does not need Creator MCP and previously rewrote the user's canonical Codex
 config, violating the acceptance boundary. **Impact:** New receiver-only
 regression passes; full suite is 348/348, release tools 109/109, package and
 packaged 7-stage handoff pass.
+
+## [2026-09-13 18:51] Install bootstrap fix into active CLI
+
+**Decision:** Repack current source and replace the global AgentShare CLI with
+the latest local 0.3.2 diagnostic artifact. **Why:** Source tests alone would
+leave real `agentshare bootstrap` on the pre-fix implementation; active PATH and
+MCP must execute identical bytes. **Impact:** Global version is 0.3.2; malformed
+bootstrap leaves canonical Codex config hash unchanged; fresh MCP initialization
+exposes all 9 creator tools. Artifact remains non-promotable until immutable
+release/evidence review.
