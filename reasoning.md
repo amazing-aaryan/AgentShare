@@ -537,3 +537,14 @@ requires canonical metadata to remain byte-identical. **Impact:** Native
 recipient startup writes are confined to disposable runtime state; user skills
 continue to be discovered from the canonical home and disabled by launcher
 config. Focused regression suite passes 15/15.
+
+## [2026-09-13 14:50] Verify patched package and real Codex startup
+
+**Decision:** Validate the patched build through npm packaging, the local
+loopback seven-stage handoff, the full Vitest suite, release-tool tests, lint,
+format, and a real Codex 0.153.4 startup using the private home. **Why:** Unit
+coverage alone cannot prove bundled-package behavior or that Codex startup no
+longer writes canonical model metadata. **Impact:** Package handoff passed 7/7
+stages; Vitest passed 345/345 with 8 opt-in skips; release tools passed 109/109;
+lint, format, build, and real private-home startup passed. Immutable published
+v0.3.2 acceptance evidence remains incomplete and cannot be fabricated.
