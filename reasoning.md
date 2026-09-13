@@ -657,3 +657,14 @@ MCP must execute identical bytes. **Impact:** Global version is 0.3.2; malformed
 bootstrap leaves canonical Codex config hash unchanged; fresh MCP initialization
 exposes all 9 creator tools. Artifact remains non-promotable until immutable
 release/evidence review.
+
+## [2026-09-13 18:58] Reproduce terminal review boundary with synthetic capture
+
+**Decision:** Exercise current packaged terminal share flow through capture,
+selection, draft review, and the native approval menu using synthetic-only
+session/workspace data; stop before publish. **Why:** Separates capture/TTY
+defects from the earlier `Draft changed or expired during approval` revalidation
+failure without fabricating acceptance evidence or human consent. **Impact:**
+Exact session capture and terminal review reached the publish choice with stable
+draft digest; native app/runtime mismatch and approval-state cause remain
+unresolved, so acceptance is not complete.
