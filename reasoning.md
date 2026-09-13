@@ -668,3 +668,13 @@ failure without fabricating acceptance evidence or human consent. **Impact:**
 Exact session capture and terminal review reached the publish choice with stable
 draft digest; native app/runtime mismatch and approval-state cause remain
 unresolved, so acceptance is not complete.
+
+## [2026-09-13 19:10] Version follow-up fixes separately from immutable v0.3.2
+
+**Decision:** Bump the repaired CLI package to `0.3.3` while preserving the
+published `0.3.2` artifact and its frozen acceptance profile. **Why:** The
+acceptance contract forbids replacing changed `0.3.2` bytes; the
+bootstrap/config and native-isolation fixes therefore require a new package
+version before distribution. **Impact:** Subsequent package/build checks target
+`agentshare-0.3.3.tgz`; `agentshare-0.3.2.tgz` remains byte-identical and
+non-promotable.
