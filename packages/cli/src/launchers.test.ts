@@ -6,6 +6,7 @@ import {
   runTarget,
   supportsReviewedTargetVersion,
   supportsReviewedEnvironmentTargetVersion,
+  verifyTarget,
   waitForTargetClose,
 } from "./launchers.js";
 
@@ -25,6 +26,15 @@ const CODEX_INCOMPLETE_HELP = [
   "  -c, --config <key=value>  Config",
   "  -C, --cd <dir>  Working root",
   "  --ephemeral  Ephemeral",
+].join("\n");
+const CODEX_COMPLETE_HELP = [
+  "  --ephemeral  Ephemeral",
+  "  --ignore-user-config  Ignore user config",
+  "  --ignore-rules  Ignore rules",
+  "  --strict-config  Strict config",
+  "  --skip-git-repo-check  Skip repository check",
+  "  --cd <dir>  Working root",
+  "  --config <key=value>  Config",
 ].join("\n");
 
 const { existsSyncMock, spawnMock } = vi.hoisted(() => ({
@@ -209,5 +219,19 @@ describe("target process lifecycle", () => {
       env: Record<string, string>;
     };
     expect(options.env.CODEX_HOME).toBe("C:\\private\\codex-home");
+  });
+
+  it("keeps target validation probes inside the explicit private home", async () => {
+    spawnMock
+      .mockImplementationOnce(() => fakeProcess("codex-cli 0.153.4\n"))
+      .mockImplementationOnce(() => fakeProcess(CODEX_COMPLETE_HELP));
+
+    await verifyTarget("codex", { CODEX_HOME: "C:\\private\\codex-home" });
+
+    expect(
+      spawnMock.mock.calls.map(
+        (call) => (call[2] as { env: Record<string, string> }).env.CODEX_HOME,
+      ),
+    ).toEqual(["C:\\private\\codex-home", "C:\\private\\codex-home"]);
   });
 });
