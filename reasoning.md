@@ -619,3 +619,12 @@ and `session-context` now work, while the managed MCP block points to the
 durable patched package. Fresh Codex processes can load the complete creator
 surface; native evidence still requires host MCP reload and genuine human
 consent.
+
+## [2026-09-13 16:08] Align Codex MCP and PATH to one installed binary
+
+**Decision:** Re-run `agentshare init` from the patched global CLI after global
+installation, making the managed MCP config and skill command resolve the same
+AgentShare 0.3.2 binary. **Why:** A split durable-prefix/global setup could
+drift again and recreate the native-chat mismatch. **Impact:** `config.toml` now
+references the global patched binary; version, session-context, MCP
+initialization, and creator tool discovery all pass.
