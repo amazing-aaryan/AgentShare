@@ -578,3 +578,13 @@ package-install checks, and real packaged 7-stage Codex handoff. **Impact:**
 The fix is reviewable on `codex/fix-v0.3.2-acceptance`; changed bytes must use a
 new package version, and native terminal/chat evidence is still required before
 any stable promotion.
+
+## [2026-09-13 16:05] Verify isolated canonical end-to-end handoff
+
+**Decision:** Run the rebuilt packaged 7-stage handoff with a disposable
+canonical Codex home containing copied authentication and model metadata.
+**Why:** This removes unrelated desktop Codex cache churn while retaining real
+Codex 0.153.4 execution, MCP receipts, proposal flow, refresh, revoke, and
+cleanup. **Impact:** 7/7 stages passed; disposable canonical cache hash stayed
+identical; fixture directory was permanently removed. This is diagnostic
+evidence, not native human terminal/chat release evidence.
