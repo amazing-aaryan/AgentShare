@@ -19,7 +19,10 @@ export const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION = "0.152.1";
 const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION_TUPLE: VersionTuple = [
   0, 152, 1,
 ];
-const STABLE_CODEX_VERSION_PATTERN = /^codex-cli\s+(\d+)\.(\d+)\.(\d+)\s*$/u;
+// Codex can emit a harmless PATH-alias warning on stderr when CODEX_HOME is
+// redirected under Windows Temp. Match the executable's exact version line
+// without letting that warning make a supported runtime look unrecognized.
+const STABLE_CODEX_VERSION_PATTERN = /^codex-cli\s+(\d+)\.(\d+)\.(\d+)\s*$/mu;
 const STABLE_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/u;
 
 export type HardenedCodexModelCatalog = {

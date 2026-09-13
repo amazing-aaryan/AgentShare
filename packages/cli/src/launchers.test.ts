@@ -197,4 +197,17 @@ describe("target process lifecycle", () => {
     await vi.advanceTimersByTimeAsync(11);
     await rejection;
   });
+
+  it("applies explicit private-home overrides to compatibility probes", async () => {
+    spawnMock.mockImplementationOnce(() => fakeProcess("codex-cli 0.153.4\n"));
+
+    await captureProcess("codex", ["--version"], 1_000, 1_048_576, {
+      CODEX_HOME: "C:\\private\\codex-home",
+    });
+
+    const options = spawnMock.mock.calls[0]?.[2] as {
+      env: Record<string, string>;
+    };
+    expect(options.env.CODEX_HOME).toBe("C:\\private\\codex-home");
+  });
 });

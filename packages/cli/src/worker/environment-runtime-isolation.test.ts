@@ -79,6 +79,14 @@ describe("recipient runtime isolation selection", () => {
       "win32",
       "codex-cli 0.152.1",
     ]);
+    expect(captureMock).toHaveBeenCalledTimes(2);
+    const preflightEnvironment = captureMock.mock.calls[0]?.[4] as {
+      CODEX_HOME: string;
+    };
+    expect(preflightEnvironment.CODEX_HOME).toMatch(
+      /agentshare-receipts-[^\\]+[\\/]codex-preflight-home$/u,
+    );
+    expect(captureMock.mock.calls[1]?.[4]).toEqual(preflightEnvironment);
     const args = spawnMock.mock.calls[0]?.[1] as string[];
     expect(args).toContain(`model_catalog_json=${JSON.stringify(catalog)}`);
     expect(args).not.toContain('default_permissions="agentshare-query"');

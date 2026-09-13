@@ -219,7 +219,7 @@ describe("native Windows Codex catalog preparation", () => {
     const currentOutput = join(root, "private-output-current");
     const currentResult = await prepareNativeIsolation()(
       "win32",
-      "codex-cli 0.153.4",
+      "codex-cli 0.153.4\nWARNING: proceeding, even though Codex could not create PATH aliases",
       {},
       defaultHome,
       currentOutput,

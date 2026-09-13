@@ -186,9 +186,12 @@ export async function runTarget(
   }
 }
 
-export async function verifyTarget(target: TargetAgent): Promise<void> {
+export async function verifyTarget(
+  target: TargetAgent,
+  environmentOverrides: NodeJS.ProcessEnv = {},
+): Promise<void> {
   const executable = resolveAgentExecutable(target);
-  await assertSupportedTarget(target, executable);
+  await assertSupportedTarget(target, executable, environmentOverrides);
 }
 
 export function waitForTargetClose(
@@ -279,19 +282,24 @@ export function supportsReviewedEnvironmentTargetVersion(
 async function assertSupportedTarget(
   target: TargetAgent,
   executable: AgentExecutable,
+  environmentOverrides: NodeJS.ProcessEnv = {},
 ): Promise<void> {
-  await inspectTargetVersion(target, executable);
+  await inspectTargetVersion(target, executable, environmentOverrides);
 }
 
 async function inspectTargetVersion(
   target: TargetAgent,
   executable: AgentExecutable,
+  environmentOverrides: NodeJS.ProcessEnv = {},
 ): Promise<void> {
   const contract = TARGET_CONTRACTS[target];
-  const output = await captureProcess(executable.command, [
-    ...executable.prefixArgs,
-    "--version",
-  ]);
+  const output = await captureProcess(
+    executable.command,
+    [...executable.prefixArgs, "--version"],
+    15_000,
+    1_048_576,
+    environmentOverrides,
+  );
   if (!recognizesTargetVersion(target, output)) {
     throw new Error(unsupportedTargetVersionMessage(target, output));
   }
@@ -307,10 +315,13 @@ async function inspectTargetVersion(
         `Update AgentShare or install a reviewed ${target} version; sandbox controls will not be assumed safe.`,
     );
   }
-  const help = await captureProcess(executable.command, [
-    ...executable.prefixArgs,
-    ...contract.helpArgs,
-  ]);
+  const help = await captureProcess(
+    executable.command,
+    [...executable.prefixArgs, ...contract.helpArgs],
+    15_000,
+    1_048_576,
+    environmentOverrides,
+  );
   const missing = missingTargetCapabilities(target, help);
   if (missing.length > 0) {
     throw new Error(
@@ -339,10 +350,11 @@ export async function captureProcess(
   args: string[],
   timeoutMs = 15_000,
   maxOutputBytes = 1_048_576,
+  environmentOverrides: NodeJS.ProcessEnv = {},
 ): Promise<string> {
   const child = spawn(command, args, {
     detached: process.platform !== "win32",
-    env: safeEnvironment(),
+    env: safeEnvironment(environmentOverrides),
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -507,7 +519,9 @@ export function resolveAgentExecutable(
   throw new Error(`${target} CLI executable not found on PATH`);
 }
 
-function safeEnvironment(): NodeJS.ProcessEnv {
+function safeEnvironment(
+  environmentOverrides: NodeJS.ProcessEnv = {},
+): NodeJS.ProcessEnv {
   const allow = new Set([
     "PATH",
     "Path",
@@ -525,9 +539,13 @@ function safeEnvironment(): NodeJS.ProcessEnv {
     "COLORTERM",
     "NO_COLOR",
   ]);
-  return Object.fromEntries(
+  const environment = Object.fromEntries(
     Object.entries(process.env).filter(
       ([key, value]) => allow.has(key) && value !== undefined,
     ),
   );
+  for (const [key, value] of Object.entries(environmentOverrides)) {
+    if (value !== undefined) environment[key] = value;
+  }
+  return environment;
 }
