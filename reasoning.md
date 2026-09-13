@@ -699,6 +699,23 @@ Offline verification can now reject mismatched 0.3.3 evidence without relabeling
 it as v0.3.2; no native acceptance is implied.
 
 ## [2026-09-13 19:39] Verify repaired release and live isolated Codex probe
-**Decision:** Keep current 0.3.3 source unchanged after full tests, release checks, lint/format checks, and a disposable-home Codex 0.153.4 probe all passed.
-**Why:** The live probe accepted the private model catalog and left canonical `models_cache.json` hash unchanged; no additional code defect is evidenced. The original failure remains limited to immutable v0.3.2 and desktop-host/process drift.
-**Impact:** Current repaired branch is technically green but cannot be called 18/18 real-host acceptance; native Codex-chat trust/approval and exact immutable candidate remain outstanding.
+
+**Decision:** Keep current 0.3.3 source unchanged after full tests, release
+checks, lint/format checks, and a disposable-home Codex 0.153.4 probe all
+passed. **Why:** The live probe accepted the private model catalog and left
+canonical `models_cache.json` hash unchanged; no additional code defect is
+evidenced. The original failure remains limited to immutable v0.3.2 and
+desktop-host/process drift. **Impact:** Current repaired branch is technically
+green but cannot be called 18/18 real-host acceptance; native Codex-chat
+trust/approval and exact immutable candidate remain outstanding.
+
+## [2026-09-13 19:50] Align opt-in real Codex test with native Windows profile
+
+**Decision:** Update only the opt-in `local-codex.real` setup to prepare the
+private Windows Codex home/catalog and disable the unsupported split-read ACL;
+retain real inference, MCP transport, and receipt assertions. **Why:** Running
+the unchanged test on Windows failed because Codex correctly refused an OS-level
+split-read configuration that native Windows cannot enforce. The production
+launcher already uses the native replacement profile. **Impact:** The isolated
+real test now passes both ask/propose cases under Codex 0.153.4; default suite
+behavior remains unchanged and no canonical state is used.

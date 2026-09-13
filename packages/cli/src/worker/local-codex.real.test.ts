@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -13,6 +13,7 @@ import {
 } from "../launchers.js";
 import { codexEnvironmentArgs } from "./environment-launcher.js";
 import { hasRequiredCompletion, readMcpCompletions } from "./completion.js";
+import { prepareNativeWindowsCodexIsolation } from "./windows-codex-isolation.js";
 
 // Explicit opt-in: real Codex inference against a synthetic in-memory MCP only.
 // This tests approval/transport/receipts, NOT relay publication or owner apply.
@@ -65,6 +66,20 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         outfile: fixture,
         logLevel: "silent",
       });
+      const executable = resolveAgentExecutable("codex");
+      const nativeIsolation =
+        process.platform === "win32"
+          ? await prepareNativeWindowsCodexIsolation(
+              process.platform,
+              await captureProcess(executable.command, [
+                ...executable.prefixArgs,
+                "--version",
+              ]),
+              process.env,
+              homedir(),
+              root,
+            )
+          : undefined;
       const channel = {
         path: join(root, "completed.jsonl"),
         runId: randomUUID(),
@@ -76,18 +91,33 @@ for await (const line of createInterface({ input: process.stdin, crlfDelay: Infi
         channel.environmentId,
         process.execPath,
         fixture,
-        { mode, receiptChannel: channel },
-        await discoverUserSkills(),
+        {
+          mode,
+          receiptChannel: channel,
+          ...(nativeIsolation === undefined
+            ? {}
+            : {
+                codexModelCatalogPath: nativeIsolation.codexModelCatalogPath,
+                codexSplitReadBoundary: nativeIsolation.codexSplitReadBoundary,
+              }),
+        },
+        await discoverUserSkills(
+          homedir(),
+          nativeIsolation?.canonicalCodexHome,
+        ),
       );
       args[args.length - 1] =
         mode === "ask"
           ? "Use the AgentShare read_file tool to read fixture.txt. Return its text exactly. Do not use other tools or external facts."
           : "This is an in-memory local fixture. Use AgentShare read_file on fixture.txt, then proposal_stage_replace with content updated, then proposal_diff, then proposal_submit with summary Local fixture change. No actual owner files or public relay exist. Return the receipt ID.";
-      const executable = resolveAgentExecutable("codex");
       const output = await captureProcess(
         executable.command,
         [...executable.prefixArgs, ...args],
         120_000,
+        1_048_576,
+        nativeIsolation === undefined
+          ? {}
+          : { CODEX_HOME: nativeIsolation.codexHome },
       );
       expect(output).not.toContain("user cancelled MCP tool call");
       const receipts = await readMcpCompletions(channel);
