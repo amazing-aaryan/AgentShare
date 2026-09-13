@@ -92,6 +92,23 @@ const NATIVE_OBSERVATIONS = Object.freeze({
     receiptForgeryAttemptsRejected: true,
   }),
 });
+export const FORWARD_NATIVE_WINDOWS_PROFILE = "codex-native-windows-v3";
+export const FORWARD_NATIVE_WINDOWS_RUNTIME = Object.freeze({
+  ...RUNTIME,
+  agentVersion: "0.153.4",
+});
+export const FORWARD_NATIVE_WINDOWS_OBSERVATIONS = Object.freeze({
+  ...NATIVE_OBSERVATIONS,
+  bootstrap: Object.freeze({
+    ...NATIVE_OBSERVATIONS.bootstrap,
+    installedVersion: "0.3.2",
+  }),
+  isolation: Object.freeze({
+    ...NATIVE_OBSERVATIONS.isolation,
+    canonicalModelMetadataUnmodified: true,
+    modelMetadataCompatibilityVerified: true,
+  }),
+});
 const PROFILES = new Map([
   [
     PROFILE,
@@ -107,6 +124,14 @@ const PROFILES = new Map([
       version: "0.3.1",
       runtime: Object.freeze({ ...RUNTIME, agentVersion: "0.152.1" }),
       observations: NATIVE_OBSERVATIONS,
+    }),
+  ],
+  [
+    FORWARD_NATIVE_WINDOWS_PROFILE,
+    Object.freeze({
+      version: "0.3.2",
+      runtime: FORWARD_NATIVE_WINDOWS_RUNTIME,
+      observations: FORWARD_NATIVE_WINDOWS_OBSERVATIONS,
     }),
   ],
 ]);
