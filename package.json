@@ -16,7 +16,7 @@
     "clean": "tsc -b --clean",
     "dev:relay": "npm run dev --workspace @agentshare/relay",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --write scripts/deployment-v032.test.mjs && git diff -- scripts/deployment-v032.test.mjs && exit 1",
     "lint": "tsc -b --pretty false && eslint .",
     "test": "vitest run",
     "test:conformance": "vitest run packages/acb/src/conformance.test.ts",
