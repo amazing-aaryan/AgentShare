@@ -1,10 +1,11 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   installCreatorMcpConfiguration,
   installIntegrations,
+  installReceiverIntegrations,
   removeIntegrations,
 } from "./index.js";
 
@@ -77,6 +78,35 @@ describe("host integrations", () => {
     expect(codexCreator).toContain("allow_implicit_invocation: false");
     expect(codexReceiver).toContain("allow_implicit_invocation: true");
     await removeIntegrations(roots);
+  });
+
+  it("installs receiver integrations without changing creator MCP config", async () => {
+    const root = await mkdtemp(
+      join(tmpdir(), "agentshare-receiver-integration-"),
+    );
+    directories.push(root);
+    const config = join(root, "codex", "config.toml");
+    const original = '[mcp_servers.other]\ncommand = "other-tool"\n';
+    await mkdir(join(root, "codex"), { recursive: true });
+    await writeFile(config, original, "utf8");
+    const roots = {
+      codexConfig: config,
+      codexSkills: join(root, "codex"),
+      claudeSkills: join(root, "claude"),
+    };
+
+    await installReceiverIntegrations(roots);
+
+    expect(await readFile(config, "utf8")).toBe(original);
+    expect(
+      await readFile(
+        join(roots.codexSkills, "agentshare-receive", "SKILL.md"),
+        "utf8",
+      ),
+    ).toContain("agentshare bootstrap");
+    await expect(
+      readFile(join(roots.codexSkills, "agentshare", "SKILL.md"), "utf8"),
+    ).rejects.toThrow();
   });
 
   it("refreshes older AgentShare-managed integration content", async () => {

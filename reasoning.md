@@ -638,3 +638,12 @@ version check, while the app bundle is a different prerelease executable.
 **Impact:** Corrected MCP config is valid for fresh hosts; native-chat
 acceptance remains unverified until a host using the exact reviewed runtime is
 reloaded and human approval is observed.
+
+## [2026-09-13 18:50] Keep recipient bootstrap config-read-only
+
+**Decision:** Make `bootstrap` install receiver skills only; reserve Creator MCP
+config writes for explicit `init`/repair flows. **Why:** Recipient bootstrap
+does not need Creator MCP and previously rewrote the user's canonical Codex
+config, violating the acceptance boundary. **Impact:** New receiver-only
+regression passes; full suite is 348/348, release tools 109/109, package and
+packaged 7-stage handoff pass.

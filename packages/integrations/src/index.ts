@@ -121,16 +121,8 @@ export async function installIntegrations(
       join(roots.codexSkills, "agentshare", "agents", "openai.yaml"),
       CODEX_CREATOR_INTERFACE,
     ],
-    [
-      join(roots.codexSkills, "agentshare-receive", "SKILL.md"),
-      CODEX_RECEIVER_SKILL,
-    ],
-    [
-      join(roots.codexSkills, "agentshare-receive", "agents", "openai.yaml"),
-      CODEX_RECEIVER_INTERFACE,
-    ],
     [join(roots.claudeSkills, "share", "SKILL.md"), CLAUDE_CREATOR_SKILL],
-    [join(roots.claudeSkills, "agentshare", "SKILL.md"), CLAUDE_RECEIVER_SKILL],
+    ...receiverIntegrationFiles(roots),
   ] as const;
   for (const [path, content] of files) await writeManaged(path, content);
   const installed = files.map(([path]) => path);
@@ -139,6 +131,29 @@ export async function installIntegrations(
     installed.push(roots.codexConfig);
   }
   return installed;
+}
+
+/** Install recipient skills without touching the creator's Codex config. */
+export async function installReceiverIntegrations(
+  roots = defaultIntegrationRoots(),
+): Promise<string[]> {
+  const files = receiverIntegrationFiles(roots);
+  for (const [path, content] of files) await writeManaged(path, content);
+  return files.map(([path]) => path);
+}
+
+function receiverIntegrationFiles(roots: IntegrationRoots) {
+  return [
+    [
+      join(roots.codexSkills, "agentshare-receive", "SKILL.md"),
+      CODEX_RECEIVER_SKILL,
+    ],
+    [
+      join(roots.codexSkills, "agentshare-receive", "agents", "openai.yaml"),
+      CODEX_RECEIVER_INTERFACE,
+    ],
+    [join(roots.claudeSkills, "agentshare", "SKILL.md"), CLAUDE_RECEIVER_SKILL],
+  ] as const;
 }
 
 export async function removeIntegrations(
