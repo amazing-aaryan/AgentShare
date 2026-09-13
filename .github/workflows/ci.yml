@@ -1,38 +1,40 @@
 name: ci
 
 permissions:
-  contents: write
+  contents: read
 
 on:
   push:
+  pull_request:
 
 jobs:
-  repair-audit-lock:
-    if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  verify:
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          persist-credentials: true
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - name: Set safe direct dependency minima
-        run: npm install --package-lock-only --save-dev vitest@4.1.11 @vitest/coverage-v8@4.1.11 wrangler@4.131.0
-      - name: Reinstall repaired dependency graph
-        run: npm ci
-      - name: Verify clean audit
-        run: npm audit
-      - name: Show resolved versions
-        run: npm ls vitest @vitest/coverage-v8 wrangler miniflare sharp
-      - name: Commit generated dependency repair
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "chore: update audited dev dependencies"
-          git push origin HEAD:fix/dependency-audit-20260912
+      - run: node scripts/check-repository-hygiene.mjs
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test:release-tools
+      - run: npm run test:coverage
+      - run: npm run test:conformance
+      - run: npm run test:package
+      - run: npm run test:edge-runtime
+      - run:
+          npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
+      - run: npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
+      - run: npm audit --audit-level=high
