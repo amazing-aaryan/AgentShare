@@ -607,3 +607,15 @@ not start Creator MCP; direct JSON-RPC and `codex mcp list` now see AgentShare
 loadable in a fresh Codex process; the already-running host still needs MCP
 reload/restart before native-chat evidence can be collected. No stable-release
 claim.
+
+## [2026-09-13 16:02] Align PATH CLI with creator MCP version
+
+**Decision:** Replace the stale global AgentShare 0.2.0 CLI with the current
+patched 0.3.2 package used for this end-to-end validation. **Why:** The
+installed Codex creator skill invokes `agentshare session-context` by command
+name; the old global CLI returned usage instead of exact thread context,
+preventing native-chat creator resolution. **Impact:** `agentshare --version`
+and `session-context` now work, while the managed MCP block points to the
+durable patched package. Fresh Codex processes can load the complete creator
+surface; native evidence still requires host MCP reload and genuine human
+consent.
