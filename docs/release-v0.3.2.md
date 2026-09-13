@@ -1,8 +1,8 @@
 # v0.3.2 candidate: forward-compatible native Windows acceptance
 
 **Status: candidate, not stable sign-off.** This document defines required
-acceptance evidence; it is not evidence that those runs occurred. The v0.3.0
-and v0.3.1 releases and their evidence profiles remain frozen and must not be
+acceptance evidence; it is not evidence that those runs occurred. The v0.3.0 and
+v0.3.1 releases and their evidence profiles remain frozen and must not be
 reinterpreted for these bytes.
 
 ## Exact profile
@@ -15,8 +15,8 @@ profiles remain frozen for their original packages and runtimes.
 AgentShare's runtime compatibility policy is intentionally broader than this
 release-evidence profile. Native Windows recipients accept stable Codex CLI
 versions at or above 0.152.1 only when the required `exec` and MCP capability
-probes continue to pass and the restrictive launcher profile can be applied.
-The v3 acceptance profile nevertheless pins one exact real-host runtime so that
+probes continue to pass and the restrictive launcher profile can be applied. The
+v3 acceptance profile nevertheless pins one exact real-host runtime so that
 evidence remains reproducible and cannot silently change meaning when Codex is
 updated later.
 
@@ -45,11 +45,11 @@ invocation. Do not downgrade, fabricate, replace, or otherwise modify the
 creator's normal Codex configuration, authentication, or canonical model cache.
 
 Before the first recipient launch, hash the canonical `models_cache.json` when
-present and record its non-secret `client_version`. After both flows and cleanup,
-hash that same file again. The before/after hashes must match. Evidence must also
-show that AgentShare accepted only model entries compatible with the actual
-acceptance executable and produced its separate private hardened catalog. The
-private catalog is temporary evidence/runtime state and must be cleaned up.
+present and record its non-secret `client_version`. After both flows and
+cleanup, hash that same file again. The before/after hashes must match. Evidence
+must also show that AgentShare accepted only model entries compatible with the
+actual acceptance executable and produced its separate private hardened catalog.
+The private catalog is temporary evidence/runtime state and must be cleaned up.
 
 Use synthetic data with independently generated workspace-only and
 conversation-only canaries, a decision with its reason, and unfinished task
@@ -92,13 +92,12 @@ not human approval evidence. A model claiming it used MCP is not an MCP receipt.
 ## Evidence integrity and promotion
 
 Use the existing `agentshare-release-candidate/v1` and
-`agentshare-release-evidence/v1` schemas with profile
-`codex-native-windows-v3`. Independently record the immutable package URL,
-exact full source commit, byte size, SHA-256, and each Worker's origin, version
-UUID, deployment UUID and source commit. Keep redacted evidence attachments and
-their actual byte hashes together outside tracked source. Never commit live
-capability fragments, auth material, private paths, customer context or raw user
-transcripts.
+`agentshare-release-evidence/v1` schemas with profile `codex-native-windows-v3`.
+Independently record the immutable package URL, exact full source commit, byte
+size, SHA-256, and each Worker's origin, version UUID, deployment UUID and
+source commit. Keep redacted evidence attachments and their actual byte hashes
+together outside tracked source. Never commit live capability fragments, auth
+material, private paths, customer context or raw user transcripts.
 
 For the canonical model-cache proof, store only redacted metadata and hashes
 needed to establish version/integrity. Do not copy authentication or unrelated
