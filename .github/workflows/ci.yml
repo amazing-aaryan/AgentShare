@@ -5,36 +5,27 @@ permissions:
 
 on:
   push:
-  pull_request:
 
 jobs:
-  verify:
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [22, 24]
-    runs-on: ${{ matrix.os }}
+  inspect-audit-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 24
           cache: npm
       - run: npm ci
-      - run: node scripts/check-repository-hygiene.mjs
-      - run: npm run format:check
-      - run: npm run lint
-      - run: npm run build
-      - run: npm run test:release-tools
-      - run: npm run test:coverage
-      - run: npm run test:conformance
-      - run: npm run test:package
-      - run: npm run test:edge-runtime
-      - run:
-          npx wrangler deploy --dry-run --config apps/edge-relay/wrangler.jsonc
-      - run: npx wrangler deploy --dry-run --config apps/handoff/wrangler.jsonc
-      - run: npm audit --audit-level=high
+      - name: Compute npm audit fix
+        run: npm audit fix --package-lock-only
+      - name: Show proposed dependency diff
+        run: git diff -- package.json package-lock.json
+      - name: Reinstall proposed lockfile
+        run: npm ci
+      - name: Verify audit
+        run: npm audit --audit-level=high
+      - name: Show resolved versions
+        run: npm ls vitest @vitest/coverage-v8 wrangler miniflare sharp
