@@ -719,3 +719,13 @@ split-read configuration that native Windows cannot enforce. The production
 launcher already uses the native replacement profile. **Impact:** The isolated
 real test now passes both ask/propose cases under Codex 0.153.4; default suite
 behavior remains unchanged and no canonical state is used.
+
+## [2026-09-13 19:54] Verify packaged 0.3.3 after native real-test fix
+
+**Decision:** Accept the repaired test/runtime alignment after build,
+package-install validation, and packaged 7-stage handoff all passed. **Why:**
+The real Codex ask/propose cases pass with actual MCP transport and receipts
+under disposable state; package installation and owner/revocation lifecycle
+remain green. The diagnostic explicitly remains non-promotable because it lacks
+native human UI evidence. **Impact:** Branch is clean at `8b19c74`; only the
+external exact-host acceptance gate remains incomplete.
