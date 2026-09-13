@@ -25,11 +25,13 @@ test("v0.3.2 forward-compatible Windows profile is a new frozen contract", () =>
     true,
   );
   assert.equal(
-    FORWARD_NATIVE_WINDOWS_OBSERVATIONS.isolation.canonicalModelMetadataUnmodified,
+    FORWARD_NATIVE_WINDOWS_OBSERVATIONS.isolation
+      .canonicalModelMetadataUnmodified,
     true,
   );
   assert.equal(
-    FORWARD_NATIVE_WINDOWS_OBSERVATIONS.isolation.modelMetadataCompatibilityVerified,
+    FORWARD_NATIVE_WINDOWS_OBSERVATIONS.isolation
+      .modelMetadataCompatibilityVerified,
     true,
   );
   assert.equal(Object.isFrozen(FORWARD_NATIVE_WINDOWS_RUNTIME), true);
