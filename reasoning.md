@@ -596,3 +596,14 @@ Preflight needs a private Codex home, but arbitrary inherited environment
 overrides would weaken the isolation boundary. **Impact:** Focused
 launcher/isolation tests pass 19/19; typecheck and build pass; release
 acceptance remains open.
+
+## [2026-09-13 15:58] Repair stale native creator MCP installation
+
+**Decision:** Install current patched package in a durable local prefix and
+rewrite only the managed `agentshare_creator` Codex configuration block.
+**Why:** Native chat pointed at a deleted acceptance temp prefix, so Codex could
+not start Creator MCP; direct JSON-RPC and `codex mcp list` now see AgentShare
+0.3.2 and its creator tool surface. **Impact:** Native chat configuration is
+loadable in a fresh Codex process; the already-running host still needs MCP
+reload/restart before native-chat evidence can be collected. No stable-release
+claim.
