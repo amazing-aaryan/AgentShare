@@ -17,6 +17,7 @@ type TargetChildLifecycle = {
 };
 
 type VersionTuple = readonly [major: number, minor: number, patch: number];
+type ProbeEnvironmentOverrides = { CODEX_HOME?: string };
 
 const MINIMUM_CODEX_VERSION: VersionTuple = [0, 145, 0];
 const MINIMUM_CODEX_ENVIRONMENT_VERSION: VersionTuple = [0, 147, 0];
@@ -188,7 +189,7 @@ export async function runTarget(
 
 export async function verifyTarget(
   target: TargetAgent,
-  environmentOverrides: NodeJS.ProcessEnv = {},
+  environmentOverrides: ProbeEnvironmentOverrides = {},
 ): Promise<void> {
   const executable = resolveAgentExecutable(target);
   await assertSupportedTarget(target, executable, environmentOverrides);
@@ -282,7 +283,7 @@ export function supportsReviewedEnvironmentTargetVersion(
 async function assertSupportedTarget(
   target: TargetAgent,
   executable: AgentExecutable,
-  environmentOverrides: NodeJS.ProcessEnv = {},
+  environmentOverrides: ProbeEnvironmentOverrides = {},
 ): Promise<void> {
   await inspectTargetVersion(target, executable, environmentOverrides);
 }
@@ -290,7 +291,7 @@ async function assertSupportedTarget(
 async function inspectTargetVersion(
   target: TargetAgent,
   executable: AgentExecutable,
-  environmentOverrides: NodeJS.ProcessEnv = {},
+  environmentOverrides: ProbeEnvironmentOverrides = {},
 ): Promise<void> {
   const contract = TARGET_CONTRACTS[target];
   const output = await captureProcess(
@@ -350,7 +351,7 @@ export async function captureProcess(
   args: string[],
   timeoutMs = 15_000,
   maxOutputBytes = 1_048_576,
-  environmentOverrides: NodeJS.ProcessEnv = {},
+  environmentOverrides: ProbeEnvironmentOverrides = {},
 ): Promise<string> {
   const child = spawn(command, args, {
     detached: process.platform !== "win32",
@@ -520,7 +521,7 @@ export function resolveAgentExecutable(
 }
 
 function safeEnvironment(
-  environmentOverrides: NodeJS.ProcessEnv = {},
+  environmentOverrides: ProbeEnvironmentOverrides = {},
 ): NodeJS.ProcessEnv {
   const allow = new Set([
     "PATH",
@@ -544,8 +545,7 @@ function safeEnvironment(
       ([key, value]) => allow.has(key) && value !== undefined,
     ),
   );
-  for (const [key, value] of Object.entries(environmentOverrides)) {
-    if (value !== undefined) environment[key] = value;
-  }
+  if (environmentOverrides.CODEX_HOME !== undefined)
+    environment.CODEX_HOME = environmentOverrides.CODEX_HOME;
   return environment;
 }
