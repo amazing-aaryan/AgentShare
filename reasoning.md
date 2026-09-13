@@ -628,3 +628,13 @@ AgentShare 0.3.2 binary. **Why:** A split durable-prefix/global setup could
 drift again and recreate the native-chat mismatch. **Impact:** `config.toml` now
 references the global patched binary; version, session-context, MCP
 initialization, and creator tool discovery all pass.
+
+## [2026-09-13 16:07] Preserve exact Codex runtime boundary
+
+**Decision:** Keep exact acceptance evidence bound to PATH Codex 0.153.4 and do
+not relabel the app-bundled 0.154.0-alpha.6.2 binary as the pinned runtime.
+**Why:** The two host entrypoints coexist; the PATH CLI passes the pinned
+version check, while the app bundle is a different prerelease executable.
+**Impact:** Corrected MCP config is valid for fresh hosts; native-chat
+acceptance remains unverified until a host using the exact reviewed runtime is
+reloaded and human approval is observed.
