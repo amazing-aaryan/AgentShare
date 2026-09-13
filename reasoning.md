@@ -688,3 +688,12 @@ Codex state, while preserving the rule that human trust and AgentShare
 publication consent cannot be simulated. **Impact:** Exact CLI startup is
 proven; Creator MCP discovery and native elicitation remain unverified until a
 human accepts the disposable directory and reviews the live draft.
+
+## [2026-09-13 19:32] Add frozen verifier profile for 0.3.3 follow-up
+
+**Decision:** Register `codex-native-windows-v4` for repaired package `0.3.3`
+and preserve the existing `codex-native-windows-v3` / `0.3.2` profile unchanged.
+**Why:** Changed package bytes cannot be tested under the immutable 0.3.2
+contract; future evidence needs an explicit version-bound profile. **Impact:**
+Offline verification can now reject mismatched 0.3.3 evidence without relabeling
+it as v0.3.2; no native acceptance is implied.
