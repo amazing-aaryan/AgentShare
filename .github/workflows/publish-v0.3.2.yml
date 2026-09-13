@@ -1,0 +1,144 @@
+name: publish-v0.3.2
+
+on:
+  push:
+    branches:
+      - release/publish-v0.3.2
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-prerelease:
+    if: >-
+      github.repository == 'amazing-aaryan/AgentShare' &&
+      github.event.head_commit.message == 'Publish v0.3.2 immutable prerelease'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CANDIDATE_SHA: 4d6957bd2effebf1c1136e1cac60424d88c4eaea
+      CANDIDATE_CI_RUN: "34728587437"
+      RELEASE_VERSION: 0.3.2
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out exact candidate source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Require exact successful master CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_CI_RUN}")"
+          test "$(jq -r '.head_sha' <<<"${run}")" = "${CANDIDATE_SHA}"
+          test "$(jq -r '.head_branch' <<<"${run}")" = "master"
+          test "$(jq -r '.event' <<<"${run}")" = "push"
+          test "$(jq -r '.status' <<<"${run}")" = "completed"
+          test "$(jq -r '.conclusion' <<<"${run}")" = "success"
+          jobs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_CI_RUN}/jobs?filter=latest&per_page=100")"
+          test "$(jq '[.jobs[] | select(.name | startswith("verify ("))] | length' <<<"${jobs}")" = "6"
+          test "$(jq '[.jobs[] | select(.name | startswith("verify (")) | select(.conclusion == "success")] | length' <<<"${jobs}")" = "6"
+          test "$(git rev-parse HEAD)" = "${CANDIDATE_SHA}"
+
+      - name: Require release and tag to be absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "v${RELEASE_VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "::error::v${RELEASE_VERSION} release already exists; refusing replacement"
+            exit 1
+          fi
+          test -z "$(git ls-remote --tags origin "refs/tags/v${RELEASE_VERSION}")"
+
+      - name: Build and verify exact package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          node scripts/check-repository-hygiene.mjs
+          npm run format:check
+          npm run lint
+          npm run build
+          npm run test:release-tools
+          npm run test:package
+          npm audit --audit-level=high
+          test "$(node packages/cli/dist/bin.js --version)" = "${RELEASE_VERSION}"
+
+      - name: Pack candidate once
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release-asset
+          npm pack ./packages/cli --pack-destination release-asset >/tmp/agentshare-pack-name.txt
+          asset="release-asset/agentshare-${RELEASE_VERSION}.tgz"
+          test -f "${asset}"
+          test "$(find release-asset -maxdepth 1 -type f -name '*.tgz' | wc -l | tr -d ' ')" = "1"
+          sha="$(sha256sum "${asset}" | awk '{print $1}')"
+          size="$(stat -c '%s' "${asset}")"
+          test "${size}" -gt 0
+          echo "asset=${asset}" >> "${GITHUB_OUTPUT}"
+          echo "sha256=${sha}" >> "${GITHUB_OUTPUT}"
+          echo "size=${size}" >> "${GITHUB_OUTPUT}"
+
+          prefix="${RUNNER_TEMP}/agentshare-v032-prefix"
+          npm install --global --prefix "${prefix}" "${asset}"
+          cli_root="$(npm root --global --prefix "${prefix}")"
+          test "$(node "${cli_root}/agentshare/dist/bin.js" --version)" = "${RELEASE_VERSION}"
+
+      - name: Publish immutable prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<EOF
+          AgentShare v${RELEASE_VERSION} candidate
+
+          This is an immutable prerelease candidate, not stable release attestation.
+
+          Exact source commit: ${CANDIDATE_SHA}
+          Package SHA-256: ${{ steps.package.outputs.sha256 }}
+          Package bytes: ${{ steps.package.outputs.size }}
+          Acceptance profile: codex-native-windows-v3
+
+          This candidate adds forward-compatible native Windows Codex support for stable Codex CLI >= 0.152.1 when the required isolation/MCP controls remain present, while keeping release acceptance pinned to Codex CLI 0.153.4 on Windows build 26200 / Node 24.14.0.
+
+          The release MUST remain a prerelease until protected production deployment, public handoff/bootstrap/relay smoke checks, disposable public v1/v2 lifecycles, authenticated 18/18 codex-native-windows-v3 acceptance, and human evidence review all pass.
+
+          Do not replace this asset. Any changed package bytes require a new version.
+          EOF
+          gh release create "v${RELEASE_VERSION}" "${{ steps.package.outputs.asset }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${CANDIDATE_SHA}" \
+            --prerelease \
+            --title "AgentShare v${RELEASE_VERSION} candidate" \
+            --notes-file release-notes.md
+
+      - name: Re-verify published immutable prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$(gh release view "v${RELEASE_VERSION}" --repo "${GITHUB_REPOSITORY}" --json tagName,isDraft,isImmutable,isPrerelease,targetCommitish,assets)"
+          test "$(jq -r '.tagName' <<<"${metadata}")" = "v${RELEASE_VERSION}"
+          test "$(jq -r '.isDraft' <<<"${metadata}")" = "false"
+          test "$(jq -r '.isImmutable' <<<"${metadata}")" = "true"
+          test "$(jq -r '.isPrerelease' <<<"${metadata}")" = "true"
+          test "$(jq -r '.targetCommitish' <<<"${metadata}")" = "${CANDIDATE_SHA}"
+          test "$(jq -r ".assets[] | select(.name == \"agentshare-${RELEASE_VERSION}.tgz\") | .size" <<<"${metadata}")" = "${{ steps.package.outputs.size }}"
+          test "$(jq -r ".assets[] | select(.name == \"agentshare-${RELEASE_VERSION}.tgz\") | .digest" <<<"${metadata}")" = "sha256:${{ steps.package.outputs.sha256 }}"
+          {
+            echo "### v${RELEASE_VERSION} immutable prerelease published"
+            echo "- Candidate: \`${CANDIDATE_SHA}\`"
+            echo "- SHA-256: \`${{ steps.package.outputs.sha256 }}\`"
+            echo "- Bytes: \`${{ steps.package.outputs.size }}\`"
+            echo "- Stable promotion: intentionally not performed"
+          } >> "${GITHUB_STEP_SUMMARY}"
