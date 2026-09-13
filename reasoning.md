@@ -568,3 +568,13 @@ no-AgentShare idle control changes the cache hash; restoring or editing
 canonical metadata would violate the acceptance boundary. **Impact:** AgentShare
 child lifecycle passes packaged 7-stage diagnostic; exact v0.3.2 acceptance
 remains blocked by host-level cache churn and missing native-chat evidence.
+
+## [2026-09-13 15:30] Verify committed HEAD
+
+**Decision:** Accept committed source as regression-clean while keeping release
+acceptance open. **Why:** HEAD passes full Vitest (66 files, 347 tests, 8
+intentional skips), typecheck, build, lint, format, 109 release-tool tests,
+package-install checks, and real packaged 7-stage Codex handoff. **Impact:**
+The fix is reviewable on `codex/fix-v0.3.2-acceptance`; changed bytes must use a
+new package version, and native terminal/chat evidence is still required before
+any stable promotion.
