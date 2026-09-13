@@ -17,7 +17,8 @@ jobs:
   deploy-and-live-gate:
     if: >-
       github.repository == 'amazing-aaryan/AgentShare' &&
-      startsWith(github.event.head_commit.message, 'Merge v0.3.2 production deployment gate')
+      startsWith(github.event.head_commit.message, 'Merge v0.3.2 production
+      deployment gate')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
@@ -77,7 +78,8 @@ jobs:
           npm ci
           npm run build
 
-      - name: Verify exact candidate CI, production binding, and immutable package
+      - name:
+          Verify exact candidate CI, production binding, and immutable package
         env:
           AGENTSHARE_CANDIDATE_SHA: ${{ env.CANDIDATE_SHA }}
           AGENTSHARE_PACKAGE_SHA256: ${{ env.PACKAGE_SHA256 }}
