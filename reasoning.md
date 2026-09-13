@@ -697,3 +697,8 @@ and preserve the existing `codex-native-windows-v3` / `0.3.2` profile unchanged.
 contract; future evidence needs an explicit version-bound profile. **Impact:**
 Offline verification can now reject mismatched 0.3.3 evidence without relabeling
 it as v0.3.2; no native acceptance is implied.
+
+## [2026-09-13 19:39] Verify repaired release and live isolated Codex probe
+**Decision:** Keep current 0.3.3 source unchanged after full tests, release checks, lint/format checks, and a disposable-home Codex 0.153.4 probe all passed.
+**Why:** The live probe accepted the private model catalog and left canonical `models_cache.json` hash unchanged; no additional code defect is evidenced. The original failure remains limited to immutable v0.3.2 and desktop-host/process drift.
+**Impact:** Current repaired branch is technically green but cannot be called 18/18 real-host acceptance; native Codex-chat trust/approval and exact immutable candidate remain outstanding.
