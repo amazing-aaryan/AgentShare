@@ -590,6 +590,9 @@ identical; fixture directory was permanently removed. This is diagnostic
 evidence, not native human terminal/chat release evidence.
 
 ## [2026-09-13 15:43] Restrict native probe environment overrides
-**Decision:** Allow compatibility probes to override only `CODEX_HOME`.
-**Why:** Preflight needs a private Codex home, but arbitrary inherited environment overrides would weaken the isolation boundary.
-**Impact:** Focused launcher/isolation tests pass 19/19; typecheck and build pass; release acceptance remains open.
+
+**Decision:** Allow compatibility probes to override only `CODEX_HOME`. **Why:**
+Preflight needs a private Codex home, but arbitrary inherited environment
+overrides would weaken the isolation boundary. **Impact:** Focused
+launcher/isolation tests pass 19/19; typecheck and build pass; release
+acceptance remains open.
