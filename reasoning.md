@@ -678,3 +678,13 @@ bootstrap/config and native-isolation fixes therefore require a new package
 version before distribution. **Impact:** Subsequent package/build checks target
 `agentshare-0.3.3.tgz`; `agentshare-0.3.2.tgz` remains byte-identical and
 non-promotable.
+
+## [2026-09-13 19:25] Verify pinned Codex interactive startup boundary
+
+**Decision:** Start exact `codex-cli 0.153.4` with a disposable `CODEX_HOME` and
+minimal Creator MCP config; stop at Codex's directory-trust prompt. **Why:**
+Confirms the pinned interactive runtime can start without changing canonical
+Codex state, while preserving the rule that human trust and AgentShare
+publication consent cannot be simulated. **Impact:** Exact CLI startup is
+proven; Creator MCP discovery and native elicitation remain unverified until a
+human accepts the disposable directory and reviews the live draft.
