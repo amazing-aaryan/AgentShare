@@ -813,3 +813,13 @@ with the full 350-test suite, edge-runtime handoff passed, conformance passed,
 and `npm audit --audit-level=high` found zero vulnerabilities. **Impact:** No
 remaining source/test failure is reproduced locally; only the undeployed 0.3.3
 public state and native human acceptance remain.
+
+## [2026-09-13 21:43] Merge repaired follow-up into master
+
+**Decision:** Merge remote production-gate history and repaired Windows
+acceptance fixes into local `master`, preserving the immutable v0.3.2 tag and
+artifact. **Why:** The remote branch had advanced independently after the v0.3.2
+candidate; dropping either line would lose release-gate history or the repair.
+**Impact:** `master` is locally integrated at `22f9188`; 351 tests,
+typecheck/lint, format, build, and package smoke pass. Live deployment smoke
+still fails closed on the expected undeployed v0.3.3 package pin.
