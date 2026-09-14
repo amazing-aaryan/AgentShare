@@ -773,3 +773,13 @@ build, so a restarted Codex host would still load stale creator behavior.
 **Impact:** Global binary now byte-matches current `packages/cli/dist/bin.js`;
 `agentshare --version` remains 0.3.3. Existing MCP child processes retain old
 loaded bytes until Codex reload/restart.
+
+## [2026-09-13 20:38] Preserve deployment pin mismatch as a release gate
+
+**Decision:** Do not change the deployed v0.3.2 handoff/bootstrap pin to make
+the follow-up branch's deployment smoke pass. **Why:**
+`npm run test:deployment:smoke` correctly fails because current CLI is 0.3.3
+while production remains immutable v0.3.2; changing the gate or old deployment
+would conceal an unperformed follow-up deployment. **Impact:** New v0.3.3
+requires its own release asset and handoff deployment before public smoke can
+pass; v0.3.2 acceptance remains untouched.
