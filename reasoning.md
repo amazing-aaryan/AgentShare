@@ -832,3 +832,9 @@ Linux/macOS CI correctly does not create a Windows disposable probe, and macOS
 resolves `/var` through `/private/var`; the prior assertions treated both as
 universal behavior. **Impact:** Focused launcher/isolation suite passes 16/16;
 push the test-only portability fix before release validation resumes.
+
+## [2026-09-13 22:09] Publish and deploy repaired follow-up
+
+**Decision:** Publish immutable prerelease `v0.3.3` and deploy its exact candidate to both production Workers after protected preflight passed.
+**Why:** User approved release/deployment; repaired bytes require a new version, while exact immutable `v0.3.2` remains untouched and stable promotion is not authorized.
+**Impact:** Candidate `3157b433680fdeb965c31596eda3980349e7fb3f`, package size `157780`, SHA-256 `ee8ec10ce90524b54c7f6977bb83ae7755bcb465e87c6c1008658ec712d8d49b` is live; protected deploy and public read-only smoke pass. Native human acceptance remains separate evidence.
