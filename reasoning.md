@@ -783,3 +783,13 @@ while production remains immutable v0.3.2; changing the gate or old deployment
 would conceal an unperformed follow-up deployment. **Impact:** New v0.3.3
 requires its own release asset and handoff deployment before public smoke can
 pass; v0.3.2 acceptance remains untouched.
+
+## [2026-09-13 20:46] Pin public v2 surfaces to repaired 0.3.3
+
+**Decision:** Update v2 bootstrap and trusted handoff package pins, plus their
+exact-version contract assertions, from frozen 0.3.2 to follow-up 0.3.3.
+**Why:** A repaired 0.3.3 CLI cannot work end to end when public links still
+instruct recipients to install 0.3.2; v0.3.2 evidence/profile files remain
+unchanged. **Impact:** App tests, full suite, build, package, and handoff
+dry-run pass. Live smoke now correctly stops at the undeployed production 0.3.2
+pin; deployment requires a separately authorized 0.3.3 release/handoff update.
