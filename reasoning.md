@@ -750,3 +750,16 @@ or mutate the canonical desktop Codex home, even before the launcher can
 establish recipient isolation. **Impact:** Added focused coverage for disposable
 `CODEX_HOME`; targeted and lint checks pass. Exact immutable v0.3.2 host
 acceptance remains external and separate.
+
+## [2026-09-13 20:33] Verify repaired packaged and real Codex paths
+
+**Decision:** Treat the repaired branch as technically verified through full
+tests, packaged handoff, release-contract tests, and opt-in real Codex
+execution; retain the native-chat acceptance gate. **Why:** Current evidence
+covers 350 default tests, 7 packaged lifecycle stages, 111 release-tool tests, 2
+real Codex MCP receipt flows, and 2 hostile Codex isolation/continuity checks
+without canonical-cache mutation. It does not establish native Codex chat
+consent, deployed relay publication, or the immutable v0.3.2 profile.
+**Impact:** Commit `225881a` is ready for follow-up release review; stable
+promotion remains prohibited until a fresh exact-runtime real-host run supplies
+missing evidence.
