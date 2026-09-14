@@ -5,12 +5,19 @@ import type { AcbManifest, SessionEvent } from "@agentshare/contracts";
 
 type JsonObject = Record<string, unknown>;
 
-export async function exportCurrentClaudeSession(
+export type ClaudeHostCapture = {
+  sourceAgent: "claude";
+  title: string;
+  workspaceRoot: string;
+  conversation: SessionEvent[];
+};
+
+export async function exportCurrentClaudeCapture(
   options: {
     sessionId?: string;
     projectsRoot?: string;
   } = {},
-): Promise<AcbManifest> {
+): Promise<ClaudeHostCapture> {
   const sessionId = options.sessionId ?? process.env.CLAUDE_SESSION_ID;
   if (sessionId === undefined || !/^[A-Za-z0-9-]+$/u.test(sessionId)) {
     throw new Error(
@@ -26,21 +33,30 @@ export async function exportCurrentClaudeSession(
       `Expected one Claude session for ${sessionId}; found ${matches.length}`,
     );
   }
-  return parseClaudeSession(await readFile(matches[0], "utf8"), sessionId);
+  return parseClaudeCapture(await readFile(matches[0], "utf8"), sessionId);
 }
 
-export function parseClaudeSession(
+export async function exportCurrentClaudeSession(
+  options: {
+    sessionId?: string;
+    projectsRoot?: string;
+  } = {},
+): Promise<AcbManifest> {
+  return captureToManifest(await exportCurrentClaudeCapture(options));
+}
+
+export function parseClaudeCapture(
   jsonl: string,
   sessionId = "claude-session",
-): AcbManifest {
+): ClaudeHostCapture {
   const events: SessionEvent[] = [];
-  let project = "session";
+  let workspaceRoot: string | undefined;
   for (const line of jsonl.split(/\r?\n/u)) {
     if (line.trim().length === 0) continue;
     const item = parseObject(line);
     if (item === undefined || item.isSidechain === true) continue;
     const cwd = stringValue(item.cwd);
-    if (cwd !== undefined) project = basename(cwd);
+    if (cwd !== undefined) workspaceRoot = cwd;
     if (item.type !== "user" && item.type !== "assistant") continue;
     const message = asObject(item.message);
     const text = messageText(message?.content);
@@ -55,12 +71,30 @@ export function parseClaudeSession(
   }
   if (events.length === 0)
     throw new Error("Claude session contains no shareable messages");
+  if (workspaceRoot === undefined)
+    throw new Error("Claude session does not contain a workspace root");
+  return {
+    sourceAgent: "claude",
+    title: `Claude: ${basename(workspaceRoot)}`,
+    workspaceRoot,
+    conversation: events,
+  };
+}
+
+export function parseClaudeSession(
+  jsonl: string,
+  sessionId = "claude-session",
+): AcbManifest {
+  return captureToManifest(parseClaudeCapture(jsonl, sessionId));
+}
+
+function captureToManifest(capture: ClaudeHostCapture): AcbManifest {
   return {
     version: "acb-v1",
-    title: `Claude: ${project}`,
+    title: capture.title,
     sourceAgent: "claude",
     exportedAt: new Date().toISOString(),
-    events,
+    events: capture.conversation,
     resources: [],
   };
 }

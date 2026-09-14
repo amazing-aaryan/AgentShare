@@ -1,23 +1,26 @@
 import { z } from "zod";
+import {
+  MAX_CIPHERTEXT_BYTES,
+  MAX_RESOURCE_BYTES,
+  MAX_TTL_SECONDS,
+  base64UrlSchema,
+  sessionEventSchema,
+  sha256Schema,
+} from "./shared.js";
+
+export {
+  MAX_CIPHERTEXT_BYTES,
+  MAX_RESOURCE_BYTES,
+  MAX_TTL_SECONDS,
+  base64UrlSchema,
+  sessionEventSchema,
+  sha256Schema,
+} from "./shared.js";
+export type { SessionEvent } from "./shared.js";
 
 export const PROTOCOL_VERSION = "agentshare-relay-v1" as const;
 export const ACB_VERSION = "acb-v1" as const;
-export const MAX_CIPHERTEXT_BYTES = 50 * 1024 * 1024;
-export const MAX_RESOURCE_BYTES = 5 * 1024 * 1024;
-export const MAX_TTL_SECONDS = 72 * 60 * 60;
-
-export const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/u);
-export const base64UrlSchema = z.string().regex(/^[A-Za-z0-9_-]+$/u);
-
-export const sessionEventSchema = z.object({
-  sequence: z.number().int().nonnegative(),
-  role: z.enum(["user", "assistant", "system", "tool"]),
-  kind: z.enum(["message", "reasoning-summary", "tool-call", "tool-result"]),
-  text: z.string(),
-  sourceId: z.string().min(1),
-  createdAt: z.iso.datetime().optional(),
-});
-export type SessionEvent = z.infer<typeof sessionEventSchema>;
+export const MAX_QUERY_MESSAGE_BYTES = 256 * 1024;
 
 export const resourceSchema = z.object({
   id: z.string().min(1),
@@ -124,3 +127,62 @@ export type RelayRecord = {
   status: ShareStatus;
   upload?: UploadDescriptor;
 };
+
+export const QUERY_PROTOCOL_VERSION = "agentshare-query-v1" as const;
+export const queryCreateRequestSchema = z.object({
+  endpointId: base64UrlSchema.min(20).max(100),
+  requestedTtlSeconds: z.number().int().positive().max(MAX_TTL_SECONDS),
+  requestUploadTokenDigest: sha256Schema,
+  requestReadTokenDigest: sha256Schema,
+  responseUploadTokenDigest: sha256Schema,
+  responseReadTokenDigest: sha256Schema,
+  revokeTokenDigest: sha256Schema,
+});
+export type QueryCreateRequest = z.infer<typeof queryCreateRequestSchema>;
+
+export const queryMetadataSchema = z.object({
+  protocolVersion: z.literal(QUERY_PROTOCOL_VERSION),
+  endpointId: base64UrlSchema,
+  createdAt: z.iso.datetime(),
+  expiresAt: z.iso.datetime(),
+});
+export type QueryMetadata = z.infer<typeof queryMetadataSchema>;
+
+export const queryStatusSchema = z.enum([
+  "awaiting-question",
+  "question-available",
+  "answer-available",
+  "revoked",
+  "expired",
+]);
+export type QueryStatus = z.infer<typeof queryStatusSchema>;
+
+export const queryMessageSchema = z
+  .object({
+    id: base64UrlSchema.min(20).max(100),
+    kind: z.enum(["question", "answer"]),
+    question: z.string().min(1).max(20_000).optional(),
+    answer: z.string().min(1).max(100_000).optional(),
+    evidence: z
+      .array(
+        z.object({
+          source: z.string().min(1).max(500),
+          detail: z.string().min(1).max(2_000),
+        }),
+      )
+      .max(100)
+      .optional(),
+    createdAt: z.iso.datetime(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.kind === "question" && value.question === undefined)
+      ctx.addIssue({ code: "custom", message: "Question text required" });
+    if (value.kind === "answer" && value.answer === undefined)
+      ctx.addIssue({ code: "custom", message: "Answer text required" });
+  });
+export type QueryMessage = z.infer<typeof queryMessageSchema>;
+
+export * from "./environment.js";
+export * from "./proposals.js";
+export * from "./relay-v2.js";
+export * from "./environment-machine.js";

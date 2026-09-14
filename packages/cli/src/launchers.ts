@@ -16,6 +16,13 @@ type TargetChildLifecycle = {
   ): TargetChildLifecycle;
 };
 
+type VersionTuple = readonly [major: number, minor: number, patch: number];
+
+const MINIMUM_CODEX_VERSION: VersionTuple = [0, 145, 0];
+const MINIMUM_CODEX_ENVIRONMENT_VERSION: VersionTuple = [0, 147, 0];
+const CODEX_VERSION_PATTERN =
+  /^codex-cli\s+(\d+)\.(\d+)\.(\d+)(?:[-+][^\s]+)?\s*$/mu;
+
 const TARGET_CONTRACTS: Record<
   TargetAgent,
   { helpArgs: string[]; requiredHelpOptions: string[]; versionPattern: RegExp }
@@ -31,7 +38,7 @@ const TARGET_CONTRACTS: Record<
       "--cd",
       "--config",
     ],
-    versionPattern: /^codex-cli\s+\d+\.\d+\.\d+(?:[-+][^\s]+)?\s*$/mu,
+    versionPattern: CODEX_VERSION_PATTERN,
   },
   claude: {
     helpArgs: ["--help"],
@@ -50,11 +57,8 @@ const TARGET_CONTRACTS: Record<
   },
 };
 
-const REVIEWED_VERSIONS: Record<TargetAgent, RegExp> = {
-  codex: /^codex-cli 0\.(?:145|146|147)\.0\s*$/mu,
-  claude:
-    /^2\.1\.(?:210|211|212|213|214|215|216|217|218|219|220|221|222|223|224|225|226|227|228|229|231)\s+\(Claude Code\)\s*$/mu,
-};
+const REVIEWED_CLAUDE_VERSIONS =
+  /^2\.1\.(?:210|211|212|213|214|215|216|217|218|219|220|221|222|223|224|225|226|227|228|229|231|238)\s+\(Claude Code\)\s*$/mu;
 
 export function codexArgs(
   workspace: string,
@@ -87,6 +91,12 @@ export function codexArgs(
     "features.unified_exec=false",
     "--config",
     "features.apply_patch_freeform=false",
+    "--config",
+    "features.view_image=false",
+    "--config",
+    "features.request_permissions_tool=false",
+    "--config",
+    "agents.enabled=false",
     "--config",
     "features.js_repl=false",
     "--config",
@@ -237,7 +247,33 @@ export function supportsReviewedTargetVersion(
   target: TargetAgent,
   versionOutput: string,
 ): boolean {
-  return REVIEWED_VERSIONS[target].test(versionOutput.trim());
+  if (target === "claude") {
+    return REVIEWED_CLAUDE_VERSIONS.test(versionOutput.trim());
+  }
+  const version = parseCodexVersion(versionOutput);
+  return (
+    version !== undefined &&
+    compareVersions(version, MINIMUM_CODEX_VERSION) >= 0
+  );
+}
+
+/**
+ * V2 MCP support starts at a separately reviewed Codex baseline. Newer
+ * recognizable releases still have to pass the runtime isolation and MCP
+ * capability probes before AgentShare launches them.
+ */
+export function supportsReviewedEnvironmentTargetVersion(
+  target: TargetAgent,
+  versionOutput: string,
+): boolean {
+  if (target !== "codex") {
+    return supportsReviewedTargetVersion(target, versionOutput);
+  }
+  const version = parseCodexVersion(versionOutput);
+  return (
+    version !== undefined &&
+    compareVersions(version, MINIMUM_CODEX_ENVIRONMENT_VERSION) >= 0
+  );
 }
 
 async function assertSupportedTarget(
@@ -260,6 +296,12 @@ async function inspectTargetVersion(
     throw new Error(unsupportedTargetVersionMessage(target, output));
   }
   if (!supportsReviewedTargetVersion(target, output)) {
+    if (target === "codex") {
+      throw new Error(
+        `codex ${displayTargetOutput(output)} requires Codex CLI >= 0.145.0. ` +
+          "Update Codex; AgentShare will not run against an older recipient sandbox.",
+      );
+    }
     throw new Error(
       `${target} ${displayTargetOutput(output)} has not passed AgentShare isolation review. ` +
         `Update AgentShare or install a reviewed ${target} version; sandbox controls will not be assumed safe.`,
@@ -275,6 +317,21 @@ async function inspectTargetVersion(
       unsupportedTargetCapabilitiesMessage(target, output, missing),
     );
   }
+}
+
+function parseCodexVersion(versionOutput: string): VersionTuple | undefined {
+  const match = CODEX_VERSION_PATTERN.exec(versionOutput.trim());
+  if (match === null) return undefined;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function compareVersions(
+  [leftMajor, leftMinor, leftPatch]: VersionTuple,
+  [rightMajor, rightMinor, rightPatch]: VersionTuple,
+): number {
+  if (leftMajor !== rightMajor) return leftMajor - rightMajor;
+  if (leftMinor !== rightMinor) return leftMinor - rightMinor;
+  return leftPatch - rightPatch;
 }
 
 export async function captureProcess(
@@ -378,11 +435,15 @@ function displayTargetOutput(output: string): string {
   return sanitizeTerminalText(output).trim().slice(0, 512) || "unknown";
 }
 
-export async function discoverUserSkills(home = homedir()): Promise<string[]> {
-  const roots = [
+export async function discoverUserSkills(
+  home = homedir(),
+  codexHome = join(home, ".codex"),
+): Promise<string[]> {
+  const roots = new Set([
     join(home, ".codex", "skills"),
     join(home, ".agents", "skills"),
-  ];
+    join(codexHome, "skills"),
+  ]);
   const found: string[] = [];
   for (const root of roots) found.push(...(await findSkillFiles(root)));
   return found.sort((a, b) => a.localeCompare(b, "en"));

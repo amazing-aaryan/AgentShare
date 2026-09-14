@@ -5,7 +5,7 @@ const capability = (bytes = 32) => randomBytes(bytes).toString("base64url");
 const digest = (value) =>
   createHash("sha256").update(value, "utf8").digest("hex");
 
-const worker = await unstable_dev("apps/edge-relay/src/index.ts", {
+const worker = await unstable_dev("apps/edge-relay/src/worker.ts", {
   config: "apps/edge-relay/wrangler.jsonc",
   local: true,
   logLevel: "error",

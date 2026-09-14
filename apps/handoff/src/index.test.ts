@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { handleRequest, renderTrustedHandoffPage } from "./index.js";
 
 describe("trusted handoff worker", () => {
-  it("serves only the static handoff page with restrictive headers", async () => {
+  it("serves the v1 handoff page with restrictive headers", async () => {
     const response = handleRequest(
       new Request(
         "https://handoff.example/s/abcdefghijklmnopqrstuvwx?relay=https%3A%2F%2Frelay.example",
@@ -24,6 +24,37 @@ describe("trusted handoff worker", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("serves v2 environment bootstrap from the trusted origin without capability fragments", async () => {
+    const page = handleRequest(
+      new Request(
+        "https://handoff.example/e/env_12345678901234567890?relay=https%3A%2F%2Frelay.example",
+      ),
+    );
+    expect(page.status).toBe(200);
+    expect(page.headers.get("cache-control")).toBe("no-store");
+    expect(page.headers.get("content-security-policy")).toContain(
+      "default-src 'none'",
+    );
+    await expect(page.text()).resolves.toContain(
+      "Open this AgentShare environment with your agent",
+    );
+
+    const bootstrap = handleRequest(
+      new Request(
+        "https://handoff.example/e/env_12345678901234567890/bootstrap.json?relay=https%3A%2F%2Frelay.example",
+      ),
+    );
+    expect(bootstrap.status).toBe(200);
+    expect(bootstrap.headers.get("content-security-policy")).toBe(
+      "default-src 'none'",
+    );
+    await expect(bootstrap.json()).resolves.toMatchObject({
+      environmentProtocol: "agentshare-environment-v2",
+      release: { version: "0.3.2" },
+      actions: { accept: { command: "agentshare bootstrap" } },
+    });
+  });
+
   it("requires an explicit relay origin and never sends the fragment key", () => {
     const html = renderTrustedHandoffPage();
 
@@ -35,6 +66,7 @@ describe("trusted handoff worker", () => {
     );
     expect(html).not.toContain("fetch(original.origin");
     expect(html).not.toMatch(/fetch\([^)]*fragmentKey/u);
-    expect(html).toContain("agentshare-0.1.11.tgz");
+    expect(html).toContain("agentshare-0.3.2.tgz");
+    expect(html).not.toContain("agentshare-0.3.1.tgz");
   });
 });

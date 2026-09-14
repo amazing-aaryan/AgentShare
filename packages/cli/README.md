@@ -1,20 +1,150 @@
 # AgentShare CLI
 
-Encrypted Codex and Claude Code context handoff.
+**Free, open, review-before-send AI context handoff by capability link.**
+
+AgentShare lets you select useful context from a supported agent, review what
+will cross the boundary, encrypt it locally, and send one link to another person
+or machine. The recipient does not need an AgentShare account, shared workspace,
+or company membership.
+
+The official relay transports ciphertext and does not receive conversation or
+workspace plaintext or the decryption key. The complete link is the bearer
+access capability, so treat it as a secret.
+
+Current first-class host integrations are Codex and Claude Code. The broader
+project direction is agent-agnostic through the open Agent Context Bundle rather
+than through a proprietary server-side session store.
 
 Requires Node.js 22 or newer.
 
+> [!NOTE] This package is the **v0.3.1 release candidate** for collaborative
+> environments. Native Windows Codex 0.152.1 acceptance and public deployment
+> verification remain required before stable promotion. Do not infer readiness
+> from the package version alone. Use the published stable GitHub release for
+> ordinary installation and do not share high-risk data through the public beta.
+
+## Create an Environment
+
+After installing the CLI and running `agentshare init`, start a new Codex or
+Claude Code session so the host discovers the AgentShare integration.
+
+Use `$agentshare` in Codex or `/share` in Claude Code. The direct CLI
+equivalents are:
+
 ```sh
-npm install --global https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz
-agentshare init
+agentshare share --current --source codex
+agentshare share --current --source claude
 ```
 
-Start a new agent session, then invoke `$agentshare` in Codex or `/share` in
-Claude Code. Before a new upload, AgentShare shows all normalized text content
-exactly after redaction. Binary resources, when present, are not printed
-byte-for-byte; they are inventoried by media type, byte length, and SHA-256 and
-are scanned for suspected secrets in supported text views. Review and approve
-before sending the resulting link.
+For a new v2 environment, AgentShare interactively asks for:
+
+- scope: conversation + project, conversation only, or project only;
+- access: read + propose changes or read only;
+- expiry: 1 hour, 24 hours, or 72 hours.
+
+It then shows the included-file summary, exclusions, redactions, access mode,
+and expiry before publication. Creator selection and final review require an
+interactive terminal and fail closed when one is not available. There is no
+public `--yes` approval bypass.
+
+The output is one split-origin `/e/` capability link. Send the complete link
+only to intended recipients.
+
+### Creator controls
+
+```sh
+# Force a separate environment instead of reusing/updating the workspace link.
+agentshare share --current --source codex --new
+
+# Override a new environment's reviewed expiry, up to 72 hours.
+agentshare share --current --source codex --new --ttl 3600
+
+# Use compatible self-hosted transport and handoff origins.
+agentshare share --current --source codex \
+  --relay https://relay.example \
+  --handoff https://handoff.example
+```
+
+Equivalent self-hosting environment variables are `AGENTSHARE_RELAY` and
+`AGENTSHARE_HANDOFF`. `--ttl` must be an integer from `1` through `259200`
+seconds.
+
+Rerunning `agentshare share --current` in a workspace with an owned environment
+shows actions for updating that environment, reviewing proposals, copying the
+existing link, or creating a separate share. An approved revision keeps the same
+recipient capability URL.
+
+## Receive an Environment
+
+`agentshare init` installs automatic receiver integrations for supported Codex
+and Claude Code hosts. A recipient can paste a complete AgentShare `/e/` link
+into a supported host; the integration treats it as a bearer secret and attaches
+it through AgentShare rather than copying decrypted files into the current
+project.
+
+The explicit CLI path is:
+
+```sh
+agentshare bootstrap
+```
+
+Provide the complete capability link on stdin or through the command's
+interactive input, not as a shell argument.
+
+After an environment is attached:
+
+```sh
+agentshare ask --target codex --question "What remains unresolved?"
+agentshare ask --target claude --question "What remains unresolved?"
+```
+
+AgentShare refreshes approved revisions and starts an isolated supported child
+agent with only the local AgentShare evidence interface.
+
+If the environment includes proposal access, an explicit requested change can be
+submitted as encrypted proposal ciphertext:
+
+```sh
+agentshare propose --target codex --instruction "Update the parser tests"
+agentshare propose --target claude --instruction "Update the parser tests"
+```
+
+A proposal never writes the creator's workspace directly.
+
+## Review Proposals and Revoke
+
+The creator reviews encrypted proposals through the creator-only inbox:
+
+```sh
+agentshare inbox --source codex
+agentshare inbox --source claude
+```
+
+Approval applies deterministic file operations against the reviewed base
+revision and publishes a new revision through the normal creator boundary.
+
+Revoke a v2 environment with its creator-owned ID:
+
+```sh
+agentshare revoke-environment --environment <environment-id>
+```
+
+Revocation invalidates the environment capability for all recipients.
+
+## V1 Compatibility
+
+The original one-shot `/s/` handoff remains available for compatibility:
+
+```sh
+agentshare share-v1 --current --source codex
+agentshare share-v1 ./context.md --source generic
+agentshare open --target codex
+agentshare revoke
+```
+
+`agentshare share --legacy ...` also selects the v1 path. V1 and v2 capability
+formats are intentionally distinct; supporting v2 does not reinterpret existing
+v1 ciphertext or links.
 
 ## Updates
 
@@ -29,26 +159,27 @@ agentshare update
 Successful creator commands perform a best-effort release check at most once per
 24 hours and write any update notice to stderr. They never install an update
 silently. Set `AGENTSHARE_NO_UPDATE_CHECK=1` to disable passive checks; explicit
-`agentshare update --check` and `agentshare update` still work.
+update commands still work.
 
 The updater accepts only exact stable `vMAJOR.MINOR.PATCH` releases from
-`amazing-aaryan/AgentShare`, derives the immutable release tarball URL locally,
-and verifies the newly installed CLI version before running `agentshare repair`
-from that new installation. AgentShare-managed Codex and Claude skills are
-refreshed; unmanaged conflicting skills are not overwritten.
+`amazing-aaryan/AgentShare`. Drafts and prereleases are ignored. After an
+update, AgentShare verifies the new CLI version and runs `agentshare repair` so
+managed Codex and Claude skills are refreshed without overwriting unmanaged
+conflicts.
 
-The pinned `npm install --global ...` command remains the manual recovery path
-if an update cannot be completed automatically.
+## Project Principles
 
-Recipients may run the connector without a global installation:
+AgentShare is intended to remain:
 
-```sh
-npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.1.11/agentshare-0.1.11.tgz -- agentshare open --target codex
-```
+- free to use rather than freemium;
+- open source and self-hostable;
+- account-free for the core handoff flow;
+- capability-based across organizational boundaries;
+- blind at the relay content boundary;
+- explicit about creator review;
+- portable across more agent vendors over time.
 
-The connector requests the capability link through hidden terminal input. New
-v0.1.11 links use the independent AgentShare handoff origin while the encrypted
-blob remains on the selected relay. Use `--target claude` for Claude Code. See
-the [full guide](https://github.com/amazing-aaryan/AgentShare#readme).
+See the [full guide](../../README.md), [project vision](../../docs/VISION.md),
+and [environment protocol](../../docs/protocol/environment-v2.md).
 
 Apache-2.0.

@@ -8,6 +8,8 @@ import {
   type RelayRecord,
 } from "@agentshare/contracts";
 import { RelayStateError } from "@agentshare/contracts/relay-machine";
+import { handleEnvironmentRequest } from "./environment-handler.js";
+import { InMemoryEnvironmentStore } from "./environment-store.js";
 import { InMemoryRelayStore, RelayStoreError } from "./store.js";
 
 export type RelayHandlerOptions = {
@@ -20,6 +22,7 @@ export function createRelayHandler(
   options: RelayHandlerOptions = {},
 ): (request: Request) => Promise<Response> {
   const now = options.now ?? (() => new Date());
+  const environmentStore = new InMemoryEnvironmentStore();
   return async (request) => {
     if (request.method === "OPTIONS")
       return withCors(new Response(null, { status: 204 }), options);
@@ -27,6 +30,14 @@ export function createRelayHandler(
       const url = new URL(request.url);
       if (request.method === "GET" && /^\/s\/[^/]+$/u.test(url.pathname)) {
         return sharePage();
+      }
+      const environmentResponse = await handleEnvironmentRequest(
+        environmentStore,
+        request,
+        now(),
+      );
+      if (environmentResponse !== undefined) {
+        return withCors(environmentResponse, options);
       }
       if (request.method === "POST" && url.pathname === "/v1/shares") {
         const body: unknown = await request.json();

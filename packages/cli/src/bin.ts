@@ -1,9 +1,26 @@
 #!/usr/bin/env node
+import { MAX_TTL_SECONDS } from "@agentshare/contracts";
 import { openCommand, revokeCommand, shareCommand } from "./commands.js";
 import {
   installIntegrations,
   removeIntegrations,
 } from "@agentshare/integrations";
+import { askAttachedEnvironment } from "./commands/ask-v2.js";
+import { bootstrapEnvironment } from "./commands/bootstrap-v2.js";
+import { reviewProposalInbox } from "./commands/inbox-v2.js";
+import { proposeAttachedEnvironmentChange } from "./commands/propose-v2.js";
+import {
+  latestAttachedEnvironment,
+  repairOwnedEnvironmentPublications,
+  revokeOwnedEnvironment,
+} from "./commands/runtime-v2.js";
+import {
+  copyOwnedEnvironmentLink,
+  reviewShareDraftInTerminal,
+  shareCurrentV2,
+} from "./commands/share-v2.js";
+import { creatorDoctor, runCreatorMcpServer } from "./creator-mcp.js";
+import { runInternalMcpServer } from "./worker/internal-mcp.js";
 import { sanitizeTerminalText } from "./terminal.js";
 import {
   checkForUpdate,
@@ -23,6 +40,34 @@ try {
   if (command === "--version") {
     assertKnownOptions(args, new Set());
     process.stdout.write(`${AGENTSHARE_VERSION}\n`);
+  } else if (command === "session-context") {
+    assertKnownOptions(args, new Set());
+    const threadId = process.env.CODEX_THREAD_ID;
+    if (threadId === undefined || threadId.length === 0)
+      throw new Error("SESSION_REQUIRED");
+    process.stdout.write(
+      `${JSON.stringify({ threadId, cwd: process.cwd() })}\n`,
+    );
+  } else if (command === "creator-mcp") {
+    assertKnownOptions(args, new Set(["--state-path"]));
+    const statePath = option(args, "--state-path");
+    await runCreatorMcpServer(statePath === undefined ? {} : { statePath });
+  } else if (command === "doctor") {
+    assertKnownOptions(args, new Set());
+    process.stdout.write(`${JSON.stringify(creatorDoctor())}\n`);
+  } else if (command === "review") {
+    assertKnownOptions(args, new Set(["--draft", "--digest", "--state-path"]));
+    const draftId = option(args, "--draft");
+    const digest = option(args, "--digest");
+    if (draftId === undefined || digest === undefined)
+      throw new Error("Review requires --draft and --digest");
+    const statePath = option(args, "--state-path");
+    const result = await reviewShareDraftInTerminal(
+      draftId,
+      digest,
+      statePath === undefined ? {} : { statePath },
+    );
+    process.stdout.write(`${result.url}\n`);
   } else if (command === "update") {
     assertKnownOptions(args, new Set(["--check"]));
     if (args.includes("--check")) {
@@ -51,23 +96,174 @@ try {
   } else if (command === "share") {
     assertKnownOptions(
       args,
-      new Set(["--current", "--relay", "--ttl", "--source", "--new"]),
+      new Set([
+        "--current",
+        "--relay",
+        "--handoff",
+        "--ttl",
+        "--source",
+        "--new",
+        "--legacy",
+        "--session-id",
+        "--project-root",
+        "--state-path",
+        "--environment",
+      ]),
+    );
+    const current = args.includes("--current");
+    const selectedSource = sourceAgent(option(args, "--source") ?? "generic");
+    const ttlSeconds = optionalTtlSeconds(args);
+    if (
+      current &&
+      (selectedSource === "codex" || selectedSource === "claude") &&
+      !args.includes("--legacy")
+    ) {
+      const relayOrigin =
+        option(args, "--relay") ?? process.env.AGENTSHARE_RELAY;
+      const handoffOrigin =
+        option(args, "--handoff") ??
+        process.env.AGENTSHARE_HANDOFF ??
+        TRUSTED_HANDOFF_ORIGIN;
+      const result = await shareCurrentV2(selectedSource, {
+        ...(relayOrigin === undefined ? {} : { relayOrigin }),
+        handoffOrigin,
+        forceNew: args.includes("--new"),
+        ...(ttlSeconds === undefined ? {} : { ttlSeconds }),
+        ...v2ShareIdentityOptions(args),
+      });
+      process.stdout.write(`${result.url}\n`);
+    } else {
+      if (
+        [
+          "--session-id",
+          "--project-root",
+          "--state-path",
+          "--environment",
+        ].some((flag) => args.includes(flag))
+      ) {
+        throw new Error(
+          "Session/project/state/environment options require v2 share --current --source codex|claude",
+        );
+      }
+      const inputPath = current ? undefined : positional(args, 0);
+      process.stdout.write(
+        `${await legacyShare(
+          args,
+          current,
+          inputPath,
+          selectedSource,
+          ttlSeconds,
+        )}\n`,
+      );
+    }
+  } else if (command === "share-v1") {
+    assertKnownOptions(
+      args,
+      new Set([
+        "--current",
+        "--relay",
+        "--handoff",
+        "--ttl",
+        "--source",
+        "--new",
+      ]),
     );
     const current = args.includes("--current");
     const inputPath = current ? undefined : positional(args, 0);
-    const url = await shareCommand({
-      ...(inputPath === undefined ? {} : { inputPath }),
-      current,
-      relayOrigin:
-        option(args, "--relay") ??
-        process.env.AGENTSHARE_RELAY ??
-        DEFAULT_RELAY_ORIGIN,
-      handoffOrigin: TRUSTED_HANDOFF_ORIGIN,
-      ttlSeconds: Number(option(args, "--ttl") ?? "3600"),
-      sourceAgent: sourceAgent(option(args, "--source") ?? "generic"),
-      forceNew: args.includes("--new"),
+    process.stdout.write(
+      `${await legacyShare(
+        args,
+        current,
+        inputPath,
+        sourceAgent(option(args, "--source") ?? "generic"),
+        optionalTtlSeconds(args),
+      )}\n`,
+    );
+  } else if (command === "bootstrap" || command === "accept") {
+    assertKnownOptions(args, new Set(["--state-path", "--cache-root"]));
+    const result = await bootstrapEnvironment(v2StorageOptions(args));
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+  } else if (command === "ask") {
+    assertKnownOptions(
+      args,
+      new Set([
+        "--environment",
+        "--target",
+        "--question",
+        "--state-path",
+        "--cache-root",
+      ]),
+    );
+    const attached =
+      option(args, "--environment") === undefined
+        ? await latestAttachedEnvironment(option(args, "--state-path"))
+        : undefined;
+    const environmentId =
+      option(args, "--environment") ?? attached?.environmentId;
+    if (environmentId === undefined) throw new Error("Missing environment");
+    const question = option(args, "--question");
+    if (question === undefined) throw new Error("Missing --question");
+    const answer = await askAttachedEnvironment(environmentId, question, {
+      target: targetAgent(option(args, "--target") ?? "codex"),
+      ...v2StorageOptions(args),
     });
-    process.stdout.write(`${url}\n`);
+    process.stdout.write(`${answer}\n`);
+  } else if (command === "propose") {
+    assertKnownOptions(
+      args,
+      new Set([
+        "--environment",
+        "--target",
+        "--instruction",
+        "--state-path",
+        "--cache-root",
+      ]),
+    );
+    const attached =
+      option(args, "--environment") === undefined
+        ? await latestAttachedEnvironment(option(args, "--state-path"))
+        : undefined;
+    const environmentId =
+      option(args, "--environment") ?? attached?.environmentId;
+    if (environmentId === undefined) throw new Error("Missing environment");
+    const instruction = option(args, "--instruction");
+    if (instruction === undefined) throw new Error("Missing --instruction");
+    const result = await proposeAttachedEnvironmentChange(
+      environmentId,
+      instruction,
+      {
+        target: targetAgent(option(args, "--target") ?? "codex"),
+        ...v2StorageOptions(args),
+      },
+    );
+    process.stdout.write(`${result}\n`);
+  } else if (command === "inbox") {
+    assertKnownOptions(args, new Set(["--source", "--state-path"]));
+    await reviewProposalInbox(
+      targetAgent(option(args, "--source") ?? "codex"),
+      option(args, "--state-path"),
+    );
+  } else if (command === "internal-mcp") {
+    assertKnownOptions(
+      args,
+      new Set(["--environment", "--state-path", "--cache-root"]),
+    );
+    const environmentId = option(args, "--environment");
+    if (environmentId === undefined) throw new Error("Missing --environment");
+    await runInternalMcpServer(environmentId, v2StorageOptions(args));
+  } else if (command === "revoke-environment") {
+    assertKnownOptions(args, new Set(["--environment", "--state-path"]));
+    const environmentId = option(args, "--environment");
+    if (environmentId === undefined) throw new Error("Missing --environment");
+    await revokeOwnedEnvironment(environmentId, option(args, "--state-path"));
+    process.stdout.write("Environment revoked\n");
+  } else if (command === "copy-environment") {
+    assertKnownOptions(args, new Set(["--environment", "--state-path"]));
+    const environmentId = option(args, "--environment");
+    if (environmentId === undefined) throw new Error("Missing --environment");
+    process.stdout.write(
+      `${await copyOwnedEnvironmentLink(environmentId, option(args, "--state-path"))}\n`,
+    );
   } else if (command === "open") {
     assertKnownOptions(args, new Set(["--target"]));
     await openCommand(targetAgent(option(args, "--target") ?? "codex"));
@@ -76,10 +272,32 @@ try {
     await revokeCommand();
     process.stdout.write("Share revoked\n");
   } else if (command === "init" || command === "repair") {
-    assertKnownOptions(args, new Set());
-    const files = await installIntegrations();
+    assertKnownOptions(
+      args,
+      new Set(
+        command === "repair"
+          ? ["--state-path", "--environment"]
+          : ["--state-path"],
+      ),
+    );
+    const environmentId = option(args, "--environment");
+    const files =
+      environmentId === undefined ? await installIntegrations() : [];
+    const repaired =
+      environmentId === undefined
+        ? 0
+        : await repairOwnedEnvironmentPublications(
+            option(args, "--state-path"),
+            environmentId,
+          );
     process.stdout.write(
-      sanitizeTerminalText(`Installed integrations:\n${files.join("\n")}\n`),
+      sanitizeTerminalText(
+        environmentId === undefined
+          ? `Installed integrations:\n${files.join("\n")}\n${command === "repair" ? "No publications resumed. Use repair --environment ID for scoped recovery.\n" : ""}`
+          : repaired > 0
+            ? `Resumed pending publication for ${environmentId}.\n`
+            : `No pending publication for ${environmentId}.\n`,
+      ),
     );
   } else if (command === "remove") {
     assertKnownOptions(args, new Set());
@@ -105,9 +323,87 @@ try {
   process.exitCode = 1;
 }
 
+async function legacyShare(
+  args: string[],
+  current: boolean,
+  inputPath: string | undefined,
+  selectedSource: "codex" | "claude" | "generic",
+  ttlSeconds: number | undefined,
+): Promise<string> {
+  return shareCommand({
+    ...(inputPath === undefined ? {} : { inputPath }),
+    current,
+    relayOrigin:
+      option(args, "--relay") ??
+      process.env.AGENTSHARE_RELAY ??
+      DEFAULT_RELAY_ORIGIN,
+    handoffOrigin:
+      option(args, "--handoff") ??
+      process.env.AGENTSHARE_HANDOFF ??
+      TRUSTED_HANDOFF_ORIGIN,
+    ttlSeconds: ttlSeconds ?? 3600,
+    sourceAgent: selectedSource,
+    forceNew: args.includes("--new"),
+  });
+}
+
+function optionalTtlSeconds(args: string[]): number | undefined {
+  const raw = option(args, "--ttl");
+  if (raw === undefined) return undefined;
+  if (!/^\d+$/u.test(raw)) {
+    throw new Error(
+      `--ttl must be an integer between 1 and ${MAX_TTL_SECONDS} seconds`,
+    );
+  }
+  const ttlSeconds = Number(raw);
+  if (
+    !Number.isSafeInteger(ttlSeconds) ||
+    ttlSeconds < 1 ||
+    ttlSeconds > MAX_TTL_SECONDS
+  ) {
+    throw new Error(
+      `--ttl must be an integer between 1 and ${MAX_TTL_SECONDS} seconds`,
+    );
+  }
+  return ttlSeconds;
+}
+
+function v2StorageOptions(args: string[]): {
+  statePath?: string;
+  cacheRoot?: string;
+} {
+  const statePath = option(args, "--state-path");
+  const cacheRoot = option(args, "--cache-root");
+  return {
+    ...(statePath === undefined ? {} : { statePath }),
+    ...(cacheRoot === undefined ? {} : { cacheRoot }),
+  };
+}
+
+function v2ShareIdentityOptions(args: string[]): {
+  sessionId?: string;
+  projectRoot?: string;
+  statePath?: string;
+  existingEnvironmentId?: string;
+} {
+  const sessionId = option(args, "--session-id");
+  const projectRoot = option(args, "--project-root");
+  const statePath = option(args, "--state-path");
+  const existingEnvironmentId = option(args, "--environment");
+  if (existingEnvironmentId !== undefined && args.includes("--new"))
+    throw new Error("--new conflicts with --environment");
+  return {
+    ...(sessionId === undefined ? {} : { sessionId }),
+    ...(projectRoot === undefined ? {} : { projectRoot }),
+    ...(statePath === undefined ? {} : { statePath }),
+    ...(existingEnvironmentId === undefined ? {} : { existingEnvironmentId }),
+  };
+}
+
 function shouldRunPassiveUpdateCheck(command: string | undefined): boolean {
   return (
     command === "share" ||
+    command === "share-v1" ||
     command === "revoke" ||
     command === "init" ||
     command === "repair"
@@ -122,12 +418,21 @@ function assertKnownOptions(
     if (value.startsWith("--") && !allowed.has(value)) {
       throw new Error(`Unknown option: ${value}`);
     }
+    if (
+      value.startsWith("--") &&
+      args.indexOf(value) !== args.lastIndexOf(value)
+    )
+      throw new Error(`Duplicate option: ${value}`);
   }
 }
 
 function option(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
-  return index === -1 ? undefined : args[index + 1];
+  if (index === -1) return undefined;
+  const value = args[index + 1];
+  if (value === undefined || value.length === 0 || value.startsWith("--"))
+    throw new Error(`Missing value for ${name}`);
+  return value;
 }
 
 function positional(args: string[], position: number): string {
@@ -148,16 +453,37 @@ function sourceAgent(value: string): "codex" | "claude" | "generic" {
 
 function targetAgent(value: string): "codex" | "claude" {
   if (value === "codex" || value === "claude") return value;
-  throw new Error("--target must be codex or claude");
+  throw new Error("target/source must be codex or claude");
 }
 
 function usage(): void {
   process.stdout.write(`AgentShare\n\n`);
   process.stdout.write(
-    `  agentshare share <file> [--source codex|claude|generic] [--relay URL] [--ttl seconds] [--new]\n`,
+    `  agentshare share --current --source codex|claude [--session-id ID] [--project-root PATH] [--state-path PATH] [--environment ID|--new] [--ttl SECONDS] [--relay URL] [--handoff URL]\n`,
+  );
+  process.stdout.write(`  agentshare bootstrap < link-on-stdin\n`);
+  process.stdout.write(
+    `  agentshare ask [--environment ID] --target codex|claude --question TEXT\n`,
   );
   process.stdout.write(
-    `  agentshare share --current --source codex|claude [--relay URL] [--ttl seconds]\n`,
+    `  agentshare propose [--environment ID] --target codex|claude --instruction TEXT\n`,
+  );
+  process.stdout.write(`  agentshare inbox --source codex|claude\n`);
+  process.stdout.write(`  agentshare revoke-environment --environment ID\n`);
+  process.stdout.write(
+    `  agentshare copy-environment --environment ID [--state-path PATH]\n`,
+  );
+  process.stdout.write(
+    `  agentshare repair --environment ID [--state-path PATH]\n`,
+  );
+  process.stdout.write(
+    `  agentshare review --draft ID --digest SHA256 [--state-path PATH]\n`,
+  );
+  process.stdout.write(`  agentshare creator-mcp [--state-path PATH]\n`);
+  process.stdout.write(`  agentshare doctor\n`);
+  process.stdout.write(`  agentshare session-context\n`);
+  process.stdout.write(
+    `  agentshare share-v1 <file>|--current [--new] [--ttl SECONDS] [--relay URL] [--handoff URL]\n`,
   );
   process.stdout.write(`  agentshare open --target codex|claude\n`);
   process.stdout.write(`  agentshare revoke\n`);

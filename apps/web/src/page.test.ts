@@ -68,6 +68,7 @@ describe("share page", () => {
     expect(html).toContain("0.145.0");
     expect(html).toContain("0.147.0");
     expect(html).toContain("2.1.210");
+    expect(html).toContain("2.1.238");
     expect(html).toContain("2.1.231");
   });
 

@@ -108,6 +108,11 @@ export async function fetchLatestRelease(
     clearTimeout(timeout);
   }
   if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error(
+        "Unable to check for AgentShare updates (GitHub HTTP 403). GitHub may be rate-limiting update checks; try again later. Set AGENTSHARE_NO_UPDATE_CHECK=1 to disable passive checks.",
+      );
+    }
     throw new Error(
       `Unable to check for AgentShare updates (GitHub HTTP ${response.status})`,
     );
