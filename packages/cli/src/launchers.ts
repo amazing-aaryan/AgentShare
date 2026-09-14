@@ -4,6 +4,8 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { sanitizeTerminalText } from "./terminal.js";
+import { ensurePrivateDirectory } from "./environment/private-store.js";
+import { prepareNativeWindowsCodexIsolation } from "./worker/windows-codex-isolation.js";
 
 export type TargetAgent = "codex" | "claude";
 export type TargetResult = { exitCode: number; output: string };
@@ -144,19 +146,63 @@ export async function runTarget(
   prompt: string,
 ): Promise<TargetResult> {
   const workspace = await mkdtemp(join(tmpdir(), "agentshare-query-"));
+  let nativeIsolationDirectory: string | undefined;
   try {
+    nativeIsolationDirectory =
+      target === "codex" && process.platform === "win32"
+        ? await mkdtemp(join(tmpdir(), "agentshare-query-isolation-"))
+        : undefined;
     const executable = resolveAgentExecutable(target);
-    await assertSupportedTarget(target, executable);
+    const nativePreflightHome =
+      nativeIsolationDirectory === undefined
+        ? undefined
+        : join(nativeIsolationDirectory, "codex-preflight-home");
+    if (nativePreflightHome !== undefined)
+      await ensurePrivateDirectory(nativePreflightHome);
+    const preflightEnvironment =
+      nativePreflightHome === undefined
+        ? {}
+        : { CODEX_HOME: nativePreflightHome };
+    await assertSupportedTarget(target, executable, preflightEnvironment);
+    const nativeIsolation =
+      nativeIsolationDirectory === undefined
+        ? undefined
+        : await prepareNativeWindowsCodexIsolation(
+            process.platform,
+            await captureProcess(
+              executable.command,
+              [...executable.prefixArgs, "--version"],
+              15_000,
+              1_048_576,
+              preflightEnvironment,
+            ),
+            process.env,
+            homedir(),
+            nativeIsolationDirectory,
+          );
     const args =
       target === "codex"
-        ? codexArgs(workspace, await discoverUserSkills())
+        ? nativeIsolation === undefined
+          ? codexArgs(workspace, await discoverUserSkills())
+          : nativeCodexArgs(
+              workspace,
+              await discoverUserSkills(
+                homedir(),
+                nativeIsolation.canonicalCodexHome,
+              ),
+              nativeIsolation.codexModelCatalogPath,
+            )
         : claudeArgs();
     const child = spawn(
       executable.command,
       [...executable.prefixArgs, ...args],
       {
         cwd: workspace,
-        env: safeEnvironment(),
+        env: safeEnvironment(
+          nativeIsolation === undefined
+            ? {}
+            : { CODEX_HOME: nativeIsolation.codexHome },
+        ),
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       },
@@ -184,7 +230,24 @@ export async function runTarget(
     return { exitCode, output: output.trim() };
   } finally {
     await rm(workspace, { recursive: true, force: true });
+    if (nativeIsolationDirectory !== undefined)
+      await rm(nativeIsolationDirectory, { recursive: true, force: true });
   }
+}
+
+export function nativeCodexArgs(
+  workspace: string,
+  disabledSkillPaths: string[],
+  modelCatalogPath: string,
+): string[] {
+  const args = codexArgs(workspace, disabledSkillPaths);
+  const promptIndex = args.at(-1) === "-" ? args.length - 1 : args.length;
+  return [
+    ...withoutCodexSplitReadPermissionProfile(args.slice(0, promptIndex)),
+    "--config",
+    `model_catalog_json=${JSON.stringify(modelCatalogPath)}`,
+    "-",
+  ];
 }
 
 export async function verifyTarget(
@@ -548,4 +611,23 @@ function safeEnvironment(
   if (environmentOverrides.CODEX_HOME !== undefined)
     environment.CODEX_HOME = environmentOverrides.CODEX_HOME;
   return environment;
+}
+
+function withoutCodexSplitReadPermissionProfile(args: string[]): string[] {
+  const blocked = new Set([
+    'default_permissions="agentshare-query"',
+    'permissions.agentshare-query.filesystem={":minimal"="deny",":workspace_roots"="deny"}',
+    "permissions.agentshare-query.network.enabled=false",
+  ]);
+  const result: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    const next = args[index + 1];
+    if (value === "--config" && next !== undefined && blocked.has(next)) {
+      index += 1;
+      continue;
+    }
+    if (value !== undefined) result.push(value);
+  }
+  return result;
 }

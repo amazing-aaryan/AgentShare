@@ -729,3 +729,14 @@ under disposable state; package installation and owner/revocation lifecycle
 remain green. The diagnostic explicitly remains non-promotable because it lacks
 native human UI evidence. **Impact:** Branch is clean at `8b19c74`; only the
 external exact-host acceptance gate remains incomplete.
+
+## [2026-09-13 20:09] Apply native isolation to legacy Codex launcher
+
+**Decision:** Make legacy `runTarget` use the same disposable preflight home,
+hardened model catalog, private runtime home, and native Windows read-only
+profile as v2 recipients. **Why:** The real hostile-isolation suite exposed the
+remaining path: legacy `open` still sent Codex's unsupported split-read ACL and
+failed before inference. The fix removes only the unsupported ACL; read-only
+sandbox, disabled host tools, and model compatibility checks remain. **Impact:**
+Real Codex Windows security/continuity tests pass; unit, full suite (349
+passed), build, package, release tools (111/111), and packaged handoff pass.

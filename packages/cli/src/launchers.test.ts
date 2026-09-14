@@ -3,6 +3,7 @@ import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   captureProcess,
+  nativeCodexArgs,
   runTarget,
   supportsReviewedTargetVersion,
   supportsReviewedEnvironmentTargetVersion,
@@ -37,13 +38,26 @@ const CODEX_COMPLETE_HELP = [
   "  --config <key=value>  Config",
 ].join("\n");
 
-const { existsSyncMock, spawnMock } = vi.hoisted(() => ({
+const {
+  ensurePrivateDirectoryMock,
+  existsSyncMock,
+  prepareNativeWindowsCodexIsolationMock,
+  spawnMock,
+} = vi.hoisted(() => ({
+  ensurePrivateDirectoryMock: vi.fn(),
   existsSyncMock: vi.fn(() => true),
+  prepareNativeWindowsCodexIsolationMock: vi.fn(),
   spawnMock: vi.fn(),
 }));
 
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
 vi.mock("node:fs", () => ({ existsSync: existsSyncMock }));
+vi.mock("./environment/private-store.js", () => ({
+  ensurePrivateDirectory: ensurePrivateDirectoryMock,
+}));
+vi.mock("./worker/windows-codex-isolation.js", () => ({
+  prepareNativeWindowsCodexIsolation: prepareNativeWindowsCodexIsolationMock,
+}));
 
 function fakeProcess(stdout: string, stderr = "") {
   const child = fakeHangingProcess();
@@ -72,6 +86,15 @@ function fakeHangingProcess() {
 
 beforeEach(() => {
   spawnMock.mockReset();
+  ensurePrivateDirectoryMock.mockReset();
+  ensurePrivateDirectoryMock.mockResolvedValue(undefined);
+  prepareNativeWindowsCodexIsolationMock.mockReset();
+  prepareNativeWindowsCodexIsolationMock.mockResolvedValue({
+    canonicalCodexHome: "C:\\canonical\\.codex",
+    codexHome: "C:\\private\\.codex",
+    codexModelCatalogPath: "C:\\private\\catalog.json",
+    codexSplitReadBoundary: false,
+  });
   existsSyncMock.mockClear();
 });
 
@@ -140,6 +163,23 @@ describe("target process lifecycle", () => {
     expect(settled).toBe(false);
     child.emit("close", 0);
     await expect(result).resolves.toBe(0);
+  });
+
+  it("builds the native Windows Codex profile from a private model catalog", () => {
+    const args = nativeCodexArgs(
+      "C:\\workspace",
+      [],
+      "C:\\private\\catalog.json",
+    );
+
+    expect(args).toContain('sandbox_mode="read-only"');
+    expect(args).not.toContain('default_permissions="agentshare-query"');
+    expect(args).not.toContain(
+      'permissions.agentshare-query.filesystem={":minimal"="deny",":workspace_roots"="deny"}',
+    );
+    expect(args).toContain(
+      'model_catalog_json="C:\\\\private\\\\catalog.json"',
+    );
   });
 
   it("sanitizes child output before display and conversation storage", async () => {
