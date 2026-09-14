@@ -793,3 +793,12 @@ instruct recipients to install 0.3.2; v0.3.2 evidence/profile files remain
 unchanged. **Impact:** App tests, full suite, build, package, and handoff
 dry-run pass. Live smoke now correctly stops at the undeployed production 0.3.2
 pin; deployment requires a separately authorized 0.3.3 release/handoff update.
+
+## [2026-09-13 20:53] Complete CI-equivalent follow-up validation
+
+**Decision:** Accept the follow-up branch's local CI-equivalent checks as green
+while retaining live deployment as a separate gate. **Why:** Coverage passed
+with the full 350-test suite, edge-runtime handoff passed, conformance passed,
+and `npm audit --audit-level=high` found zero vulnerabilities. **Impact:** No
+remaining source/test failure is reproduced locally; only the undeployed 0.3.3
+public state and native human acceptance remain.
