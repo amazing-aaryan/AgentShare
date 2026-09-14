@@ -740,3 +740,13 @@ failed before inference. The fix removes only the unsupported ACL; read-only
 sandbox, disabled host tools, and model compatibility checks remain. **Impact:**
 Real Codex Windows security/continuity tests pass; unit, full suite (349
 passed), build, package, release tools (111/111), and packaged handoff pass.
+
+## [2026-09-13 20:18] Isolate default Windows Codex validation probes
+
+**Decision:** Make public `verifyTarget("codex")` use a disposable hardened
+Windows preflight home when no explicit `CODEX_HOME` is supplied; preserve
+caller-provided overrides. **Why:** Default compatibility probes must not read
+or mutate the canonical desktop Codex home, even before the launcher can
+establish recipient isolation. **Impact:** Added focused coverage for disposable
+`CODEX_HOME`; targeted and lint checks pass. Exact immutable v0.3.2 host
+acceptance remains external and separate.

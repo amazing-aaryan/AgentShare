@@ -255,7 +255,25 @@ export async function verifyTarget(
   environmentOverrides: ProbeEnvironmentOverrides = {},
 ): Promise<void> {
   const executable = resolveAgentExecutable(target);
-  await assertSupportedTarget(target, executable, environmentOverrides);
+  if (
+    target !== "codex" ||
+    process.platform !== "win32" ||
+    environmentOverrides.CODEX_HOME !== undefined
+  ) {
+    await assertSupportedTarget(target, executable, environmentOverrides);
+    return;
+  }
+  const preflightHome = await mkdtemp(
+    join(tmpdir(), "agentshare-codex-preflight-"),
+  );
+  try {
+    await ensurePrivateDirectory(preflightHome);
+    await assertSupportedTarget(target, executable, {
+      CODEX_HOME: preflightHome,
+    });
+  } finally {
+    await rm(preflightHome, { recursive: true, force: true });
+  }
 }
 
 export function waitForTargetClose(
