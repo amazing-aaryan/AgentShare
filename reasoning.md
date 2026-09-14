@@ -527,6 +527,243 @@ seams preserve coverage of both rollback outcomes. **Impact:** Both rollback
 cases pass locally; prior production code restored unchanged. CI must rerun on
 this test-only fix.
 
+## [2026-09-13 14:29] Isolate native Windows recipient Codex home
+
+**Decision:** Keep canonical Codex home read-only for metadata validation, copy
+only `auth.json` into a temporary private runtime home, and point native
+recipients at that home. **Why:** Codex startup can refresh `models_cache.json`
+even when AgentShare supplies a hardened catalog; the acceptance contract
+requires canonical metadata to remain byte-identical. **Impact:** Native
+recipient startup writes are confined to disposable runtime state; user skills
+continue to be discovered from the canonical home and disabled by launcher
+config. Focused regression suite passes 15/15.
+
+## [2026-09-13 14:50] Verify patched package and real Codex startup
+
+**Decision:** Validate the patched build through npm packaging, the local
+loopback seven-stage handoff, the full Vitest suite, release-tool tests, lint,
+format, and a real Codex 0.153.4 startup using the private home. **Why:** Unit
+coverage alone cannot prove bundled-package behavior or that Codex startup no
+longer writes canonical model metadata. **Impact:** Package handoff passed 7/7
+stages; Vitest passed 345/345 with 8 opt-in skips; release tools passed 109/109;
+lint, format, build, and real private-home startup passed. Immutable published
+v0.3.2 acceptance evidence remains incomplete and cannot be fabricated.
+
+## [2026-09-13 15:20] Isolate Codex compatibility preflight from canonical home
+
+**Decision:** Route native Windows Codex version/help probes through a private
+temporary `CODEX_HOME`, and accept the exact version line when Codex emits its
+Temp PATH-alias warning on stderr. **Why:** Preflight ran before private
+isolation and could rewrite canonical `models_cache.json`; redirecting it
+exposed a benign warning that otherwise caused false rejection of supported
+Codex 0.153.4. **Impact:** Added trusted environment overrides and regression
+coverage; full suite passes 346/346 with 8 intentional skips.
+
+## [2026-09-13 15:25] Separate desktop Codex cache refresh from AgentShare writes
+
+**Decision:** Treat canonical-cache changes during long acceptance windows as
+external host activity unless a bounded AgentShare probe/child reproduces them.
+**Why:** Isolated probes leave canonical bytes unchanged, while a 35-second
+no-AgentShare idle control changes the cache hash; restoring or editing
+canonical metadata would violate the acceptance boundary. **Impact:** AgentShare
+child lifecycle passes packaged 7-stage diagnostic; exact v0.3.2 acceptance
+remains blocked by host-level cache churn and missing native-chat evidence.
+
+## [2026-09-13 15:30] Verify committed HEAD
+
+**Decision:** Accept committed source as regression-clean while keeping release
+acceptance open. **Why:** HEAD passes full Vitest (66 files, 347 tests, 8
+intentional skips), typecheck, build, lint, format, 109 release-tool tests,
+package-install checks, and real packaged 7-stage Codex handoff. **Impact:** The
+fix is reviewable on `codex/fix-v0.3.2-acceptance`; changed bytes must use a new
+package version, and native terminal/chat evidence is still required before any
+stable promotion.
+
+## [2026-09-13 16:05] Verify isolated canonical end-to-end handoff
+
+**Decision:** Run the rebuilt packaged 7-stage handoff with a disposable
+canonical Codex home containing copied authentication and model metadata.
+**Why:** This removes unrelated desktop Codex cache churn while retaining real
+Codex 0.153.4 execution, MCP receipts, proposal flow, refresh, revoke, and
+cleanup. **Impact:** 7/7 stages passed; disposable canonical cache hash stayed
+identical; fixture directory was permanently removed. This is diagnostic
+evidence, not native human terminal/chat release evidence.
+
+## [2026-09-13 15:43] Restrict native probe environment overrides
+
+**Decision:** Allow compatibility probes to override only `CODEX_HOME`. **Why:**
+Preflight needs a private Codex home, but arbitrary inherited environment
+overrides would weaken the isolation boundary. **Impact:** Focused
+launcher/isolation tests pass 19/19; typecheck and build pass; release
+acceptance remains open.
+
+## [2026-09-13 15:58] Repair stale native creator MCP installation
+
+**Decision:** Install current patched package in a durable local prefix and
+rewrite only the managed `agentshare_creator` Codex configuration block.
+**Why:** Native chat pointed at a deleted acceptance temp prefix, so Codex could
+not start Creator MCP; direct JSON-RPC and `codex mcp list` now see AgentShare
+0.3.2 and its creator tool surface. **Impact:** Native chat configuration is
+loadable in a fresh Codex process; the already-running host still needs MCP
+reload/restart before native-chat evidence can be collected. No stable-release
+claim.
+
+## [2026-09-13 16:02] Align PATH CLI with creator MCP version
+
+**Decision:** Replace the stale global AgentShare 0.2.0 CLI with the current
+patched 0.3.2 package used for this end-to-end validation. **Why:** The
+installed Codex creator skill invokes `agentshare session-context` by command
+name; the old global CLI returned usage instead of exact thread context,
+preventing native-chat creator resolution. **Impact:** `agentshare --version`
+and `session-context` now work, while the managed MCP block points to the
+durable patched package. Fresh Codex processes can load the complete creator
+surface; native evidence still requires host MCP reload and genuine human
+consent.
+
+## [2026-09-13 16:08] Align Codex MCP and PATH to one installed binary
+
+**Decision:** Re-run `agentshare init` from the patched global CLI after global
+installation, making the managed MCP config and skill command resolve the same
+AgentShare 0.3.2 binary. **Why:** A split durable-prefix/global setup could
+drift again and recreate the native-chat mismatch. **Impact:** `config.toml` now
+references the global patched binary; version, session-context, MCP
+initialization, and creator tool discovery all pass.
+
+## [2026-09-13 16:07] Preserve exact Codex runtime boundary
+
+**Decision:** Keep exact acceptance evidence bound to PATH Codex 0.153.4 and do
+not relabel the app-bundled 0.154.0-alpha.6.2 binary as the pinned runtime.
+**Why:** The two host entrypoints coexist; the PATH CLI passes the pinned
+version check, while the app bundle is a different prerelease executable.
+**Impact:** Corrected MCP config is valid for fresh hosts; native-chat
+acceptance remains unverified until a host using the exact reviewed runtime is
+reloaded and human approval is observed.
+
+## [2026-09-13 18:50] Keep recipient bootstrap config-read-only
+
+**Decision:** Make `bootstrap` install receiver skills only; reserve Creator MCP
+config writes for explicit `init`/repair flows. **Why:** Recipient bootstrap
+does not need Creator MCP and previously rewrote the user's canonical Codex
+config, violating the acceptance boundary. **Impact:** New receiver-only
+regression passes; full suite is 348/348, release tools 109/109, package and
+packaged 7-stage handoff pass.
+
+## [2026-09-13 18:51] Install bootstrap fix into active CLI
+
+**Decision:** Repack current source and replace the global AgentShare CLI with
+the latest local 0.3.2 diagnostic artifact. **Why:** Source tests alone would
+leave real `agentshare bootstrap` on the pre-fix implementation; active PATH and
+MCP must execute identical bytes. **Impact:** Global version is 0.3.2; malformed
+bootstrap leaves canonical Codex config hash unchanged; fresh MCP initialization
+exposes all 9 creator tools. Artifact remains non-promotable until immutable
+release/evidence review.
+
+## [2026-09-13 18:58] Reproduce terminal review boundary with synthetic capture
+
+**Decision:** Exercise current packaged terminal share flow through capture,
+selection, draft review, and the native approval menu using synthetic-only
+session/workspace data; stop before publish. **Why:** Separates capture/TTY
+defects from the earlier `Draft changed or expired during approval` revalidation
+failure without fabricating acceptance evidence or human consent. **Impact:**
+Exact session capture and terminal review reached the publish choice with stable
+draft digest; native app/runtime mismatch and approval-state cause remain
+unresolved, so acceptance is not complete.
+
+## [2026-09-13 19:10] Version follow-up fixes separately from immutable v0.3.2
+
+**Decision:** Bump the repaired CLI package to `0.3.3` while preserving the
+published `0.3.2` artifact and its frozen acceptance profile. **Why:** The
+acceptance contract forbids replacing changed `0.3.2` bytes; the
+bootstrap/config and native-isolation fixes therefore require a new package
+version before distribution. **Impact:** Subsequent package/build checks target
+`agentshare-0.3.3.tgz`; `agentshare-0.3.2.tgz` remains byte-identical and
+non-promotable.
+
+## [2026-09-13 19:25] Verify pinned Codex interactive startup boundary
+
+**Decision:** Start exact `codex-cli 0.153.4` with a disposable `CODEX_HOME` and
+minimal Creator MCP config; stop at Codex's directory-trust prompt. **Why:**
+Confirms the pinned interactive runtime can start without changing canonical
+Codex state, while preserving the rule that human trust and AgentShare
+publication consent cannot be simulated. **Impact:** Exact CLI startup is
+proven; Creator MCP discovery and native elicitation remain unverified until a
+human accepts the disposable directory and reviews the live draft.
+
+## [2026-09-13 19:32] Add frozen verifier profile for 0.3.3 follow-up
+
+**Decision:** Register `codex-native-windows-v4` for repaired package `0.3.3`
+and preserve the existing `codex-native-windows-v3` / `0.3.2` profile unchanged.
+**Why:** Changed package bytes cannot be tested under the immutable 0.3.2
+contract; future evidence needs an explicit version-bound profile. **Impact:**
+Offline verification can now reject mismatched 0.3.3 evidence without relabeling
+it as v0.3.2; no native acceptance is implied.
+
+## [2026-09-13 19:39] Verify repaired release and live isolated Codex probe
+
+**Decision:** Keep current 0.3.3 source unchanged after full tests, release
+checks, lint/format checks, and a disposable-home Codex 0.153.4 probe all
+passed. **Why:** The live probe accepted the private model catalog and left
+canonical `models_cache.json` hash unchanged; no additional code defect is
+evidenced. The original failure remains limited to immutable v0.3.2 and
+desktop-host/process drift. **Impact:** Current repaired branch is technically
+green but cannot be called 18/18 real-host acceptance; native Codex-chat
+trust/approval and exact immutable candidate remain outstanding.
+
+## [2026-09-13 19:50] Align opt-in real Codex test with native Windows profile
+
+**Decision:** Update only the opt-in `local-codex.real` setup to prepare the
+private Windows Codex home/catalog and disable the unsupported split-read ACL;
+retain real inference, MCP transport, and receipt assertions. **Why:** Running
+the unchanged test on Windows failed because Codex correctly refused an OS-level
+split-read configuration that native Windows cannot enforce. The production
+launcher already uses the native replacement profile. **Impact:** The isolated
+real test now passes both ask/propose cases under Codex 0.153.4; default suite
+behavior remains unchanged and no canonical state is used.
+
+## [2026-09-13 19:54] Verify packaged 0.3.3 after native real-test fix
+
+**Decision:** Accept the repaired test/runtime alignment after build,
+package-install validation, and packaged 7-stage handoff all passed. **Why:**
+The real Codex ask/propose cases pass with actual MCP transport and receipts
+under disposable state; package installation and owner/revocation lifecycle
+remain green. The diagnostic explicitly remains non-promotable because it lacks
+native human UI evidence. **Impact:** Branch is clean at `8b19c74`; only the
+external exact-host acceptance gate remains incomplete.
+
+## [2026-09-13 20:09] Apply native isolation to legacy Codex launcher
+
+**Decision:** Make legacy `runTarget` use the same disposable preflight home,
+hardened model catalog, private runtime home, and native Windows read-only
+profile as v2 recipients. **Why:** The real hostile-isolation suite exposed the
+remaining path: legacy `open` still sent Codex's unsupported split-read ACL and
+failed before inference. The fix removes only the unsupported ACL; read-only
+sandbox, disabled host tools, and model compatibility checks remain. **Impact:**
+Real Codex Windows security/continuity tests pass; unit, full suite (349
+passed), build, package, release tools (111/111), and packaged handoff pass.
+
+## [2026-09-13 20:18] Isolate default Windows Codex validation probes
+
+**Decision:** Make public `verifyTarget("codex")` use a disposable hardened
+Windows preflight home when no explicit `CODEX_HOME` is supplied; preserve
+caller-provided overrides. **Why:** Default compatibility probes must not read
+or mutate the canonical desktop Codex home, even before the launcher can
+establish recipient isolation. **Impact:** Added focused coverage for disposable
+`CODEX_HOME`; targeted and lint checks pass. Exact immutable v0.3.2 host
+acceptance remains external and separate.
+
+## [2026-09-13 20:33] Verify repaired packaged and real Codex paths
+
+**Decision:** Treat the repaired branch as technically verified through full
+tests, packaged handoff, release-contract tests, and opt-in real Codex
+execution; retain the native-chat acceptance gate. **Why:** Current evidence
+covers 350 default tests, 7 packaged lifecycle stages, 111 release-tool tests, 2
+real Codex MCP receipt flows, and 2 hostile Codex isolation/continuity checks
+without canonical-cache mutation. It does not establish native Codex chat
+consent, deployed relay publication, or the immutable v0.3.2 profile.
+**Impact:** Commit `225881a` is ready for follow-up release review; stable
+promotion remains prohibited until a fresh exact-runtime real-host run supplies
+missing evidence.
+
 ## [2026-08-30 22:15] Beta readiness rechecked against live production gate
 
 **Decision:** Keep AgentShare in limited public-beta status; do not certify the
@@ -537,3 +774,42 @@ wildcard, and both Claude real-agent checks failed because the organization
 disabled Claude subscription access. **Impact:** Investigate/redeploy or correct
 the CORS behavior, restore an authorized Claude test path, then rerun
 `npm run test:release` and require 6/6 passes before changing readiness status.
+
+## [2026-09-13 20:35] Align user-level creator MCP with repaired artifact
+
+**Decision:** Install the current packaged 0.3.3 artifact into the user-level
+global AgentShare location referenced by `agentshare_creator`. **Why:** PATH
+version alone was misleading: global `dist/bin.js` differed from the repaired
+build, so a restarted Codex host would still load stale creator behavior.
+**Impact:** Global binary now byte-matches current `packages/cli/dist/bin.js`;
+`agentshare --version` remains 0.3.3. Existing MCP child processes retain old
+loaded bytes until Codex reload/restart.
+
+## [2026-09-13 20:38] Preserve deployment pin mismatch as a release gate
+
+**Decision:** Do not change the deployed v0.3.2 handoff/bootstrap pin to make
+the follow-up branch's deployment smoke pass. **Why:**
+`npm run test:deployment:smoke` correctly fails because current CLI is 0.3.3
+while production remains immutable v0.3.2; changing the gate or old deployment
+would conceal an unperformed follow-up deployment. **Impact:** New v0.3.3
+requires its own release asset and handoff deployment before public smoke can
+pass; v0.3.2 acceptance remains untouched.
+
+## [2026-09-13 20:46] Pin public v2 surfaces to repaired 0.3.3
+
+**Decision:** Update v2 bootstrap and trusted handoff package pins, plus their
+exact-version contract assertions, from frozen 0.3.2 to follow-up 0.3.3.
+**Why:** A repaired 0.3.3 CLI cannot work end to end when public links still
+instruct recipients to install 0.3.2; v0.3.2 evidence/profile files remain
+unchanged. **Impact:** App tests, full suite, build, package, and handoff
+dry-run pass. Live smoke now correctly stops at the undeployed production 0.3.2
+pin; deployment requires a separately authorized 0.3.3 release/handoff update.
+
+## [2026-09-13 20:53] Complete CI-equivalent follow-up validation
+
+**Decision:** Accept the follow-up branch's local CI-equivalent checks as green
+while retaining live deployment as a separate gate. **Why:** Coverage passed
+with the full 350-test suite, edge-runtime handoff passed, conformance passed,
+and `npm audit --audit-level=high` found zero vulnerabilities. **Impact:** No
+remaining source/test failure is reproduced locally; only the undeployed 0.3.3
+public state and native human acceptance remain.

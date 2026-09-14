@@ -12,7 +12,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { promisify } from "node:util";
@@ -46,6 +46,8 @@ assert(address && typeof address !== "string");
 const relay = `http://127.0.0.1:${address.port}`;
 let owner;
 let environmentId;
+let canonicalModelCachePath;
+let canonicalModelCacheBefore;
 const ownerState = join(root, "owner", ".agentshare", "state-v2.json");
 let failed;
 try {
@@ -94,6 +96,35 @@ try {
     )
   ).stdout.trim();
   const cli = join(npmRoot, "agentshare", "dist", "bin.js");
+  const sourceCodexHome = resolve(
+    process.env.CODEX_HOME?.trim() || join(homedir(), ".codex"),
+  );
+  const isolatedCodexHome = join(root, "canonical-codex-home");
+  await mkdir(isolatedCodexHome);
+  await copyFile(
+    join(sourceCodexHome, "auth.json"),
+    join(isolatedCodexHome, "auth.json"),
+  );
+  canonicalModelCachePath = join(isolatedCodexHome, "models_cache.json");
+  await copyFile(
+    join(sourceCodexHome, "models_cache.json"),
+    canonicalModelCachePath,
+  );
+  canonicalModelCacheBefore = createHash("sha256")
+    .update(await readFile(canonicalModelCachePath))
+    .digest("hex");
+  const canonicalModelMetadata = JSON.parse(
+    await readFile(canonicalModelCachePath, "utf8"),
+  );
+  report.canonicalModelMetadata = {
+    clientVersion: canonicalModelMetadata.client_version,
+    beforeSha256: canonicalModelCacheBefore,
+  };
+  const recipientEnvironment = {
+    ...process.env,
+    CODEX_HOME: isolatedCodexHome,
+    AGENTSHARE_NO_UPDATE_CHECK: "1",
+  };
   const workspace = join(root, "workspace");
   const ownerHome = join(root, "owner");
   const recipientHome = join(root, "recipient");
@@ -200,16 +231,21 @@ try {
     name: "packaged isolated recipient bootstrap",
     status: "passed",
   });
-  const ask = await runCli(cli, [
-    "ask",
-    "--target",
-    "codex",
-    "--environment",
-    environmentId,
-    "--question",
-    "Use read_file on notes.txt and read_conversation. What project, retry limit and owner? Cite both sources.",
-    ...storage,
-  ]);
+  const ask = await runCli(
+    cli,
+    [
+      "ask",
+      "--target",
+      "codex",
+      "--environment",
+      environmentId,
+      "--question",
+      "Use read_file on notes.txt and read_conversation. What project, retry limit and owner? Cite both sources.",
+      ...storage,
+    ],
+    "",
+    recipientEnvironment,
+  );
   assert.equal(ask.code, 0, ask.stderr);
   assert.match(ask.stdout, /LANTERN/u);
   assert.match(ask.stdout, /Mira/u);
@@ -219,16 +255,21 @@ try {
     name: "real Codex file and conversation MCP read",
     status: "passed",
   });
-  const proposed = await runCli(cli, [
-    "propose",
-    "--target",
-    "codex",
-    "--environment",
-    environmentId,
-    "--instruction",
-    `Read notes.txt, stage replacement with exactly ${JSON.stringify(after)}, inspect proposal_diff and submit. Change no other file.`,
-    ...storage,
-  ]);
+  const proposed = await runCli(
+    cli,
+    [
+      "propose",
+      "--target",
+      "codex",
+      "--environment",
+      environmentId,
+      "--instruction",
+      `Read notes.txt, stage replacement with exactly ${JSON.stringify(after)}, inspect proposal_diff and submit. Change no other file.`,
+      ...storage,
+    ],
+    "",
+    recipientEnvironment,
+  );
   assert.equal(proposed.code, 0, proposed.stderr);
   assert.equal(await readFile(join(workspace, "notes.txt"), "utf8"), before);
   const inbox = await owner.call("list_proposals", { environmentId });
@@ -266,16 +307,21 @@ try {
     name: "packaged owner approval; only reviewed proposal published",
     status: "passed",
   });
-  const refreshed = await runCli(cli, [
-    "ask",
-    "--target",
-    "codex",
-    "--environment",
-    environmentId,
-    "--question",
-    "Read notes.txt. What retry limit is now approved? Cite the file.",
-    ...storage,
-  ]);
+  const refreshed = await runCli(
+    cli,
+    [
+      "ask",
+      "--target",
+      "codex",
+      "--environment",
+      environmentId,
+      "--question",
+      "Read notes.txt. What retry limit is now approved? Cite the file.",
+      ...storage,
+    ],
+    "",
+    recipientEnvironment,
+  );
   assert.equal(refreshed.code, 0, refreshed.stderr);
   assert.match(refreshed.stdout, /5/u);
   cases.push({
@@ -283,21 +329,32 @@ try {
     status: "passed",
   });
   await owner.call("revoke_share", { environmentId });
-  const denied = await runCli(cli, [
-    "ask",
-    "--target",
-    "codex",
-    "--environment",
-    environmentId,
-    "--question",
-    "Read notes.txt",
-    ...storage,
-  ]);
+  const denied = await runCli(
+    cli,
+    [
+      "ask",
+      "--target",
+      "codex",
+      "--environment",
+      environmentId,
+      "--question",
+      "Read notes.txt",
+      ...storage,
+    ],
+    "",
+    recipientEnvironment,
+  );
   assert.notEqual(denied.code, 0);
   cases.push({
     name: "packaged owner revoke; recipient denied",
     status: "passed",
   });
+  const canonicalModelCacheAfter = createHash("sha256")
+    .update(await readFile(canonicalModelCachePath))
+    .digest("hex");
+  assert.equal(canonicalModelCacheAfter, canonicalModelCacheBefore);
+  report.canonicalModelMetadata.afterSha256 = canonicalModelCacheAfter;
+  report.canonicalModelMetadata.unchanged = true;
 } catch (error) {
   failed = error;
   report.error =

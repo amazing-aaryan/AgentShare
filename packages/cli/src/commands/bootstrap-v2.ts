@@ -1,11 +1,11 @@
-import { installIntegrations } from "@agentshare/integrations";
+import { installReceiverIntegrations } from "@agentshare/integrations";
 import { acceptEnvironmentLink } from "../environment/accept.js";
 import { readHiddenLine } from "../terminal.js";
 
 export async function bootstrapEnvironment(
   options: { statePath?: string; cacheRoot?: string; link?: string } = {},
 ): Promise<Awaited<ReturnType<typeof acceptEnvironmentLink>>> {
-  await installIntegrations();
+  await installReceiverIntegrations();
   const link = options.link ?? (await readCapabilityInput());
   return acceptEnvironmentLink(link, {
     ...(options.statePath === undefined

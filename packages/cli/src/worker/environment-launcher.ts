@@ -61,9 +61,23 @@ export async function runEnvironmentTarget(
   };
   try {
     await ensurePrivateDirectory(receiptDirectory);
-    await verifyTarget(target);
+    const nativePreflightHome =
+      target === "codex" && process.platform === "win32"
+        ? join(receiptDirectory, "codex-preflight-home")
+        : undefined;
+    if (nativePreflightHome !== undefined)
+      await ensurePrivateDirectory(nativePreflightHome);
+    const preflightEnvironment =
+      nativePreflightHome === undefined
+        ? {}
+        : { CODEX_HOME: nativePreflightHome };
+    await verifyTarget(target, preflightEnvironment);
     const executable = resolveAgentExecutable(target);
-    const version = await verifyEnvironmentMcpSupport(target, executable);
+    const version = await verifyEnvironmentMcpSupport(
+      target,
+      executable,
+      preflightEnvironment,
+    );
     const nativeIsolation =
       target === "codex" && process.platform === "win32"
         ? await prepareNativeWindowsCodexIsolation(
@@ -95,7 +109,8 @@ export async function runEnvironmentTarget(
     };
     const environment = safeEnvironment();
     if (nativeIsolation !== undefined) {
-      // Metadata and authentication must use the same canonical provider home.
+      // The private runtime home contains only copied authentication state;
+      // canonical model metadata was read and hardened before this point.
       environment.CODEX_HOME = nativeIsolation.codexHome;
     }
     const cliPath = process.argv[1];
@@ -109,7 +124,10 @@ export async function runEnvironmentTarget(
             process.execPath,
             cliPath,
             runtimeOptions,
-            await discoverUserSkills(homedir(), nativeIsolation?.codexHome),
+            await discoverUserSkills(
+              homedir(),
+              nativeIsolation?.canonicalCodexHome,
+            ),
           )
         : claudeEnvironmentArgs(
             environmentId,
@@ -256,11 +274,15 @@ export function claudeEnvironmentArgs(
 async function verifyEnvironmentMcpSupport(
   target: TargetAgent,
   executable: { command: string; prefixArgs: string[] },
+  environmentOverrides: NodeJS.ProcessEnv = {},
 ): Promise<string> {
-  const version = await captureProcess(executable.command, [
-    ...executable.prefixArgs,
-    "--version",
-  ]);
+  const version = await captureProcess(
+    executable.command,
+    [...executable.prefixArgs, "--version"],
+    15_000,
+    1_048_576,
+    environmentOverrides,
+  );
   if (!supportsReviewedEnvironmentTargetVersion(target, version)) {
     throw new Error(
       target === "codex"
@@ -282,11 +304,13 @@ async function verifyEnvironmentMcpSupport(
     }
     return version;
   }
-  const help = await captureProcess(executable.command, [
-    ...executable.prefixArgs,
-    "mcp",
-    "--help",
-  ]);
+  const help = await captureProcess(
+    executable.command,
+    [...executable.prefixArgs, "mcp", "--help"],
+    15_000,
+    1_048_576,
+    environmentOverrides,
+  );
   if (!/\bmcp\b/iu.test(help) && !/model context protocol/iu.test(help)) {
     throw new Error(
       "codex no longer advertises MCP client support; refusing to weaken AgentShare isolation",

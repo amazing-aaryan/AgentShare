@@ -4,6 +4,8 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { sanitizeTerminalText } from "./terminal.js";
+import { ensurePrivateDirectory } from "./environment/private-store.js";
+import { prepareNativeWindowsCodexIsolation } from "./worker/windows-codex-isolation.js";
 
 export type TargetAgent = "codex" | "claude";
 export type TargetResult = { exitCode: number; output: string };
@@ -17,6 +19,7 @@ type TargetChildLifecycle = {
 };
 
 type VersionTuple = readonly [major: number, minor: number, patch: number];
+type ProbeEnvironmentOverrides = { CODEX_HOME?: string };
 
 const MINIMUM_CODEX_VERSION: VersionTuple = [0, 145, 0];
 const MINIMUM_CODEX_ENVIRONMENT_VERSION: VersionTuple = [0, 147, 0];
@@ -143,19 +146,63 @@ export async function runTarget(
   prompt: string,
 ): Promise<TargetResult> {
   const workspace = await mkdtemp(join(tmpdir(), "agentshare-query-"));
+  let nativeIsolationDirectory: string | undefined;
   try {
+    nativeIsolationDirectory =
+      target === "codex" && process.platform === "win32"
+        ? await mkdtemp(join(tmpdir(), "agentshare-query-isolation-"))
+        : undefined;
     const executable = resolveAgentExecutable(target);
-    await assertSupportedTarget(target, executable);
+    const nativePreflightHome =
+      nativeIsolationDirectory === undefined
+        ? undefined
+        : join(nativeIsolationDirectory, "codex-preflight-home");
+    if (nativePreflightHome !== undefined)
+      await ensurePrivateDirectory(nativePreflightHome);
+    const preflightEnvironment =
+      nativePreflightHome === undefined
+        ? {}
+        : { CODEX_HOME: nativePreflightHome };
+    await assertSupportedTarget(target, executable, preflightEnvironment);
+    const nativeIsolation =
+      nativeIsolationDirectory === undefined
+        ? undefined
+        : await prepareNativeWindowsCodexIsolation(
+            process.platform,
+            await captureProcess(
+              executable.command,
+              [...executable.prefixArgs, "--version"],
+              15_000,
+              1_048_576,
+              preflightEnvironment,
+            ),
+            process.env,
+            homedir(),
+            nativeIsolationDirectory,
+          );
     const args =
       target === "codex"
-        ? codexArgs(workspace, await discoverUserSkills())
+        ? nativeIsolation === undefined
+          ? codexArgs(workspace, await discoverUserSkills())
+          : nativeCodexArgs(
+              workspace,
+              await discoverUserSkills(
+                homedir(),
+                nativeIsolation.canonicalCodexHome,
+              ),
+              nativeIsolation.codexModelCatalogPath,
+            )
         : claudeArgs();
     const child = spawn(
       executable.command,
       [...executable.prefixArgs, ...args],
       {
         cwd: workspace,
-        env: safeEnvironment(),
+        env: safeEnvironment(
+          nativeIsolation === undefined
+            ? {}
+            : { CODEX_HOME: nativeIsolation.codexHome },
+        ),
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       },
@@ -183,12 +230,50 @@ export async function runTarget(
     return { exitCode, output: output.trim() };
   } finally {
     await rm(workspace, { recursive: true, force: true });
+    if (nativeIsolationDirectory !== undefined)
+      await rm(nativeIsolationDirectory, { recursive: true, force: true });
   }
 }
 
-export async function verifyTarget(target: TargetAgent): Promise<void> {
+export function nativeCodexArgs(
+  workspace: string,
+  disabledSkillPaths: string[],
+  modelCatalogPath: string,
+): string[] {
+  const args = codexArgs(workspace, disabledSkillPaths);
+  const promptIndex = args.at(-1) === "-" ? args.length - 1 : args.length;
+  return [
+    ...withoutCodexSplitReadPermissionProfile(args.slice(0, promptIndex)),
+    "--config",
+    `model_catalog_json=${JSON.stringify(modelCatalogPath)}`,
+    "-",
+  ];
+}
+
+export async function verifyTarget(
+  target: TargetAgent,
+  environmentOverrides: ProbeEnvironmentOverrides = {},
+): Promise<void> {
   const executable = resolveAgentExecutable(target);
-  await assertSupportedTarget(target, executable);
+  if (
+    target !== "codex" ||
+    process.platform !== "win32" ||
+    environmentOverrides.CODEX_HOME !== undefined
+  ) {
+    await assertSupportedTarget(target, executable, environmentOverrides);
+    return;
+  }
+  const preflightHome = await mkdtemp(
+    join(tmpdir(), "agentshare-codex-preflight-"),
+  );
+  try {
+    await ensurePrivateDirectory(preflightHome);
+    await assertSupportedTarget(target, executable, {
+      CODEX_HOME: preflightHome,
+    });
+  } finally {
+    await rm(preflightHome, { recursive: true, force: true });
+  }
 }
 
 export function waitForTargetClose(
@@ -279,19 +364,24 @@ export function supportsReviewedEnvironmentTargetVersion(
 async function assertSupportedTarget(
   target: TargetAgent,
   executable: AgentExecutable,
+  environmentOverrides: ProbeEnvironmentOverrides = {},
 ): Promise<void> {
-  await inspectTargetVersion(target, executable);
+  await inspectTargetVersion(target, executable, environmentOverrides);
 }
 
 async function inspectTargetVersion(
   target: TargetAgent,
   executable: AgentExecutable,
+  environmentOverrides: ProbeEnvironmentOverrides = {},
 ): Promise<void> {
   const contract = TARGET_CONTRACTS[target];
-  const output = await captureProcess(executable.command, [
-    ...executable.prefixArgs,
-    "--version",
-  ]);
+  const output = await captureProcess(
+    executable.command,
+    [...executable.prefixArgs, "--version"],
+    15_000,
+    1_048_576,
+    environmentOverrides,
+  );
   if (!recognizesTargetVersion(target, output)) {
     throw new Error(unsupportedTargetVersionMessage(target, output));
   }
@@ -307,10 +397,13 @@ async function inspectTargetVersion(
         `Update AgentShare or install a reviewed ${target} version; sandbox controls will not be assumed safe.`,
     );
   }
-  const help = await captureProcess(executable.command, [
-    ...executable.prefixArgs,
-    ...contract.helpArgs,
-  ]);
+  const help = await captureProcess(
+    executable.command,
+    [...executable.prefixArgs, ...contract.helpArgs],
+    15_000,
+    1_048_576,
+    environmentOverrides,
+  );
   const missing = missingTargetCapabilities(target, help);
   if (missing.length > 0) {
     throw new Error(
@@ -339,10 +432,11 @@ export async function captureProcess(
   args: string[],
   timeoutMs = 15_000,
   maxOutputBytes = 1_048_576,
+  environmentOverrides: ProbeEnvironmentOverrides = {},
 ): Promise<string> {
   const child = spawn(command, args, {
     detached: process.platform !== "win32",
-    env: safeEnvironment(),
+    env: safeEnvironment(environmentOverrides),
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -507,7 +601,9 @@ export function resolveAgentExecutable(
   throw new Error(`${target} CLI executable not found on PATH`);
 }
 
-function safeEnvironment(): NodeJS.ProcessEnv {
+function safeEnvironment(
+  environmentOverrides: ProbeEnvironmentOverrides = {},
+): NodeJS.ProcessEnv {
   const allow = new Set([
     "PATH",
     "Path",
@@ -525,9 +621,31 @@ function safeEnvironment(): NodeJS.ProcessEnv {
     "COLORTERM",
     "NO_COLOR",
   ]);
-  return Object.fromEntries(
+  const environment = Object.fromEntries(
     Object.entries(process.env).filter(
       ([key, value]) => allow.has(key) && value !== undefined,
     ),
   );
+  if (environmentOverrides.CODEX_HOME !== undefined)
+    environment.CODEX_HOME = environmentOverrides.CODEX_HOME;
+  return environment;
+}
+
+function withoutCodexSplitReadPermissionProfile(args: string[]): string[] {
+  const blocked = new Set([
+    'default_permissions="agentshare-query"',
+    'permissions.agentshare-query.filesystem={":minimal"="deny",":workspace_roots"="deny"}',
+    "permissions.agentshare-query.network.enabled=false",
+  ]);
+  const result: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    const next = args[index + 1];
+    if (value === "--config" && next !== undefined && blocked.has(next)) {
+      index += 1;
+      continue;
+    }
+    if (value !== undefined) result.push(value);
+  }
+  return result;
 }

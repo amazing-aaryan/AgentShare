@@ -35,7 +35,8 @@ vi.mock("../environment/private-store.js", async (importOriginal) => ({
 
 const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
 const catalog = "C:\\synthetic\\private\\codex-model-catalog.json";
-const codexHome = "C:\\synthetic\\Codex home";
+const canonicalCodexHome = "C:\\synthetic\\Codex home";
+const privateCodexHome = "C:\\synthetic\\private\\Codex home";
 
 function platform(value: NodeJS.Platform): void {
   Object.defineProperty(process, "platform", { value, configurable: true });
@@ -47,7 +48,8 @@ beforeEach(() => {
   prepareMock.mockReset();
   captureMock.mockReset();
   prepareMock.mockResolvedValue({
-    codexHome,
+    canonicalCodexHome,
+    codexHome: privateCodexHome,
     codexModelCatalogPath: catalog,
     codexSplitReadBoundary: false,
   });
@@ -77,6 +79,14 @@ describe("recipient runtime isolation selection", () => {
       "win32",
       "codex-cli 0.152.1",
     ]);
+    expect(captureMock).toHaveBeenCalledTimes(2);
+    const preflightEnvironment = captureMock.mock.calls[0]?.[4] as {
+      CODEX_HOME: string;
+    };
+    expect(preflightEnvironment.CODEX_HOME).toMatch(
+      /agentshare-receipts-[^\\]+[\\/]codex-preflight-home$/u,
+    );
+    expect(captureMock.mock.calls[1]?.[4]).toEqual(preflightEnvironment);
     const args = spawnMock.mock.calls[0]?.[1] as string[];
     expect(args).toContain(`model_catalog_json=${JSON.stringify(catalog)}`);
     expect(args).not.toContain('default_permissions="agentshare-query"');
@@ -89,7 +99,7 @@ describe("recipient runtime isolation selection", () => {
       cwd: string;
       env: Record<string, string>;
     };
-    expect(options.env.CODEX_HOME).toBe(codexHome);
+    expect(options.env.CODEX_HOME).toBe(privateCodexHome);
     expect(options.env).not.toHaveProperty("AGENTSHARE_MCP_RECEIPT_PATH");
     expect(options.env).not.toHaveProperty("AGENTSHARE_MCP_RUN_ID");
     expect(existsSync(options.cwd)).toBe(false);

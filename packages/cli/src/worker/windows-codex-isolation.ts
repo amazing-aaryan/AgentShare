@@ -1,4 +1,11 @@
-import { readFile, realpath, stat, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  lstat,
+  readFile,
+  realpath,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import {
   ensurePrivateDirectory,
@@ -12,7 +19,10 @@ export const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION = "0.152.1";
 const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION_TUPLE: VersionTuple = [
   0, 152, 1,
 ];
-const STABLE_CODEX_VERSION_PATTERN = /^codex-cli\s+(\d+)\.(\d+)\.(\d+)\s*$/u;
+// Codex can emit a harmless PATH-alias warning on stderr when CODEX_HOME is
+// redirected under Windows Temp. Match the executable's exact version line
+// without letting that warning make a supported runtime look unrecognized.
+const STABLE_CODEX_VERSION_PATTERN = /^codex-cli\s+(\d+)\.(\d+)\.(\d+)\s*$/mu;
 const STABLE_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/u;
 
 export type HardenedCodexModelCatalog = {
@@ -20,6 +30,7 @@ export type HardenedCodexModelCatalog = {
 };
 
 export type NativeWindowsCodexIsolation = {
+  canonicalCodexHome: string;
   codexHome: string;
   codexModelCatalogPath: string;
   codexSplitReadBoundary: false;
@@ -45,17 +56,51 @@ export async function prepareNativeWindowsCodexIsolation(
       `Native Windows AgentShare recipient isolation requires stable Codex CLI >= ${MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION}; refusing older or unrecognized Windows Codex version`,
     );
   }
-  const codexHome = await resolveCodexHome(environment, defaultHome);
+  const canonicalCodexHome = await resolveCodexHome(environment, defaultHome);
   const codexModelCatalogPath = await prepareHardenedCodexModelCatalog(
-    codexHome,
+    canonicalCodexHome,
     outputDirectory,
     runningVersion,
   );
+  // Codex may refresh models_cache.json during startup even when an explicit
+  // model catalog is supplied. Give the recipient a private provider home so
+  // that refreshes cannot mutate the creator's canonical home. Copy only the
+  // authentication file needed for the logged-in runtime; user config,
+  // sessions, skills, and model metadata stay out of the child home.
+  const codexHome = await preparePrivateCodexHome(
+    canonicalCodexHome,
+    outputDirectory,
+  );
   return {
+    canonicalCodexHome,
     codexHome,
     codexModelCatalogPath,
     codexSplitReadBoundary: false,
   };
+}
+
+async function preparePrivateCodexHome(
+  canonicalCodexHome: string,
+  outputDirectory: string,
+): Promise<string> {
+  const privateHome = join(outputDirectory, "codex-home");
+  await ensurePrivateDirectory(privateHome);
+  const canonicalAuth = join(canonicalCodexHome, "auth.json");
+  const privateAuth = join(privateHome, "auth.json");
+  try {
+    const metadata = await lstat(canonicalAuth);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) {
+      throw new Error(
+        "Codex authentication state must be a regular file for native Windows recipient isolation",
+      );
+    }
+    await copyFile(canonicalAuth, privateAuth);
+    await securePrivatePath(privateAuth);
+  } catch (error) {
+    if (isNotFound(error)) return privateHome;
+    throw error;
+  }
+  return privateHome;
 }
 
 export async function resolveCodexHome(
@@ -269,4 +314,8 @@ function isJsonObject(value: unknown): value is JsonObject {
     !Array.isArray(value) &&
     Object.getPrototypeOf(value) === Object.prototype
   );
+}
+
+function isNotFound(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

@@ -3,9 +3,11 @@ import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   captureProcess,
+  nativeCodexArgs,
   runTarget,
   supportsReviewedTargetVersion,
   supportsReviewedEnvironmentTargetVersion,
+  verifyTarget,
   waitForTargetClose,
 } from "./launchers.js";
 
@@ -26,14 +28,36 @@ const CODEX_INCOMPLETE_HELP = [
   "  -C, --cd <dir>  Working root",
   "  --ephemeral  Ephemeral",
 ].join("\n");
+const CODEX_COMPLETE_HELP = [
+  "  --ephemeral  Ephemeral",
+  "  --ignore-user-config  Ignore user config",
+  "  --ignore-rules  Ignore rules",
+  "  --strict-config  Strict config",
+  "  --skip-git-repo-check  Skip repository check",
+  "  --cd <dir>  Working root",
+  "  --config <key=value>  Config",
+].join("\n");
 
-const { existsSyncMock, spawnMock } = vi.hoisted(() => ({
+const {
+  ensurePrivateDirectoryMock,
+  existsSyncMock,
+  prepareNativeWindowsCodexIsolationMock,
+  spawnMock,
+} = vi.hoisted(() => ({
+  ensurePrivateDirectoryMock: vi.fn(),
   existsSyncMock: vi.fn(() => true),
+  prepareNativeWindowsCodexIsolationMock: vi.fn(),
   spawnMock: vi.fn(),
 }));
 
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
 vi.mock("node:fs", () => ({ existsSync: existsSyncMock }));
+vi.mock("./environment/private-store.js", () => ({
+  ensurePrivateDirectory: ensurePrivateDirectoryMock,
+}));
+vi.mock("./worker/windows-codex-isolation.js", () => ({
+  prepareNativeWindowsCodexIsolation: prepareNativeWindowsCodexIsolationMock,
+}));
 
 function fakeProcess(stdout: string, stderr = "") {
   const child = fakeHangingProcess();
@@ -62,6 +86,15 @@ function fakeHangingProcess() {
 
 beforeEach(() => {
   spawnMock.mockReset();
+  ensurePrivateDirectoryMock.mockReset();
+  ensurePrivateDirectoryMock.mockResolvedValue(undefined);
+  prepareNativeWindowsCodexIsolationMock.mockReset();
+  prepareNativeWindowsCodexIsolationMock.mockResolvedValue({
+    canonicalCodexHome: "C:\\canonical\\.codex",
+    codexHome: "C:\\private\\.codex",
+    codexModelCatalogPath: "C:\\private\\catalog.json",
+    codexSplitReadBoundary: false,
+  });
   existsSyncMock.mockClear();
 });
 
@@ -132,6 +165,23 @@ describe("target process lifecycle", () => {
     await expect(result).resolves.toBe(0);
   });
 
+  it("builds the native Windows Codex profile from a private model catalog", () => {
+    const args = nativeCodexArgs(
+      "C:\\workspace",
+      [],
+      "C:\\private\\catalog.json",
+    );
+
+    expect(args).toContain('sandbox_mode="read-only"');
+    expect(args).not.toContain('default_permissions="agentshare-query"');
+    expect(args).not.toContain(
+      'permissions.agentshare-query.filesystem={":minimal"="deny",":workspace_roots"="deny"}',
+    );
+    expect(args).toContain(
+      'model_catalog_json="C:\\\\private\\\\catalog.json"',
+    );
+  });
+
   it("sanitizes child output before display and conversation storage", async () => {
     spawnMock
       .mockImplementationOnce(() => fakeProcess("2.1.231 (Claude Code)\n"))
@@ -196,5 +246,50 @@ describe("target process lifecycle", () => {
 
     await vi.advanceTimersByTimeAsync(11);
     await rejection;
+  });
+
+  it("applies explicit private-home overrides to compatibility probes", async () => {
+    spawnMock.mockImplementationOnce(() => fakeProcess("codex-cli 0.153.4\n"));
+
+    await captureProcess("codex", ["--version"], 1_000, 1_048_576, {
+      CODEX_HOME: "C:\\private\\codex-home",
+    });
+
+    const options = spawnMock.mock.calls[0]?.[2] as {
+      env: Record<string, string>;
+    };
+    expect(options.env.CODEX_HOME).toBe("C:\\private\\codex-home");
+  });
+
+  it("keeps target validation probes inside the explicit private home", async () => {
+    spawnMock
+      .mockImplementationOnce(() => fakeProcess("codex-cli 0.153.4\n"))
+      .mockImplementationOnce(() => fakeProcess(CODEX_COMPLETE_HELP));
+
+    await verifyTarget("codex", { CODEX_HOME: "C:\\private\\codex-home" });
+
+    expect(
+      spawnMock.mock.calls.map(
+        (call) => (call[2] as { env: Record<string, string> }).env.CODEX_HOME,
+      ),
+    ).toEqual(["C:\\private\\codex-home", "C:\\private\\codex-home"]);
+  });
+
+  it("uses a disposable home for default Windows validation probes", async () => {
+    spawnMock
+      .mockImplementationOnce(() => fakeProcess("codex-cli 0.153.4\n"))
+      .mockImplementationOnce(() => fakeProcess(CODEX_COMPLETE_HELP));
+
+    await verifyTarget("codex");
+
+    expect(ensurePrivateDirectoryMock).toHaveBeenCalledOnce();
+    expect(
+      spawnMock.mock.calls.map(
+        (call) => (call[2] as { env: Record<string, string> }).env.CODEX_HOME,
+      ),
+    ).toEqual([
+      expect.stringMatching(/agentshare-codex-preflight-[^\\]+$/u),
+      expect.stringMatching(/agentshare-codex-preflight-[^\\]+$/u),
+    ]);
   });
 });

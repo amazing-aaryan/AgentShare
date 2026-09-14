@@ -108,6 +108,10 @@ async function writeReviewedCache(
   );
 }
 
+async function writeAuth(codexHome: string): Promise<void> {
+  await writeFile(join(codexHome, "auth.json"), "private-auth", "utf8");
+}
+
 describe("native Windows Codex catalog preparation", () => {
   it("derives a private static catalog from Codex's reviewed cache", async () => {
     const root = await temporaryRoot();
@@ -175,6 +179,7 @@ describe("native Windows Codex catalog preparation", () => {
     const codexHome = join(defaultHome, ".codex");
     const output = join(root, "private-output");
     await writeReviewedCache(codexHome);
+    await writeAuth(codexHome);
 
     await expect(
       prepareNativeIsolation()(
@@ -207,20 +212,30 @@ describe("native Windows Codex catalog preparation", () => {
     ).rejects.toThrow("older than running Codex 0.153.4");
 
     await writeReviewedCache(codexHome, "0.154.0");
+    const canonicalCacheBefore = await readFile(
+      join(codexHome, "models_cache.json"),
+    );
 
     const currentOutput = join(root, "private-output-current");
     const currentResult = await prepareNativeIsolation()(
       "win32",
-      "codex-cli 0.153.4",
+      "codex-cli 0.153.4\nWARNING: proceeding, even though Codex could not create PATH aliases",
       {},
       defaultHome,
       currentOutput,
     );
     expect(currentResult).toEqual({
-      codexHome,
+      canonicalCodexHome: await realpath(codexHome),
+      codexHome: join(currentOutput, "codex-home"),
       codexModelCatalogPath: join(currentOutput, "codex-model-catalog.json"),
       codexSplitReadBoundary: false,
     });
+    expect(
+      await readFile(join(currentOutput, "codex-home", "auth.json"), "utf8"),
+    ).toBe("private-auth");
+    expect(await readFile(join(codexHome, "models_cache.json"))).toEqual(
+      canonicalCacheBefore,
+    );
 
     const baselineOutput = join(root, "private-output-baseline");
     const baselineResult = await prepareNativeIsolation()(
@@ -231,7 +246,8 @@ describe("native Windows Codex catalog preparation", () => {
       baselineOutput,
     );
     expect(baselineResult).toEqual({
-      codexHome,
+      canonicalCodexHome: await realpath(codexHome),
+      codexHome: join(baselineOutput, "codex-home"),
       codexModelCatalogPath: join(baselineOutput, "codex-model-catalog.json"),
       codexSplitReadBoundary: false,
     });
