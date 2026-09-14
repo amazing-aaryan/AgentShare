@@ -763,3 +763,13 @@ consent, deployed relay publication, or the immutable v0.3.2 profile.
 **Impact:** Commit `225881a` is ready for follow-up release review; stable
 promotion remains prohibited until a fresh exact-runtime real-host run supplies
 missing evidence.
+
+## [2026-09-13 20:35] Align user-level creator MCP with repaired artifact
+
+**Decision:** Install the current packaged 0.3.3 artifact into the user-level
+global AgentShare location referenced by `agentshare_creator`. **Why:** PATH
+version alone was misleading: global `dist/bin.js` differed from the repaired
+build, so a restarted Codex host would still load stale creator behavior.
+**Impact:** Global binary now byte-matches current `packages/cli/dist/bin.js`;
+`agentshare --version` remains 0.3.3. Existing MCP child processes retain old
+loaded bytes until Codex reload/restart.
