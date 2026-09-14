@@ -225,7 +225,7 @@ describe("native Windows Codex catalog preparation", () => {
       currentOutput,
     );
     expect(currentResult).toEqual({
-      canonicalCodexHome: await realpath(codexHome),
+      canonicalCodexHome: codexHome,
       codexHome: join(currentOutput, "codex-home"),
       codexModelCatalogPath: join(currentOutput, "codex-model-catalog.json"),
       codexSplitReadBoundary: false,
@@ -246,7 +246,7 @@ describe("native Windows Codex catalog preparation", () => {
       baselineOutput,
     );
     expect(baselineResult).toEqual({
-      canonicalCodexHome: await realpath(codexHome),
+      canonicalCodexHome: codexHome,
       codexHome: join(baselineOutput, "codex-home"),
       codexModelCatalogPath: join(baselineOutput, "codex-model-catalog.json"),
       codexSplitReadBoundary: false,

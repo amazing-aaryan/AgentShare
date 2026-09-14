@@ -275,21 +275,24 @@ describe("target process lifecycle", () => {
     ).toEqual(["C:\\private\\codex-home", "C:\\private\\codex-home"]);
   });
 
-  it("uses a disposable home for default Windows validation probes", async () => {
-    spawnMock
-      .mockImplementationOnce(() => fakeProcess("codex-cli 0.153.4\n"))
-      .mockImplementationOnce(() => fakeProcess(CODEX_COMPLETE_HELP));
+  it.skipIf(process.platform !== "win32")(
+    "uses a disposable home for default Windows validation probes",
+    async () => {
+      spawnMock
+        .mockImplementationOnce(() => fakeProcess("codex-cli 0.153.4\n"))
+        .mockImplementationOnce(() => fakeProcess(CODEX_COMPLETE_HELP));
 
-    await verifyTarget("codex");
+      await verifyTarget("codex");
 
-    expect(ensurePrivateDirectoryMock).toHaveBeenCalledOnce();
-    expect(
-      spawnMock.mock.calls.map(
-        (call) => (call[2] as { env: Record<string, string> }).env.CODEX_HOME,
-      ),
-    ).toEqual([
-      expect.stringMatching(/agentshare-codex-preflight-[^\\]+$/u),
-      expect.stringMatching(/agentshare-codex-preflight-[^\\]+$/u),
-    ]);
-  });
+      expect(ensurePrivateDirectoryMock).toHaveBeenCalledOnce();
+      expect(
+        spawnMock.mock.calls.map(
+          (call) => (call[2] as { env: Record<string, string> }).env.CODEX_HOME,
+        ),
+      ).toEqual([
+        expect.stringMatching(/agentshare-codex-preflight-[^\\]+$/u),
+        expect.stringMatching(/agentshare-codex-preflight-[^\\]+$/u),
+      ]);
+    },
+  );
 });

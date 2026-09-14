@@ -823,3 +823,12 @@ candidate; dropping either line would lose release-gate history or the repair.
 **Impact:** `master` is locally integrated at `22f9188`; 351 tests,
 typecheck/lint, format, build, and package smoke pass. Live deployment smoke
 still fails closed on the expected undeployed v0.3.3 package pin.
+
+## [2026-09-13 21:47] Repair cross-platform CI assumptions
+
+**Decision:** Run the default-Windows probe assertion only on Windows and keep
+the isolation test's default-home expectation in logical-path form. **Why:**
+Linux/macOS CI correctly does not create a Windows disposable probe, and macOS
+resolves `/var` through `/private/var`; the prior assertions treated both as
+universal behavior. **Impact:** Focused launcher/isolation suite passes 16/16;
+push the test-only portability fix before release validation resumes.
