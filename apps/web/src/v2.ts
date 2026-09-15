@@ -1,4 +1,4 @@
-const PUBLIC_RELEASE = "0.3.3";
+const PUBLIC_RELEASE = "0.3.4";
 const PUBLIC_PACKAGE =
   `https://github.com/amazing-aaryan/AgentShare/releases/download/v${PUBLIC_RELEASE}/` +
   `agentshare-${PUBLIC_RELEASE}.tgz`;

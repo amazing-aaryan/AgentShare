@@ -120,6 +120,17 @@ export const FOLLOW_UP_NATIVE_WINDOWS_OBSERVATIONS = Object.freeze({
     installedVersion: "0.3.3",
   }),
 });
+export const REPAIRED_NATIVE_WINDOWS_PROFILE = "codex-native-windows-v5";
+export const REPAIRED_NATIVE_WINDOWS_RUNTIME = Object.freeze({
+  ...FOLLOW_UP_NATIVE_WINDOWS_RUNTIME,
+});
+export const REPAIRED_NATIVE_WINDOWS_OBSERVATIONS = Object.freeze({
+  ...FOLLOW_UP_NATIVE_WINDOWS_OBSERVATIONS,
+  bootstrap: Object.freeze({
+    ...FOLLOW_UP_NATIVE_WINDOWS_OBSERVATIONS.bootstrap,
+    installedVersion: "0.3.4",
+  }),
+});
 const PROFILES = new Map([
   [
     PROFILE,
@@ -151,6 +162,14 @@ const PROFILES = new Map([
       version: "0.3.3",
       runtime: FOLLOW_UP_NATIVE_WINDOWS_RUNTIME,
       observations: FOLLOW_UP_NATIVE_WINDOWS_OBSERVATIONS,
+    }),
+  ],
+  [
+    REPAIRED_NATIVE_WINDOWS_PROFILE,
+    Object.freeze({
+      version: "0.3.4",
+      runtime: REPAIRED_NATIVE_WINDOWS_RUNTIME,
+      observations: REPAIRED_NATIVE_WINDOWS_OBSERVATIONS,
     }),
   ],
 ]);

@@ -49,6 +49,74 @@ describe("Codex adapter", () => {
     ]);
   });
 
+  it("excludes managed host context encoded as user-role messages", () => {
+    const managedContext = JSON.stringify({
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "plugin recommendations" },
+          { type: "input_text", text: "AGENTS instructions" },
+          { type: "input_text", text: "environment context" },
+        ],
+        internal_chat_message_metadata_passthrough: {
+          content_item_kinds: [
+            "plugins.recommendations",
+            "agents_md.instructions",
+            "environments.environment_context",
+          ],
+        },
+      },
+    });
+    const withManagedContext = input.replace(
+      input.split("\n")[1] ?? "",
+      `${managedContext}\n${input.split("\n")[1] ?? ""}`,
+    );
+
+    expect(
+      parseCodexCapture(withManagedContext, "synthetic-id").conversation.map(
+        (event) => event.text,
+      ),
+    ).toEqual(["Question", "Answer"]);
+  });
+
+  it("retains metadata-tagged user content and rejects ambiguous metadata", () => {
+    const taggedUser = JSON.stringify({
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "Tagged question" }],
+        internal_chat_message_metadata_passthrough: {
+          content_item_kinds: ["user.text"],
+        },
+      },
+    });
+    const ambiguousUser = JSON.stringify({
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "Ambiguous context" }],
+        internal_chat_message_metadata_passthrough: {
+          content_item_kinds: [],
+        },
+      },
+    });
+    const withTaggedAndAmbiguous = input.replace(
+      input.split("\n")[1] ?? "",
+      `${taggedUser}\n${ambiguousUser}\n${input.split("\n")[1] ?? ""}`,
+    );
+
+    expect(
+      parseCodexCapture(
+        withTaggedAndAmbiguous,
+        "synthetic-id",
+      ).conversation.map((event) => event.text),
+    ).toEqual(["Tagged question", "Question", "Answer"]);
+  });
+
   it("captures the session workspace root for v2 without changing v1 output", () => {
     const capture = parseCodexCapture(input, "synthetic-id");
     expect(capture.workspaceRoot).toBe("C:/synthetic/repo");

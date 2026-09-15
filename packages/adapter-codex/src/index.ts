@@ -124,6 +124,7 @@ export function parseCodexCapture(
       throw new Error("Codex session metadata must precede conversation");
     const payload = asObject(item.payload);
     if (payload?.type !== "message") continue;
+    if (payload.role === "user" && !isShareableUserMessage(payload)) continue;
     const role =
       payload.role === "user"
         ? "user"
@@ -155,6 +156,20 @@ export function parseCodexCapture(
     sessionRef: sessionId,
     recordedRoot: workspaceRoot,
   };
+}
+
+function isShareableUserMessage(payload: JsonObject): boolean {
+  const metadata = asObject(payload.internal_chat_message_metadata_passthrough);
+  if (metadata?.content_item_kinds === undefined) return true;
+  if (
+    !Array.isArray(payload.content) ||
+    !Array.isArray(metadata.content_item_kinds) ||
+    metadata.content_item_kinds.length !== payload.content.length
+  )
+    return false;
+  return metadata.content_item_kinds.every(
+    (kind) => typeof kind === "string" && kind.startsWith("user."),
+  );
 }
 
 export function parseCodexSession(

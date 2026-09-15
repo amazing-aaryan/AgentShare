@@ -835,6 +835,62 @@ push the test-only portability fix before release validation resumes.
 
 ## [2026-09-13 22:09] Publish and deploy repaired follow-up
 
-**Decision:** Publish immutable prerelease `v0.3.3` and deploy its exact candidate to both production Workers after protected preflight passed.
-**Why:** User approved release/deployment; repaired bytes require a new version, while exact immutable `v0.3.2` remains untouched and stable promotion is not authorized.
-**Impact:** Candidate `3157b433680fdeb965c31596eda3980349e7fb3f`, package size `157780`, SHA-256 `ee8ec10ce90524b54c7f6977bb83ae7755bcb465e87c6c1008658ec712d8d49b` is live; protected deploy and public read-only smoke pass. Native human acceptance remains separate evidence.
+**Decision:** Publish immutable prerelease `v0.3.3` and deploy its exact
+candidate to both production Workers after protected preflight passed. **Why:**
+User approved release/deployment; repaired bytes require a new version, while
+exact immutable `v0.3.2` remains untouched and stable promotion is not
+authorized. **Impact:** Candidate `3157b433680fdeb965c31596eda3980349e7fb3f`,
+package size `157780`, SHA-256
+`ee8ec10ce90524b54c7f6977bb83ae7755bcb465e87c6c1008658ec712d8d49b` is live;
+protected deploy and public read-only smoke pass. Native human acceptance
+remains separate evidence.
+
+## [2026-09-13 22:47] Reject polluted acceptance draft
+
+**Decision:** Cancel terminal publication after review showed the current task
+transcript rather than synthetic-only acceptance context; create a clean private
+Codex session instead. **Why:** Acceptance evidence forbids raw real-user
+context and capability-adjacent task history; human approval must bind only to
+the exact synthetic payload. **Impact:** No unsafe share was published. Clean
+exact-version Codex session is available under disposable state; terminal human
+approval remains pending.
+
+## [2026-09-14 00:19] Restart acceptance from immutable v0.3.3 bytes
+
+**Decision:** Start a fresh real-host acceptance run from published prerelease
+`v0.3.3`, downloaded into a private untracked evidence root and paired with
+detached clean candidate checkout `3157b433680fdeb965c31596eda3980349e7fb3f`.
+**Why:** The earlier temporary scaffold included an aborted polluted draft and
+incomplete timestamps; reusing it would make provenance ambiguous. **Impact:**
+Run root is
+`C:\Users\aarya\AppData\Local\AgentShare\acceptance\v0.3.3-20260914T041930Z`;
+artifact is 157780 bytes with SHA-256
+`ee8ec10ce90524b54c7f6977bb83ae7755bcb465e87c6c1008658ec712d8d49b`, installed
+only in its disposable npm prefix. No acceptance check has yet been claimed.
+
+## [2026-09-14 20:06] Reject v0.3.3 after real recipient read
+
+**Decision:** Reject the first real-host `v0.3.3` acceptance flow and revoke its
+published environment after the recipient recovered host bootstrap/plugin/AGENTS
+context as conversation event 0. **Why:** The acceptance payload must contain
+synthetic creator facts only; exporting managed session context is an unintended
+disclosure and invalidates the create/read checks even though the exact package,
+Codex 0.153.4 MCP receipt, canary recovery, tool inventory, canonical-cache
+integrity, and 410 revocation worked. **Impact:** Environment
+`env_GNpFfAagj6E5BxCLeNsQHpDm` is revoked, canonical cache hash remained
+`9e5cde3ffdc6095c473f1816f0562cd58a42f59c2ae75deb1d887c55e0d41cbb`, `v0.3.3`
+remains prerelease, and changed bytes require separately versioned `v0.3.4`
+before acceptance restarts.
+
+## [2026-09-14 20:34] Freeze managed-context repair as v0.3.4
+
+**Decision:** Version the Codex managed-context capture filter and its release
+contract as `v0.3.4`, preserving all immutable `v0.3.3` bytes and evidence.
+**Why:** Authentic `v0.3.3` recipient testing exposed managed plugin,
+`AGENTS.md`, and environment bootstrap records as user conversation. The repair
+retains legacy and explicit `user.*` records while excluding managed or
+ambiguous content-kind metadata. **Impact:** Authentic failed-session replay now
+yields exactly the intended user and assistant events with no managed markers.
+Full 353-test serial suite, lint, format, build, package, edge, conformance,
+audit, real Codex MCP, hostile isolation, and continuity gates pass. New 18/18
+native acceptance remains mandatory before stable readiness.
