@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -7,6 +7,8 @@ import {
   checkForUpdate,
   fetchLatestRelease,
   passiveUpdateNotice,
+  installPinnedGlobalCli,
+  pinnedGlobalCliInstalled,
   updateAgentShare,
   type ProcessRunner,
 } from "./update.js";
@@ -21,6 +23,48 @@ afterEach(async () => {
 });
 
 describe("AgentShare update discovery", () => {
+  it("installs only the pinned package and verifies matching global bundle bytes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-pinned-cli-"));
+    directories.push(root);
+    const cliEntrypoint = join(root, "running-bin.js");
+    const globalBin = join(root, "agentshare", "dist", "bin.js");
+    await mkdir(join(root, "agentshare", "dist"), { recursive: true });
+    await writeFile(cliEntrypoint, "same pinned bundle");
+    await writeFile(globalBin, "same pinned bundle");
+    const calls: string[][] = [];
+    const runProcess: ProcessRunner = (_command, args) => {
+      calls.push(args);
+      if (args.includes("ls"))
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            dependencies: { agentshare: { version: "0.3.14" } },
+          }),
+          stderr: "",
+        };
+      if (args.includes("root")) return { status: 0, stdout: root, stderr: "" };
+      return { status: 0, stdout: "", stderr: "" };
+    };
+    const options = {
+      runProcess,
+      platform: "linux" as const,
+      version: "0.3.14",
+      cliEntrypoint,
+    };
+    expect(pinnedGlobalCliInstalled(options)).toBe(true);
+    await writeFile(globalBin, "different package");
+    expect(pinnedGlobalCliInstalled(options)).toBe(false);
+    await writeFile(globalBin, "same pinned bundle");
+    installPinnedGlobalCli(options);
+    expect(calls.find((args) => args.includes("install"))).toEqual([
+      "install",
+      "--global",
+      "--ignore-scripts",
+      buildReleasePackageUrl("0.3.14"),
+    ]);
+    expect(calls.filter((args) => args.includes("root"))).toHaveLength(3);
+  });
+
   it("derives the immutable package URL from a validated stable tag", async () => {
     const release = await fetchLatestRelease({
       fetchImpl: releaseFetch("v0.1.11"),

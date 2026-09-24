@@ -282,7 +282,8 @@ function smokeFetcher(overrides = {}) {
     assert.ok(["GET", "OPTIONS"].includes(options.method));
     if (options.method === "OPTIONS")
       return new Response(null, { status: 204 });
-    if (url.includes("bootstrap.json"))
+    if (url.includes("bootstrap.json")) {
+      assert.equal(new URL(url).search, "");
       return Response.json(overrides.bootstrap ?? bootstrap, {
         headers: {
           ...headers,
@@ -290,13 +291,18 @@ function smokeFetcher(overrides = {}) {
           "content-security-policy": "default-src 'none'",
         },
       });
-    return new Response(`AgentShare ${packageUrl}`, {
-      headers: {
-        ...headers,
-        "content-security-policy": `${headers["content-security-policy"]}; connect-src ${relay}`,
-        ...overrides.headers,
+    }
+    const setupLink = `<a href="${new URL(url).pathname}/bootstrap.json">Setup</a>`;
+    return new Response(
+      overrides.page ?? `AgentShare ${packageUrl} ${setupLink}`,
+      {
+        headers: {
+          ...headers,
+          "content-security-policy": `${headers["content-security-policy"]}; connect-src ${relay}`,
+          ...overrides.headers,
+        },
       },
-    });
+    );
   };
 }
 
@@ -305,6 +311,14 @@ test("read-only smoke checks cover v1/v2 headers, exact bootstrap pin and relay 
   const result = await invoke("smokeDeployment", options);
   assert.equal(result.checks, 4);
   assert.equal(result.nativeAcceptance, false);
+  await assert.rejects(
+    () =>
+      invoke("smokeDeployment", {
+        ...options,
+        fetcher: smokeFetcher({ page: `AgentShare ${packageUrl}` }),
+      }),
+    /setup link/u,
+  );
   await assert.rejects(() =>
     invoke("smokeDeployment", {
       ...options,

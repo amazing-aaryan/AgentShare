@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { sanitizeTerminalText } from "./terminal.js";
 import { ensurePrivateDirectory } from "./environment/private-store.js";
 import { prepareNativeWindowsCodexIsolation } from "./worker/windows-codex-isolation.js";
+import { refreshCodexModelCache } from "./worker/codex-model-refresh.js";
 
 export type TargetAgent = "codex" | "claude";
 export type TargetResult = { exitCode: number; output: string };
@@ -179,6 +180,7 @@ export async function runTarget(
             process.env,
             homedir(),
             nativeIsolationDirectory,
+            (privateHome) => refreshCodexModelCache(executable, privateHome),
           );
     const args =
       target === "codex"

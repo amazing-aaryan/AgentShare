@@ -28,6 +28,8 @@ import { revokeOwnedEnvironment } from "./commands/runtime-v2.js";
 import { renderProposalDiff } from "./tui/proposal-review.js";
 import { listOwnedProposals } from "./proposals/inbox.js";
 import { sanitizeTerminalText } from "./terminal.js";
+import { hostSkillsCurrent, installHostSkills } from "@agentshare/integrations";
+import { installPinnedGlobalCli, pinnedGlobalCliInstalled } from "./update.js";
 
 const RELAY = "https://agentshare-relay.carnation-vermicelli.workers.dev";
 const HANDOFF = "https://agentshare-handoff.carnation-vermicelli.workers.dev";
@@ -56,11 +58,25 @@ const tool = (
 });
 export const CREATOR_TOOLS = [
   tool(
+    "setup_agentshare",
+    "First use after connecting this MCP: ask the user through a native form whether to install the pinned global CLI and local Codex/Claude integration files. Call before other AgentShare tools. Cancel writes nothing.",
+    {},
+    [],
+    false,
+  ),
+  tool(
     "resolve_creator_session",
     "Resolve an explicit current Codex thread ID. Never guess the latest session.",
     { threadId: string },
     ["threadId"],
     true,
+  ),
+  tool(
+    "select_share_options",
+    "Open native choices for files to share, recipient access, and duration. Call after resolving the current session; do not ask for these values in chat.",
+    { sessionRef: string },
+    ["sessionRef"],
+    false,
   ),
   tool(
     "prepare_share",
@@ -155,7 +171,7 @@ export function creatorDoctor() {
     sessionContextCommand: "agentshare session-context",
     nativeApproval: "requires-host-verification",
     support: "Windows/Codex candidate; not yet release-certified",
-    next: "Reload MCP servers if supported; otherwise restart the host. Call resolve_creator_session with the exact current thread ID. Publishing requires native form confirmation; terminal review is the fallback.",
+    next: "If the Codex header says YOLO/full-auto, open /permissions and choose On Request in this same session. Codex 0.155.1 has no /approvals command. Reload MCP servers if supported; otherwise restart the host. Call resolve_creator_session with the exact current thread ID. Publishing requires native form confirmation in this session.",
   };
 }
 
@@ -198,6 +214,10 @@ export function createCreatorRuntime(
         rootStatus,
       };
     }
+    if (name === "select_share_options")
+      throw new Error(
+        "NATIVE_OPTIONS_REQUIRED: select_share_options requires a connected native MCP host",
+      );
     if (name === "prepare_share") {
       const sessionRef = textArg(args, "sessionRef");
       const session = sessions.get(sessionRef);
@@ -467,6 +487,13 @@ export async function runCreatorMcpServer(
     input?: Readable;
     output?: Writable;
     approvalTimeoutMs?: number;
+    capture?: typeof exportCurrentCodexCapture;
+    relayOrigin?: string;
+    handoffOrigin?: string;
+    installSkills?: typeof installHostSkills;
+    skillsCurrent?: typeof hostSkillsCurrent;
+    installCli?: () => void;
+    cliCurrent?: () => boolean;
   } = {},
 ): Promise<void> {
   const input = options.input ?? process.stdin,
@@ -474,9 +501,99 @@ export async function runCreatorMcpServer(
   const lines = createInterface({ input, crlfDelay: Infinity });
   let supportsForms = false;
   const approvals = new Map<string, (value: unknown) => void>();
+  const selectedShareOptions = new Map<
+    string,
+    {
+      scope: "conversation" | "workspace" | "both";
+      access: "read" | "read_propose";
+      ttlSeconds: number;
+    }
+  >();
   const active = new Set<Promise<void>>();
   const send = (value: unknown) => {
     output.write(`${JSON.stringify(value)}\n`);
+  };
+  const setupAgentShare = async (): Promise<unknown> => {
+    const cliCurrent = (options.cliCurrent ?? pinnedGlobalCliInstalled)();
+    const skillsCurrent = await (options.skillsCurrent ?? hostSkillsCurrent)();
+    if (cliCurrent && skillsCurrent)
+      return {
+        status: "ready",
+        installedFiles: 0,
+        next: "Use AgentShare in this session.",
+      };
+    if (!supportsForms)
+      throw new Error(
+        "SETUP_FORM_UNAVAILABLE: this MCP host did not advertise native form support",
+      );
+    const id = `setup-consent-${randomUUID()}`;
+    const response = await new Promise<unknown>((resolve) => {
+      const timer = setTimeout(() => {
+        approvals.delete(id);
+        resolve(undefined);
+      }, options.approvalTimeoutMs ?? 120_000);
+      approvals.set(id, (value) => {
+        clearTimeout(timer);
+        approvals.delete(id);
+        resolve(value);
+      });
+      send({
+        jsonrpc: "2.0",
+        id,
+        method: "elicitation/create",
+        params: {
+          mode: "form",
+          message:
+            "AgentShare is connected. Install the pinned AgentShare CLI globally and six managed Codex/Claude integration files? The CLI is needed for session capture and opening links. This downloads the same version already used by this MCP server and writes skill files in your home directory. Use arrow keys and Enter.",
+          requestedSchema: {
+            type: "object",
+            properties: {
+              setup: {
+                type: "string",
+                title: "Set up AgentShare",
+                oneOf: [
+                  { const: "install", title: "Install required files" },
+                  { const: "cancel", title: "Cancel" },
+                ],
+              },
+            },
+            required: ["setup"],
+          },
+        },
+      });
+    });
+    if (response === undefined)
+      throw new Error("SETUP_TIMEOUT: no files installed");
+    if (isRecord(response) && isRecord(response.error))
+      throw new Error("SETUP_FORM_UNAVAILABLE: host rejected the native form");
+    const result = isRecord(response) ? response.result : undefined;
+    const selected =
+      isRecord(result) && isRecord(result.content)
+        ? result.content.setup
+        : undefined;
+    if (
+      isRecord(result) &&
+      (["decline", "cancel"].includes(String(result.action)) ||
+        (result.action === "accept" && selected === "cancel"))
+    )
+      return { status: "cancelled", installedFiles: 0 };
+    if (
+      !isRecord(result) ||
+      result.action !== "accept" ||
+      selected !== "install"
+    )
+      throw new Error(
+        "SETUP_INCOMPLETE: choose Install or Cancel; no files installed",
+      );
+    if (!cliCurrent) (options.installCli ?? installPinnedGlobalCli)();
+    const files = skillsCurrent
+      ? []
+      : await (options.installSkills ?? installHostSkills)();
+    return {
+      status: "ready",
+      installedFiles: files.length,
+      next: "AgentShare works in this session. New sessions also discover the installed skills.",
+    };
   };
   const confirmOwner = async (
     review: DraftReview | OwnerActionReview,
@@ -486,6 +603,13 @@ export async function runCreatorMcpServer(
         "HUMAN_APPROVAL_UNAVAILABLE: this host did not advertise form elicitation; use agentshare review with this draft",
       );
     const id = `owner-consent-${randomUUID()}`;
+    const approvalLabel =
+      "action" in review
+        ? review.action === "apply-proposal"
+          ? "Apply exact reviewed proposal"
+          : "Revoke exact selected share"
+        : "Publish exact reviewed draft";
+    const confirmation = "approve";
     const response = await new Promise<unknown>((resolve) => {
       const timer = setTimeout(() => {
         approvals.delete(id);
@@ -503,28 +627,166 @@ export async function runCreatorMcpServer(
         params: {
           mode: "form",
           message: sanitizeTerminalText(
-            `Confirm this exact AgentShare action?\n${JSON.stringify(review, null, 2)}\nPublication grants the selected link audience access. Proposal approval applies and publishes only the reviewed operations. Revocation prevents future access but cannot erase recipients' copies.`,
+            `Review this exact AgentShare action, then use arrow keys to choose an option and press Enter. Approving the MCP tool call alone is not consent.\n${JSON.stringify(review, null, 2)}\nPublication grants the selected link audience access. Proposal approval applies and publishes only the reviewed operations. Revocation prevents future access but cannot erase recipients' copies.`,
           ),
           requestedSchema: {
             type: "object",
             properties: {
-              confirm: {
-                type: "boolean",
-                title: "Confirm this exact reviewed action",
-                default: false,
+              confirmation: {
+                type: "string",
+                title: "Choose an action",
+                oneOf: [
+                  { const: confirmation, title: approvalLabel },
+                  { const: "cancel", title: "Cancel" },
+                ],
               },
             },
-            required: ["confirm"],
+            required: ["confirmation"],
           },
         },
       });
     });
-    return (
-      isRecord(response) &&
-      response.action === "accept" &&
-      isRecord(response.content) &&
-      response.content.confirm === true
-    );
+    if (response === undefined)
+      throw new Error(
+        "HUMAN_APPROVAL_TIMEOUT: native confirmation did not return; no action attempted. Reload the Codex MCP server and retry the same reviewed action.",
+      );
+    if (isRecord(response) && isRecord(response.error))
+      throw new Error(
+        "HUMAN_APPROVAL_UNAVAILABLE: host rejected native confirmation; no action attempted. Use a Codex session with native form elicitation enabled.",
+      );
+    const result = isRecord(response) ? response.result : undefined;
+    if (
+      isRecord(result) &&
+      ["decline", "cancel"].includes(String(result.action))
+    )
+      throw new Error(
+        "HUMAN_APPROVAL_DECLINED: native confirmation was declined or auto-cancelled; no action attempted. If Codex is in YOLO/full-auto mode, open /permissions, choose On Request, then retry the same reviewed action.",
+      );
+    const selected =
+      isRecord(result) && isRecord(result.content)
+        ? result.content.confirmation
+        : undefined;
+    if (selected === "cancel")
+      throw new Error(
+        "HUMAN_APPROVAL_DECLINED: native Cancel option selected; no action attempted. Retry the same draft only after reviewing it again.",
+      );
+    if (
+      !isRecord(result) ||
+      result.action !== "accept" ||
+      selected !== confirmation
+    )
+      throw new Error(
+        "HUMAN_APPROVAL_INCOMPLETE: native action choice was not Publish/Apply/Revoke; no action attempted. Retry the same reviewed action with the native form.",
+      );
+    return true;
+  };
+  const selectShareOptions = async (sessionRef: string) => {
+    if (!supportsForms)
+      throw new Error(
+        "NATIVE_OPTIONS_UNAVAILABLE: this host did not advertise form elicitation; native share choices require the Codex session",
+      );
+    const id = `share-options-${randomUUID()}`;
+    const response = await new Promise<unknown>((resolve) => {
+      const timer = setTimeout(() => {
+        approvals.delete(id);
+        resolve(undefined);
+      }, options.approvalTimeoutMs ?? 120_000);
+      approvals.set(id, (value) => {
+        clearTimeout(timer);
+        approvals.delete(id);
+        resolve(value);
+      });
+      send({
+        jsonrpc: "2.0",
+        id,
+        method: "elicitation/create",
+        params: {
+          mode: "form",
+          message:
+            "Choose files to share, recipient access, and duration. Use arrow keys to choose each option and press Enter to advance and submit. No text input is required.",
+          requestedSchema: {
+            type: "object",
+            properties: {
+              files: {
+                type: "string",
+                title: "Files to share",
+                oneOf: [
+                  { const: "conversation", title: "Conversation only" },
+                  { const: "workspace", title: "Project files only" },
+                  { const: "both", title: "Conversation + project files" },
+                ],
+              },
+              access: {
+                type: "string",
+                title: "Recipient access",
+                oneOf: [
+                  { const: "read", title: "Read only" },
+                  {
+                    const: "read_propose",
+                    title: "Read + propose changes",
+                  },
+                ],
+              },
+              duration: {
+                type: "string",
+                title: "Duration",
+                oneOf: [
+                  { const: "3600", title: "1 hour" },
+                  { const: "86400", title: "24 hours" },
+                  { const: "259200", title: "72 hours" },
+                ],
+              },
+            },
+            required: ["files", "access", "duration"],
+          },
+        },
+      });
+    });
+    if (response === undefined)
+      throw new Error(
+        "NATIVE_OPTIONS_TIMEOUT: share choices did not return; no draft prepared",
+      );
+    if (isRecord(response) && isRecord(response.error))
+      throw new Error(
+        "NATIVE_OPTIONS_UNAVAILABLE: host rejected native share choices; no draft prepared",
+      );
+    const result = isRecord(response) ? response.result : undefined;
+    if (
+      isRecord(result) &&
+      ["decline", "cancel"].includes(String(result.action))
+    )
+      throw new Error(
+        "NATIVE_OPTIONS_DECLINED: share choices cancelled; no draft prepared",
+      );
+    const content =
+      isRecord(result) && isRecord(result.content) ? result.content : undefined;
+    const files = content?.files;
+    const access = content?.access;
+    const duration = content?.duration;
+    if (
+      !isRecord(result) ||
+      result.action !== "accept" ||
+      (files !== "conversation" && files !== "workspace" && files !== "both") ||
+      (access !== "read" && access !== "read_propose") ||
+      (duration !== "3600" && duration !== "86400" && duration !== "259200")
+    )
+      throw new Error(
+        "NATIVE_OPTIONS_INCOMPLETE: choose files, access, and duration with the native form; no draft prepared",
+      );
+    const selection = {
+      scope: files,
+      access,
+      ttlSeconds: Number(duration),
+    } as const;
+    selectedShareOptions.set(sessionRef, selection);
+    return {
+      sessionRef,
+      files,
+      scope: files,
+      access,
+      duration,
+      ttlSeconds: Number(duration),
+    };
   };
   const runtime = createCreatorRuntime({
     ...options,
@@ -537,7 +799,7 @@ export async function runCreatorMcpServer(
       approvals.has(message.id) &&
       !Object.hasOwn(message, "method")
     ) {
-      approvals.get(message.id)?.(message.result);
+      approvals.get(message.id)?.(message);
       return;
     }
     if (message.id === undefined) return;
@@ -562,17 +824,33 @@ export async function runCreatorMcpServer(
           },
           capabilities: { tools: {} },
           instructions:
-            "Explicit user sharing only. Resolve the exact current thread, prepare, show review, then commit. Commit requires native human form approval; never impersonate consent. Do not inspect private state or raw transcript storage.",
+            "On first use, call setup_agentshare to offer the native Install/Cancel choice for the pinned global CLI and local integration files. If accepted, continue in this session; no restart needed for MCP tools. Sharing requires an explicit user request: resolve the exact current thread, open native file/access/duration choices, prepare, show a concise summary, then commit. Final Publish/Cancel uses a native form; never impersonate consent. Do not inspect private state or raw transcript storage.",
         });
       } else if (message.method === "tools/list")
         reply({ tools: CREATOR_TOOLS });
       else if (message.method === "ping") reply({});
       else if (message.method === "tools/call") {
         const params = isRecord(message.params) ? message.params : {};
-        const result = await runtime(
-          textArg(params, "name"),
-          isRecord(params.arguments) ? params.arguments : {},
-        );
+        const name = textArg(params, "name");
+        const args = isRecord(params.arguments) ? params.arguments : {};
+        let result: unknown;
+        if (name === "setup_agentshare") {
+          result = await setupAgentShare();
+        } else if (name === "select_share_options") {
+          result = await selectShareOptions(textArg(args, "sessionRef"));
+        } else {
+          let runtimeArgs = args;
+          if (name === "prepare_share") {
+            const sessionRef = textArg(args, "sessionRef");
+            const selected = selectedShareOptions.get(sessionRef);
+            if (selected === undefined)
+              throw new Error(
+                "SHARE_OPTIONS_REQUIRED: call select_share_options and use its native choices before preparing",
+              );
+            runtimeArgs = { ...args, ...selected };
+          }
+          result = await runtime(name, runtimeArgs);
+        }
         reply({
           content: [{ type: "text", text: JSON.stringify(result) }],
           isError: false,

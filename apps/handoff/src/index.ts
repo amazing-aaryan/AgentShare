@@ -1,6 +1,6 @@
 import { bootstrapDocument, renderEnvironmentPage } from "@agentshare/web/v2";
 
-const PUBLIC_RELEASE = "0.3.4";
+const PUBLIC_RELEASE = "0.3.14";
 const PUBLIC_PACKAGE =
   `https://github.com/amazing-aaryan/AgentShare/releases/download/v${PUBLIC_RELEASE}/` +
   `agentshare-${PUBLIC_RELEASE}.tgz`;
@@ -22,14 +22,8 @@ export function handleRequest(request: Request): Response {
       url.pathname,
     );
   if (environment?.[1] !== undefined) {
-    try {
-      validateRelayOrigin(url.searchParams.get("relay"));
-    } catch {
-      return new Response("Invalid AgentShare relay origin", {
-        status: 400,
-        headers: staticSecurityHeaders(),
-      });
-    }
+    // Public installation metadata is independent of any relay or capability.
+    // Relative links to this document do not inherit the page's query string.
     if (environment[2] === "bootstrap.json") {
       return Response.json(bootstrapDocument(), {
         headers: {
@@ -39,6 +33,14 @@ export function handleRequest(request: Request): Response {
           "x-content-type-options": "nosniff",
           "x-frame-options": "DENY",
         },
+      });
+    }
+    try {
+      validateRelayOrigin(url.searchParams.get("relay"));
+    } catch {
+      return new Response("Invalid AgentShare relay origin", {
+        status: 400,
+        headers: staticSecurityHeaders(),
       });
     }
     return new Response(renderEnvironmentPage(environment[1]), {

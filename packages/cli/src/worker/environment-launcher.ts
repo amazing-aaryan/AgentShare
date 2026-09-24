@@ -18,6 +18,7 @@ import {
 import { sanitizeTerminalText } from "../terminal.js";
 import { ensurePrivateDirectory } from "../environment/private-store.js";
 import { prepareNativeWindowsCodexIsolation } from "./windows-codex-isolation.js";
+import { refreshCodexModelCache } from "./codex-model-refresh.js";
 export { hardenCodexModelsCache } from "./windows-codex-isolation.js";
 import {
   environmentToolNames,
@@ -86,6 +87,7 @@ export async function runEnvironmentTarget(
             process.env,
             homedir(),
             receiptDirectory,
+            (privateHome) => refreshCodexModelCache(executable, privateHome),
           )
         : undefined;
     // Runtime authority is selected here, never by untrusted caller options.

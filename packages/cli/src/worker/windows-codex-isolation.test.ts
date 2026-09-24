@@ -113,6 +113,63 @@ async function writeAuth(codexHome: string): Promise<void> {
 }
 
 describe("native Windows Codex catalog preparation", () => {
+  it.each(["missing", "older"])(
+    "refreshes a %s cache privately without changing the user's home",
+    async (state) => {
+      const root = await temporaryRoot();
+      const canonical = join(root, ".codex");
+      await mkdir(canonical);
+      await writeAuth(canonical);
+      if (state === "older") await writeReviewedCache(canonical, "0.152.1");
+      const before = await readFile(
+        join(canonical, "models_cache.json"),
+        "utf8",
+      ).catch(() => undefined);
+      let calls = 0;
+      const result = await windowsIsolation.prepareNativeWindowsCodexIsolation(
+        "win32",
+        "codex-cli 0.155.1",
+        {},
+        root,
+        join(root, "output"),
+        async (privateHome) => {
+          calls++;
+          expect(privateHome).not.toBe(canonical);
+          expect(await readFile(join(privateHome, "auth.json"), "utf8")).toBe(
+            "private-auth",
+          );
+          await writeReviewedCache(privateHome, "0.155.1");
+        },
+      );
+      expect(calls).toBe(1);
+      if (result === undefined) throw new Error("Expected Windows isolation");
+      const catalog = JSON.parse(
+        await readFile(result.codexModelCatalogPath, "utf8"),
+      ) as windowsIsolation.HardenedCodexModelCatalog;
+      expect(catalog.models[0]?.shell_type).toBe("disabled");
+      expect(
+        await readFile(join(canonical, "models_cache.json"), "utf8").catch(
+          () => undefined,
+        ),
+      ).toBe(before);
+    },
+  );
+
+  it("still refuses stale metadata after a refresh attempt", async () => {
+    const root = await temporaryRoot();
+    await mkdir(join(root, ".codex"));
+    await expect(
+      windowsIsolation.prepareNativeWindowsCodexIsolation(
+        "win32",
+        "codex-cli 0.155.1",
+        {},
+        root,
+        join(root, "output"),
+        async (privateHome) => writeReviewedCache(privateHome, "0.155.0"),
+      ),
+    ).rejects.toThrow("older than running Codex 0.155.1");
+  });
+
   it("derives a private static catalog from Codex's reviewed cache", async () => {
     const root = await temporaryRoot();
     const codexHome = join(root, "codex-home");

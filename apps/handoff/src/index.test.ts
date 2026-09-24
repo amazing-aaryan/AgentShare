@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { handleRequest, renderTrustedHandoffPage } from "./index.js";
+import type { BootstrapDocument } from "@agentshare/web/v2";
 
 describe("trusted handoff worker", () => {
   it("serves the v1 handoff page with restrictive headers", async () => {
@@ -50,7 +51,7 @@ describe("trusted handoff worker", () => {
     );
     await expect(bootstrap.json()).resolves.toMatchObject({
       environmentProtocol: "agentshare-environment-v2",
-      release: { version: "0.3.4" },
+      release: { version: "0.3.14" },
       actions: { accept: { command: "agentshare bootstrap" } },
     });
   });
@@ -66,7 +67,49 @@ describe("trusted handoff worker", () => {
     );
     expect(html).not.toContain("fetch(original.origin");
     expect(html).not.toMatch(/fetch\([^)]*fragmentKey/u);
-    expect(html).toContain("agentshare-0.3.4.tgz");
+    expect(html).toContain("agentshare-0.3.14.tgz");
     expect(html).not.toContain("agentshare-0.3.2.tgz");
+  });
+
+  it("lets a fresh recipient follow the setup link exactly as rendered", async () => {
+    const pageUrl =
+      "https://handoff.example/e/env_12345678901234567890?relay=https%3A%2F%2Frelay.example";
+    const page = await handleRequest(new Request(pageUrl)).text();
+    const setupPath = /href="([^"]+\/bootstrap\.json)"/u.exec(page)?.[1];
+    expect(setupPath).toBeDefined();
+    if (setupPath === undefined) throw new Error("Setup link missing");
+    const setup = handleRequest(new Request(new URL(setupPath, pageUrl)));
+    expect(setup.status).toBe(200);
+    const instructions = (await setup.json()) as BootstrapDocument;
+    expect(instructions.actions.install.command).toBe(
+      `npm install --global --ignore-scripts ${instructions.release.packageUrl}`,
+    );
+    expect(instructions.actions.ask.codex).toContain(
+      "agentshare ask --target codex",
+    );
+    expect(instructions.actions.ask.claude).toContain(
+      "agentshare ask --target claude",
+    );
+    expect(instructions.actions.ask.codex).toContain("--environment");
+    expect(instructions.actions.propose.claude).toContain("--environment");
+    expect(page).toContain("same session");
+    expect(page).toContain("agentshare ask");
+    expect(page).toContain("environmentId from bootstrap");
+  });
+
+  it("serves public setup metadata without a relay or capability", async () => {
+    const response = handleRequest(
+      new Request(
+        "https://handoff.example/e/env_12345678901234567890/bootstrap.json",
+      ),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toHaveProperty("release.packageUrl");
+    // The environment page still requires the relay in the original link.
+    expect(
+      handleRequest(
+        new Request("https://handoff.example/e/env_12345678901234567890"),
+      ).status,
+    ).toBe(400);
   });
 });

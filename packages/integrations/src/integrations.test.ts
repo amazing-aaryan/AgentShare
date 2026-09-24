@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   installCreatorMcpConfiguration,
+  hostSkillsCurrent,
+  installHostSkills,
   installIntegrations,
   installReceiverIntegrations,
   removeIntegrations,
@@ -71,7 +73,19 @@ describe("host integrations", () => {
     );
     expect(claudeCreator).toContain("disable-model-invocation: true");
     expect(claudeCreator).toContain("interactive terminal");
-    expect(codexCreatorSkill).toContain("native human confirmation");
+    expect(codexCreatorSkill).toContain("native form");
+    expect(codexCreatorSkill).toContain("select_share_options");
+    expect(codexCreatorSkill).toContain("arrow keys");
+    expect(codexCreatorSkill).toContain("press Enter");
+    expect(codexCreatorSkill).toContain("do not ask choices in chat");
+    expect(codexCreatorSkill).toContain(
+      "Do not open review pages unless the user asks",
+    );
+    expect(codexCreatorSkill).toContain("/permissions");
+    expect(codexCreatorSkill).toContain("no `/approvals` command");
+    expect(codexCreatorSkill).not.toContain("run `/approvals`");
+    expect(codexCreatorSkill).toContain("On Request");
+    expect(codexCreatorSkill).toContain("never launch the terminal fallback");
     expect(codexCreatorSkill).toContain("agentshare session-context");
     expect(claudeReceiver).toContain("/e/");
     expect(claudeReceiver).toContain("agentshare ask");
@@ -107,6 +121,27 @@ describe("host integrations", () => {
     await expect(
       readFile(join(roots.codexSkills, "agentshare", "SKILL.md"), "utf8"),
     ).rejects.toThrow();
+  });
+
+  it("installs host skills after MCP connection without changing its config", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-mcp-setup-"));
+    directories.push(root);
+    const config = join(root, "config.toml");
+    const original = '[mcp_servers.agentshare_creator]\ncommand = "npm"\n';
+    await writeFile(config, original);
+    const roots = {
+      codexConfig: config,
+      codexSkills: join(root, "codex"),
+      claudeSkills: join(root, "claude"),
+    };
+    expect(await hostSkillsCurrent(roots)).toBe(false);
+    const files = await installHostSkills(roots);
+    expect(files).toHaveLength(6);
+    expect(await hostSkillsCurrent(roots)).toBe(true);
+    expect(await readFile(config, "utf8")).toBe(original);
+    expect(
+      await readFile(join(roots.codexSkills, "agentshare", "SKILL.md"), "utf8"),
+    ).toContain("select_share_options");
   });
 
   it("refreshes older AgentShare-managed integration content", async () => {

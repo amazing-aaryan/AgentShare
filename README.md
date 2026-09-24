@@ -30,13 +30,11 @@ Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 > regulated data, or other high-risk material. Review the final normalized text,
 > included files, exclusions, and redactions before publication.
 
-> [!NOTE] This repository contains the **v0.3.1 release candidate**. The native
-> Windows Codex 0.152.1 integration still requires fresh authenticated
-> acceptance under [`codex-native-windows-v2`](docs/release-v0.3.1.md). Green CI
-> or a deployed Worker alone is not stable sign-off. The historical v0.3.0
-> evidence profile remains unchanged. Use the current stable GitHub release
-> rather than candidate source for ordinary installation, and keep the
-> public-beta data warning above.
+> [!NOTE] This repository contains the **v0.3.14 candidate**. Native Codex
+> approval and the full real-host handoff still require fresh acceptance under
+> the [v0.3.14 release notes](docs/release-v0.3.14.md). Green CI alone is not
+> stable sign-off. Use the current stable GitHub release rather than candidate
+> source for ordinary installation, and keep the public-beta data warning above.
 
 ## Principles
 
@@ -65,19 +63,31 @@ The v2 product model is deliberately small:
 **select context -> review -> send one link -> recipient chooses an agent ->
 continue**
 
-### 1. Install the stable CLI and integrations
+### 1. Connect AgentShare in Codex
 
-Requirements: Node.js 22 or newer, plus a supported Codex CLI or reviewed Claude
-Code version. Install the current immutable package from
-[GitHub Releases](https://github.com/amazing-aaryan/AgentShare/releases), then
-run:
+Requirements: Node.js 22 or newer and a supported, signed-in agent CLI. After
+v0.3.14 is published, a new Codex user can add its MCP server with one command:
+
+```powershell
+codex mcp add agentshare_creator -- cmd.exe /d /s /c npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.3.14/agentshare-0.3.14.tgz -- agentshare creator-mcp
+```
+
+On macOS/Linux, use `npm` in place of `cmd.exe /d /s /c npm`. The pinned
+AgentShare program is downloaded when Codex first starts the MCP server. At
+first use, call `setup_agentshare`; its native Install/Cancel choice asks before
+installing the same pinned CLI globally and writing six managed Codex and Claude
+skill files. Cancel writes no files. Continue sharing through the connected MCP
+tools in that session; new sessions also discover the skills. Native choices
+require Codex interactive permissions (`On Request`).
+
+Existing CLI users can still refresh the MCP connection and skills with:
 
 ```powershell
 agentshare init
 ```
 
-Start a new Codex or Claude Code session so the host discovers the managed
-integration. Recipient compatibility policy and reviewed evidence are tracked in
+Start a new Codex or Claude Code session after changing its MCP configuration.
+Recipient compatibility policy and reviewed evidence are tracked in
 [recipient compatibility](docs/recipient-compatibility.md).
 
 ### 2. Create a collaborative environment
@@ -100,21 +110,24 @@ For a new environment, AgentShare asks the creator to choose:
 - **access:** read + propose changes or read only;
 - **expiry:** 1 hour, 24 hours, or 72 hours.
 
-AgentShare then shows a publication summary with included files, exclusions,
-redactions, access mode, and expiry. Creator selection and final review require
-an interactive terminal. If a host shell cannot provide one, the managed skill
-asks the user to run the command in a real terminal. There is no public `--yes`
-approval bypass.
+In Codex, the choices and final Publish/Cancel action use native forms with
+arrow keys and Enter in the same session. AgentShare shows a concise summary
+before publication. Native prompts must be enabled; YOLO mode auto-cancels them.
+The direct CLI and Claude creator paths require an interactive terminal. There
+is no public `--yes` approval bypass.
 
 After approval, AgentShare prints one complete `/e/` capability link. Send that
 link only to intended recipients.
 
 ### 3. Receive the link
 
-A recipient with AgentShare integrations installed can paste the complete `/e/`
-link directly into a supported Codex or Claude Code host. The receiver
-integration treats the link as a bearer secret, attaches it locally, and does
-not copy decrypted shared files into the recipient's current project.
+A recipient can paste the complete `/e/` link into Codex or Claude Code and ask
+to open it. First-time recipients need Node.js 22+ and a supported, signed-in
+agent CLI. The handoff page gives their agent a pinned installation command,
+bootstrap instructions, and question/proposal commands usable immediately in the
+same session. No SDK, manual MCP setup, or receiver restart is required. The
+receiver attaches the context locally without copying decrypted shared files
+into the recipient's current project.
 
 The explicit CLI path is:
 

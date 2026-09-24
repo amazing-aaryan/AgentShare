@@ -6,3 +6,5 @@ package-lock.json
 chat-transcript.md
 plans/
 docs/superpowers/
+# AGENTS.md requires decision memory to remain append-only.
+reasoning.md

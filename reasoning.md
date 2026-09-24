@@ -894,3 +894,87 @@ yields exactly the intended user and assistant events with no managed markers.
 Full 353-test serial suite, lint, format, build, package, edge, conformance,
 audit, real Codex MCP, hostile isolation, and continuity gates pass. New 18/18
 native acceptance remains mandatory before stable readiness.
+
+## [2026-09-19 01:01] Require typed native owner confirmation
+
+**Decision:** Replace default-false boolean confirmation with an explicit action word in the MCP native form; distinguish incomplete, unsupported, and timed-out responses without relaxing fail-closed publication.
+**Why:** A user can accept a host/tool prompt yet leave `confirm: false`; Codex may also return `action: accept` with empty content. Both previously surfaced as a generic cancellation, obscuring the actual boundary.
+**Impact:** Native publication requires `PUBLISH`, proposal application `APPLY`, revocation `REVOKE`. Synthetic protocol tests do not prove native UI acceptance; a changed release artifact needs a new version and fresh native acceptance.
+
+## [2026-09-19 01:15] Package and validate local v0.3.5 candidate
+
+**Decision:** Version the repair as v0.3.5, package and install it locally, and keep public release gated on real-host acceptance.
+**Why:** v0.3.4 is immutable candidate evidence; changed approval bytes need a distinct version. Build, package smoke, typecheck, lint, 15 focused creator/integration tests, and 23 serial creator/draft/share tests passed. The parallel full suite had 355 passes and two 30-second Windows timeouts; both timed-out files passed on serial rerun with a 60-second timeout.
+**Impact:** Installed v0.3.5 bundle SHA-256 is `B2249909C14F567897E0D67742981CBE63DE5052896F8DE70EC0E3294D677D3C`; archive SHA-256 is `43933FC9CC05CF8F73DAAA5ED185D3136387A3AD62C3788B42E505798B6F93F2`. Native human confirmation, complete acceptance, and public release remain unverified.
+
+## [2026-09-19 11:37] Version YOLO/in-session fallback repair as v0.3.7
+
+**Decision:** Add explicit YOLO detection and same-session retry guidance to the managed creator skill; prohibit automatic terminal fallback when user wants to stay in Codex; version and install as v0.3.7.
+**Why:** Real transcript showed `permissions: YOLO mode`, native `commit_share` cancellation, then model-launched terminal fallback. The first failure is expected under `approval_policy=never`; the second diverges from user intent.
+**Impact:** Build/typecheck and 16 focused creator/integration tests pass. Global CLI is v0.3.7 and managed skill contains YOLO, `/approvals`, `On Request`, same-draft retry, and no-terminal guidance. Public release and native acceptance remain pending.
+
+## [2026-09-19 11:52] Version native select UX as v0.3.8
+
+**Decision:** Version and install the native select-form UX as v0.3.8; managed instructions now say arrow keys + Enter and prohibit automatic terminal fallback for same-session requests.
+**Why:** Typed confirmation did not satisfy the requested native usability. Codex’s MCP form renderer supports titled `oneOf` string options, which maps to a native select control.
+**Impact:** Installed v0.3.8 bundle SHA-256 is `4E19AFD350247D32147908BA614BE5ABB6AF70E528C7498F4A2EA7041209472C`; native acceptance and public release remain pending. User must restart Codex once so its MCP process loads v0.3.8; after that the entire share flow remains in-session.
+
+## [2026-09-19 12:10] Complete native option selection as v0.3.9
+**Decision:** Add native `select_share_options` for scope, access, and expiry, then server-bind accepted values before `prepare_share`; bump candidate to v0.3.9.
+**Why:** User requires no typed configuration at any stage. Final publish selection was native, but initial share configuration still asked in chat.
+**Impact:** All creator choices now use native arrow-key + Enter forms in one Codex session. Tests cover schema and anti-override binding. Native host acceptance remains required.
+
+## [2026-09-19 12:15] Install v0.3.9 globally
+**Decision:** Package CLI v0.3.9, install it at the user global path, and refresh integrations.
+**Why:** Native share-option behavior must be loaded by the actual Codex MCP executable, not only source tests.
+**Impact:** `agentshare --version` returns 0.3.9; installed bundle matches build SHA-256 `35422D283B90A39AB4052E65F5A93BAB06C39AAD6328F1A92835D235CF09AC1B`. Restart/reload current Codex MCP process before use.
+
+## [2026-09-19 12:11] Reinstall final v0.3.9 managed skill
+**Decision:** Rebuild and reinstall after removing typed action-token wording.
+**Why:** Arrow-key + Enter must be the only user input path.
+**Impact:** Global v0.3.9 and managed skill refreshed; installed/source bundle SHA-256 `AB11E707EA923C42EA47AB6FAA8E9FCE58D0486D268DAF0A445D7F456B6ABB9A`.
+
+## [2026-09-19 12:13] Stop instead of typed moved-root override
+**Decision:** Update managed instructions to stop on unavailable recorded root, then rebuild/install v0.3.9.
+**Why:** Standard creator flow must require only native arrow-key + Enter choices.
+**Impact:** Final global v0.3.9 bundle matches source SHA-256 `FCE5324D1314FB6F49932E30986F3F4F0EC84B7CAF9757C5B4C9A086D413A42B`.
+
+## [2026-09-19 19:52] Fix Codex permission recovery as v0.3.10
+**Decision:** Use `/permissions` instead of `/approvals` in all current skill/diagnostic guidance; add regression coverage and install v0.3.10.
+**Why:** Codex CLI 0.155.1 rejects `/approvals`; native AgentShare options then cancel under YOLO policy with no valid recovery instruction.
+**Impact:** Focused tests 18/18 pass; full suite 357 passed/8 skipped plus proposal file 16/16 at extended timeout. Installed/source bundle SHA-256 `4849D22949CC2ACBF6AD0F8C1E7590353591B7B5F60B140DD1F3F59BC042D143`; packaged smoke reports server version 0.3.10.
+
+## [2026-09-20 01:47] Ship simple v0.3.11 creator path
+**Decision:** Rename native fields to Files to share and Duration, return canonical prepare values, shorten managed skill to summary → Publish/Cancel, and install v0.3.11.
+**Why:** User explicitly rejects complex review-page interaction; native form should expose only primary choices.
+**Impact:** Global `agentshare --version` is 0.3.11. Installed/source bundle SHA-256 `87B9801F3CF50CC68D62A8A2557AFBAA58A9407814390A2D44D8A79846F80905`.
+
+## [2026-09-20 01:52] Fix v0.3.12 native required fields
+**Decision:** Align native elicitation `required` with the simplified `files`, `access`, and `duration` properties; rebuild and reinstall.
+**Why:** Stale `scope/access/expiry` required names would prevent Codex from accepting the new one-form UX.
+**Impact:** Global CLI is 0.3.12; focused creator/integration tests 17/17, typecheck, build, formatting, packaged smoke, and installed/source hash match pass. SHA-256 `242EC8FFBA8DA43BF63BB2DD6B84BD7C6129ACAE7806AA4DB01F80FC40CB2E78`.
+
+## [2026-09-20 02:00] Validate full v0.3.12 suite
+**Decision:** Run all Vitest tests with `--testTimeout=60000` after v0.3.12 installation.
+**Why:** Confirm the simplified native flow did not regress unrelated creator, relay, protocol, or integration behavior.
+**Impact:** 359 tests passed, 8 skipped across 69 files; 3 files skipped; no failures.
+
+## [2026-09-20 12:34] Record fresh-recipient setup gap
+**Decision:** Keep the requested UX walkthrough explicit about implemented behavior and unverified first-install automation.
+**Why:** Deployed `renderEnvironmentPage` advertises a bootstrap path without the `relay` query that `apps/handoff/src/index.ts` requires. Read-only GET without query returns HTTP 400 `Invalid AgentShare relay origin`; GET preserving query returns bootstrap metadata pinned to v0.3.4. GitHub API confirms v0.3.4 is a published prerelease; local native sender v0.3.12 is not that public artifact.
+**Impact:** Fix the bootstrap navigation before claiming bare-link onboarding works on a fresh recipient machine. `bootstrapEnvironment` installs receiver skills, while `ask`/`propose` start their own MCP child worker; there is no need for separate SDK or manual receiver MCP configuration. This audit changed no product code or deployment.
+
+## [2026-09-20 13:12] Validate v0.3.13 fresh-recipient corrections
+**Decision:** Fix the rendered setup-link route, publish exact install/ask/propose metadata, retain explicit environment IDs in receiver instructions, and refresh missing or incompatible Codex model metadata through an isolated app-server without changing canonical metadata or weakening validation.
+**Why:** Reproduced the queryless bootstrap failure before fixing it. The real packaged Codex run then found a 0.155.0/0.155.1 metadata mismatch; independent review found the second-attachment ambiguity. Add regression checks for each observed failure.
+**Impact:** Full coverage: 370 passed, 8 skipped, no failures. Real local packaged diagnostic: all 9 stages passed with two attachments and no initial model cache; canonical metadata remained unchanged. Lint/build/format, release tools (115 tests), package smoke, edge runtime, and dependency audit passed. Human native-UI acceptance and autonomous public-link onboarding remain distinct evidence gaps. v0.3.13 is a local candidate, not yet a published or deployed release; requested authorization before external rollout.
+
+## [2026-09-20 13:16] Final artifact installed and clean-recipient diagnostic repeated
+**Decision:** Install v0.3.13 globally, regenerate integrations, and repeat the 9-stage real Codex diagnostic against the exact final archive. Add persisted-state public-test cleanup with private recovery retention before any public diagnostic run.
+**Why:** Post-review packaging must be tied to actual test evidence, not an earlier build. A lost commit response or failed revoke must not erase the synthetic share's recovery capability.
+**Impact:** All 9 stages passed again; archive SHA-256 `2ddcab849b04544e652062b22b92526a2043964c88a30d4e2ddf062e707e5c8c`, 161393 bytes. Installed/source bundle SHA-256 `1CF6D0C7D5586C689F50B605F946398C40FC65DEDE3BBDDAE817DCBB67EEC18F`. Release-tool tests now 118 passed and independent review approved. Public prerelease/deployment authorization remains pending; no push, PR, release, or deployment performed. Native human-UI and real Claude acceptance remain unverified.
+
+## [2026-09-24 10:17] Stage connection-first v0.3.14 onboarding
+**Decision:** Add MCP first-use native Install/Cancel setup for the pinned global CLI and six managed host skills, keep direct-link recipient setup in the same session, and target a new immutable v0.3.14 release.
+**Why:** Users should connect once, approve required local files, then share or open links without manual integration steps; MCP code must be downloaded before the server can start.
+**Impact:** Cancel or incomplete forms perform no setup writes. Publication and deployment still require exact package, CI, live smoke, and human acceptance evidence.

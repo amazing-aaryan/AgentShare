@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -73,6 +74,85 @@ type UpdateOptions = CheckOptions & {
   npmCliPath?: string;
   cliEntrypoint?: string;
 };
+
+type PinnedInstallOptions = Pick<
+  UpdateOptions,
+  "runProcess" | "platform" | "nodeExecutable" | "npmCliPath"
+> & { version?: string; cliEntrypoint?: string };
+
+export function pinnedGlobalCliInstalled(
+  options: PinnedInstallOptions = {},
+): boolean {
+  const version = options.version ?? AGENTSHARE_VERSION;
+  let npm: { command: string; args: string[] };
+  try {
+    npm = resolveNpmInvocation({
+      platform: options.platform ?? process.platform,
+      nodeExecutable: options.nodeExecutable ?? process.execPath,
+      ...(options.npmCliPath === undefined
+        ? {}
+        : { npmCliPath: options.npmCliPath }),
+    });
+  } catch {
+    return false;
+  }
+  const result = (options.runProcess ?? defaultProcessRunner)(
+    npm.command,
+    [...npm.args, "ls", "--global", "--json", "--depth=0", "agentshare"],
+    { inherit: false },
+  );
+  if (!processSucceeded(result)) return false;
+  try {
+    const payload = JSON.parse(result.stdout) as {
+      dependencies?: { agentshare?: { version?: unknown } };
+    };
+    if (payload.dependencies?.agentshare?.version !== version) return false;
+    const root = (options.runProcess ?? defaultProcessRunner)(
+      npm.command,
+      [...npm.args, "root", "--global"],
+      { inherit: false },
+    );
+    if (!processSucceeded(root) || root.stdout.trim().length === 0)
+      return false;
+    const running = options.cliEntrypoint ?? process.argv[1];
+    if (running === undefined) return false;
+    const installed = join(root.stdout.trim(), "agentshare", "dist", "bin.js");
+    const digest = (path: string) =>
+      createHash("sha256").update(readFileSync(path)).digest("hex");
+    return digest(running) === digest(installed);
+  } catch {
+    return false;
+  }
+}
+
+/** Called only after native first-use consent. */
+export function installPinnedGlobalCli(
+  options: PinnedInstallOptions = {},
+): void {
+  const version = options.version ?? AGENTSHARE_VERSION;
+  const npm = resolveNpmInvocation({
+    platform: options.platform ?? process.platform,
+    nodeExecutable: options.nodeExecutable ?? process.execPath,
+    ...(options.npmCliPath === undefined
+      ? {}
+      : { npmCliPath: options.npmCliPath }),
+  });
+  const runProcess = options.runProcess ?? defaultProcessRunner;
+  const install = runProcess(
+    npm.command,
+    [
+      ...npm.args,
+      "install",
+      "--global",
+      "--ignore-scripts",
+      buildReleasePackageUrl(version),
+    ],
+    { inherit: false },
+  );
+  assertProcessSucceeded(install, "Pinned AgentShare CLI installation failed");
+  if (!pinnedGlobalCliInstalled({ ...options, runProcess, version }))
+    throw new Error("Pinned AgentShare CLI verification failed");
+}
 
 export function defaultUpdateCachePath(): string {
   return join(homedir(), ".agentshare", "update-check-v1.json");
@@ -401,7 +481,9 @@ function defaultProcessRunner(
   const result = spawnSync(
     command,
     args,
-    options.inherit ? { stdio: "inherit" } : { encoding: "utf8" },
+    options.inherit
+      ? { stdio: "inherit", timeout: 120_000 }
+      : { encoding: "utf8", timeout: 120_000, maxBuffer: 1_048_576 },
   );
   return {
     status: result.status,
