@@ -17,16 +17,20 @@ than through a proprietary server-side session store.
 
 Requires Node.js 22 or newer.
 
-> [!NOTE] This package is the **v0.3.1 release candidate** for collaborative
-> environments. Native Windows Codex 0.152.1 acceptance and public deployment
+> [!NOTE] This package is the **v0.3.14 candidate** for collaborative
+> environments. Native Windows Codex acceptance and public deployment
 > verification remain required before stable promotion. Do not infer readiness
 > from the package version alone. Use the published stable GitHub release for
 > ordinary installation and do not share high-risk data through the public beta.
 
 ## Create an Environment
 
-After installing the CLI and running `agentshare init`, start a new Codex or
-Claude Code session so the host discovers the AgentShare integration.
+In Codex, connect the pinned MCP package (see the
+[project setup](../../README.md)) and call `setup_agentshare` at first use. The
+native Install/Cancel choice installs the pinned global CLI and local
+integration files only when accepted. Existing CLI users can run
+`agentshare init` and start a new host session after the MCP configuration
+changes.
 
 Use `$agentshare` in Codex or `/share` in Claude Code. The direct CLI
 equivalents are:
@@ -42,10 +46,12 @@ For a new v2 environment, AgentShare interactively asks for:
 - access: read + propose changes or read only;
 - expiry: 1 hour, 24 hours, or 72 hours.
 
-It then shows the included-file summary, exclusions, redactions, access mode,
-and expiry before publication. Creator selection and final review require an
-interactive terminal and fail closed when one is not available. There is no
-public `--yes` approval bypass.
+In Codex, these choices and the final Publish/Cancel action are native forms
+operated with arrow keys and Enter in the same session. A concise summary
+appears before publication. YOLO mode auto-cancels native prompts; enable
+interactive prompts through `/permissions` first. Direct CLI and Claude creator
+flows require an interactive terminal. There is no public `--yes` approval
+bypass.
 
 The output is one split-origin `/e/` capability link. Send the complete link
 only to intended recipients.
@@ -76,11 +82,12 @@ recipient capability URL.
 
 ## Receive an Environment
 
-`agentshare init` installs automatic receiver integrations for supported Codex
-and Claude Code hosts. A recipient can paste a complete AgentShare `/e/` link
-into a supported host; the integration treats it as a bearer secret and attaches
-it through AgentShare rather than copying decrypted files into the current
-project.
+Paste a complete AgentShare `/e/` link into Codex or Claude Code and ask to open
+it. For a first-time recipient, the handoff page gives the agent the pinned
+installation command and instructions to attach and query in the same session.
+Node.js 22+ and a supported, signed-in agent CLI are required. No SDK or manual
+MCP configuration is needed. Bootstrap installs receiver integrations for future
+sessions; the current agent can use the page's commands immediately.
 
 The explicit CLI path is:
 
@@ -94,19 +101,22 @@ interactive input, not as a shell argument.
 After an environment is attached:
 
 ```sh
-agentshare ask --target codex --question "What remains unresolved?"
-agentshare ask --target claude --question "What remains unresolved?"
+agentshare ask --target codex --environment <attached-id> --question "What remains unresolved?"
+agentshare ask --target claude --environment <attached-id> --question "What remains unresolved?"
 ```
 
 AgentShare refreshes approved revisions and starts an isolated supported child
-agent with only the local AgentShare evidence interface.
+agent with only the local AgentShare evidence interface. Use the environment ID
+returned by bootstrap so multiple attached links remain unambiguous. On Windows,
+missing or stale Codex model metadata is automatically refreshed in a private
+home before applying the normal tool restrictions.
 
 If the environment includes proposal access, an explicit requested change can be
 submitted as encrypted proposal ciphertext:
 
 ```sh
-agentshare propose --target codex --instruction "Update the parser tests"
-agentshare propose --target claude --instruction "Update the parser tests"
+agentshare propose --target codex --environment <attached-id> --instruction "Update the parser tests"
+agentshare propose --target claude --environment <attached-id> --instruction "Update the parser tests"
 ```
 
 A proposal never writes the creator's workspace directly.

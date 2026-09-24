@@ -14,6 +14,7 @@ import {
 
 type JsonObject = Record<string, unknown>;
 type VersionTuple = readonly [major: number, minor: number, patch: number];
+class ModelCacheRefreshRequired extends Error {}
 
 export const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION = "0.152.1";
 const MINIMUM_REVIEWED_NATIVE_WINDOWS_CODEX_VERSION_TUPLE: VersionTuple = [
@@ -48,6 +49,7 @@ export async function prepareNativeWindowsCodexIsolation(
   environment: NodeJS.ProcessEnv,
   defaultHome: string,
   outputDirectory: string,
+  refreshModelCache?: (privateHome: string) => Promise<void>,
 ): Promise<NativeWindowsCodexIsolation | undefined> {
   if (platform !== "win32") return undefined;
   const runningVersion = reviewedNativeWindowsCodexVersion(versionOutput);
@@ -57,11 +59,6 @@ export async function prepareNativeWindowsCodexIsolation(
     );
   }
   const canonicalCodexHome = await resolveCodexHome(environment, defaultHome);
-  const codexModelCatalogPath = await prepareHardenedCodexModelCatalog(
-    canonicalCodexHome,
-    outputDirectory,
-    runningVersion,
-  );
   // Codex may refresh models_cache.json during startup even when an explicit
   // model catalog is supplied. Give the recipient a private provider home so
   // that refreshes cannot mutate the creator's canonical home. Copy only the
@@ -71,6 +68,25 @@ export async function prepareNativeWindowsCodexIsolation(
     canonicalCodexHome,
     outputDirectory,
   );
+  let codexModelCatalogPath: string;
+  try {
+    codexModelCatalogPath = await prepareHardenedCodexModelCatalog(
+      canonicalCodexHome,
+      outputDirectory,
+      runningVersion,
+    );
+  } catch (error) {
+    if (!(error instanceof ModelCacheRefreshRequired) || !refreshModelCache)
+      throw error;
+    await refreshModelCache(codexHome);
+    // Validate and harden the newly fetched catalog with identical checks.
+    // Never edit the canonical cache or relabel stale metadata as current.
+    codexModelCatalogPath = await prepareHardenedCodexModelCatalog(
+      codexHome,
+      outputDirectory,
+      runningVersion,
+    );
+  }
   return {
     canonicalCodexHome,
     codexHome,
@@ -145,7 +161,7 @@ export async function prepareHardenedCodexModelCatalog(
   try {
     serialized = await readFile(cachePath, "utf8");
   } catch {
-    throw new Error(
+    throw new ModelCacheRefreshRequired(
       "Codex models cache is unavailable for reviewed native Windows isolation; run Codex normally once to refresh its model metadata, then retry AgentShare",
     );
   }
@@ -154,11 +170,18 @@ export async function prepareHardenedCodexModelCatalog(
   try {
     parsed = JSON.parse(serialized);
   } catch {
-    throw new Error(
+    throw new ModelCacheRefreshRequired(
       "Codex models cache is invalid JSON; refresh Codex model metadata before retrying AgentShare",
     );
   }
-  const hardened = hardenCodexModelsCache(parsed, runningVersion);
+  let hardened: HardenedCodexModelCatalog;
+  try {
+    hardened = hardenCodexModelsCache(parsed, runningVersion);
+  } catch (error) {
+    throw new ModelCacheRefreshRequired(
+      error instanceof Error ? error.message : "Invalid Codex model metadata",
+    );
+  }
 
   await ensurePrivateDirectory(outputDirectory);
   const outputPath = join(outputDirectory, "codex-model-catalog.json");

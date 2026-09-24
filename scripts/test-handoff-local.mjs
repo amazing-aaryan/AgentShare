@@ -1,4 +1,4 @@
-/** Real packaged Codex handoff against loopback. Synthetic MCP approvals are NOT native UI evidence. */
+/** Real packaged Codex handoff. Synthetic MCP approvals are NOT native UI evidence. */
 import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -15,6 +15,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { createServer } from "node:http";
 import { promisify } from "node:util";
 import {
   createRelayHandler,
@@ -22,18 +23,53 @@ import {
   startNodeServer,
 } from "../apps/relay/src/index.ts";
 import { EnvironmentRelayClient } from "../packages/cli/src/environment/relay-client.ts";
-import { findOwnedEnvironment } from "../packages/cli/src/environment/state.ts";
+import {
+  findOwnedEnvironment,
+  loadEnvironmentState,
+} from "../packages/cli/src/environment/state.ts";
+import { ensurePrivateDirectory } from "../packages/cli/src/environment/private-store.ts";
 import { readOwnedSnapshot } from "../packages/cli/src/environment/owned-snapshot.ts";
+import { handleRequest as handoffRequest } from "../apps/handoff/src/index.ts";
+import { revokeHandoffFixtures } from "./handoff-fixture-cleanup.mjs";
 
 const execute = promisify(execFile);
+const freshModelCache = process.argv.includes("--fresh-model-cache");
+const publicRelay = process.env.AGENTSHARE_E2E_RELAY;
+const publicHandoff = process.env.AGENTSHARE_E2E_HANDOFF;
+const publicPackage = process.env.AGENTSHARE_E2E_PACKAGE;
+if (
+  Boolean(publicRelay) !== Boolean(publicHandoff) ||
+  Boolean(publicRelay) !== Boolean(publicPackage)
+) {
+  throw new Error(
+    "Public diagnostic requires relay, handoff, and exact package URL together",
+  );
+}
+if (publicRelay) {
+  assert.equal(
+    publicRelay,
+    "https://agentshare-relay.carnation-vermicelli.workers.dev",
+  );
+  assert.equal(
+    publicHandoff,
+    "https://agentshare-handoff.carnation-vermicelli.workers.dev",
+  );
+  assert.match(
+    publicPackage,
+    /^https:\/\/github\.com\/amazing-aaryan\/AgentShare\/releases\/download\/v\d+\.\d+\.\d+\/agentshare-\d+\.\d+\.\d+\.tgz$/u,
+  );
+}
 const root = await mkdtemp(join(tmpdir(), "agentshare-packaged-handoff-"));
+await ensurePrivateDirectory(root);
 const report = {
-  evidenceKind: "local-protocol-diagnostic",
+  evidenceKind: publicRelay
+    ? "public-protocol-diagnostic"
+    : "local-protocol-diagnostic",
   promotable: false,
   startedAt: new Date().toISOString(),
   cases: [],
   limitations: [
-    "Loopback relay, not deployed Workers",
+    ...(publicRelay ? [] : ["Loopback relay, not deployed Workers"]),
     "Synthetic protocol confirmations, not native human UI",
     "Terminal PTY flow not covered",
   ],
@@ -43,9 +79,20 @@ const server = startNodeServer(createRelayHandler(new InMemoryRelayStore()), 0);
 await once(server, "listening");
 const address = server.address();
 assert(address && typeof address !== "string");
-const relay = `http://127.0.0.1:${address.port}`;
+const relay = publicRelay ?? `http://127.0.0.1:${address.port}`;
+const handoffServer = createServer(async (request, response) => {
+  const result = handoffRequest(new Request(`http://127.0.0.1${request.url}`));
+  response.writeHead(result.status, Object.fromEntries(result.headers));
+  response.end(await result.text());
+});
+handoffServer.listen(0, "127.0.0.1");
+await once(handoffServer, "listening");
+const handoffAddress = handoffServer.address();
+assert(handoffAddress && typeof handoffAddress !== "string");
+const handoff = publicHandoff ?? `http://127.0.0.1:${handoffAddress.port}`;
 let owner;
 let environmentId;
+let secondEnvironmentId;
 let canonicalModelCachePath;
 let canonicalModelCacheBefore;
 const ownerState = join(root, "owner", ".agentshare", "state-v2.json");
@@ -62,6 +109,17 @@ try {
   assert(archive);
   const archiveBytes = await readFile(join(root, archive));
   const archiveHash = createHash("sha256").update(archiveBytes).digest("hex");
+  if (publicPackage) {
+    const response = await fetch(publicPackage);
+    assert.equal(response.status, 200);
+    const publishedBytes = Buffer.from(await response.arrayBuffer());
+    assert.equal(
+      createHash("sha256").update(publishedBytes).digest("hex"),
+      archiveHash,
+      "Published package must match the exact locally built artifact",
+    );
+    report.publishedArtifactVerified = true;
+  }
   const retainedPath = resolve(
     "artifacts",
     `${archive.slice(0, -4)}-${archiveHash.slice(0, 12)}.tgz`,
@@ -84,7 +142,7 @@ try {
       "--prefix",
       prefix,
       "--ignore-scripts",
-      join(root, archive),
+      publicPackage ?? join(root, archive),
     ],
     { windowsHide: true },
   );
@@ -106,20 +164,24 @@ try {
     join(isolatedCodexHome, "auth.json"),
   );
   canonicalModelCachePath = join(isolatedCodexHome, "models_cache.json");
-  await copyFile(
-    join(sourceCodexHome, "models_cache.json"),
-    canonicalModelCachePath,
-  );
-  canonicalModelCacheBefore = createHash("sha256")
-    .update(await readFile(canonicalModelCachePath))
-    .digest("hex");
-  const canonicalModelMetadata = JSON.parse(
-    await readFile(canonicalModelCachePath, "utf8"),
-  );
-  report.canonicalModelMetadata = {
-    clientVersion: canonicalModelMetadata.client_version,
-    beforeSha256: canonicalModelCacheBefore,
-  };
+  if (!freshModelCache) {
+    await copyFile(
+      join(sourceCodexHome, "models_cache.json"),
+      canonicalModelCachePath,
+    );
+    canonicalModelCacheBefore = createHash("sha256")
+      .update(await readFile(canonicalModelCachePath))
+      .digest("hex");
+    const canonicalModelMetadata = JSON.parse(
+      await readFile(canonicalModelCachePath, "utf8"),
+    );
+    report.canonicalModelMetadata = {
+      clientVersion: canonicalModelMetadata.client_version,
+      beforeSha256: canonicalModelCacheBefore,
+    };
+  } else {
+    report.canonicalModelMetadata = { cacheInitiallyPresent: false };
+  }
   const recipientEnvironment = {
     ...process.env,
     CODEX_HOME: isolatedCodexHome,
@@ -171,7 +233,7 @@ try {
       CODEX_HOME: join(ownerHome, ".codex"),
       AGENTSHARE_NO_UPDATE_CHECK: "1",
       AGENTSHARE_RELAY: relay,
-      AGENTSHARE_HANDOFF: relay,
+      AGENTSHARE_HANDOFF: handoff,
     },
     ownerState,
   );
@@ -183,11 +245,14 @@ try {
   const session = await owner.call("resolve_creator_session", {
     threadId: thread,
   });
+  const choices = await owner.call("select_share_options", {
+    sessionRef: session.sessionRef,
+  });
   const draft = await owner.call("prepare_share", {
     sessionRef: session.sessionRef,
-    scope: "both",
-    access: "read_propose",
-    ttlSeconds: 900,
+    scope: choices.scope,
+    access: choices.access,
+    ttlSeconds: choices.ttlSeconds,
   });
   const reviewed = await owner.call("review_share", {
     draftId: draft.draftId,
@@ -202,9 +267,57 @@ try {
   environmentId = published.environmentId;
   assert(typeof environmentId === "string");
   cases.push({
-    name: "packaged creator resolve/prepare/review/commit",
+    name: "packaged creator resolve/select/prepare/review/commit",
     status: "passed",
   });
+
+  // Follow the rendered setup link exactly, with no skills or configuration.
+  const publicUrl = new URL(published.url);
+  publicUrl.hash = "";
+  const pageResponse = await fetch(publicUrl);
+  assert.equal(pageResponse.status, 200);
+  const page = await pageResponse.text();
+  const setupPath = /href="([^"]+\/bootstrap\.json)"/u.exec(page)?.[1];
+  assert(setupPath, "Handoff page must expose a discoverable setup link");
+  const setupResponse = await fetch(new URL(setupPath, publicUrl));
+  assert.equal(setupResponse.status, 200);
+  const setup = await setupResponse.json();
+  assert.match(
+    setup.actions.install.command,
+    /^npm install --global --ignore-scripts https:\/\/github.com\//u,
+  );
+  assert.match(setup.actions.ask.codex, /agentshare ask --target codex/u);
+  if (publicPackage) assert.equal(setup.release.packageUrl, publicPackage);
+  assert.match(page, /same session/u);
+  cases.push({
+    name: "fresh recipient follows rendered setup link",
+    status: "passed",
+  });
+
+  // A separate install prefix and home cannot reuse the creator integration.
+  const recipientPrefix = join(root, "recipient-installed");
+  await execute(
+    process.execPath,
+    [
+      npm,
+      "install",
+      "--global",
+      "--prefix",
+      recipientPrefix,
+      "--ignore-scripts",
+      publicPackage ?? join(root, archive),
+    ],
+    { windowsHide: true },
+  );
+  const recipientNpmRoot = (
+    await execute(
+      process.execPath,
+      [npm, "root", "--global", "--prefix", recipientPrefix],
+      { windowsHide: true },
+    )
+  ).stdout.trim();
+  const recipientCli = join(recipientNpmRoot, "agentshare", "dist", "bin.js");
+  assert.notEqual(recipientCli, cli);
 
   const recipientState = join(recipientHome, ".agentshare", "state-v2.json");
   const storage = [
@@ -214,7 +327,7 @@ try {
     join(recipientHome, "cache"),
   ];
   const boot = await runCli(
-    cli,
+    recipientCli,
     ["bootstrap", ...storage],
     published.url + "\n",
     {
@@ -227,12 +340,63 @@ try {
   );
   assert.equal(boot.code, 0, boot.stderr);
   assert.equal(JSON.parse(boot.stdout).files, 1);
+  assert.match(
+    await readFile(
+      join(
+        recipientHome,
+        ".agents",
+        "skills",
+        "agentshare-receive",
+        "SKILL.md",
+      ),
+      "utf8",
+    ),
+    /agentshare ask/u,
+  );
+  await assert.rejects(readFile(join(recipientHome, ".codex", "config.toml")), {
+    code: "ENOENT",
+  });
   cases.push({
     name: "packaged isolated recipient bootstrap",
     status: "passed",
   });
+  const secondDraft = await owner.call("prepare_share", {
+    sessionRef: session.sessionRef,
+    scope: choices.scope,
+    access: choices.access,
+    ttlSeconds: choices.ttlSeconds,
+  });
+  const secondShare = await owner.call("commit_share", {
+    draftId: secondDraft.draftId,
+    digest: secondDraft.digest,
+  });
+  secondEnvironmentId = secondShare.environmentId;
+  const secondBoot = await runCli(
+    recipientCli,
+    ["bootstrap", ...storage],
+    secondShare.url + "\n",
+    {
+      ...process.env,
+      USERPROFILE: recipientHome,
+      HOME: recipientHome,
+      CODEX_HOME: join(recipientHome, ".codex"),
+    },
+  );
+  assert.equal(secondBoot.code, 0, secondBoot.stderr);
+  const ambiguous = await runCli(
+    recipientCli,
+    ["ask", "--question", "Read notes.txt", ...storage],
+    "",
+    recipientEnvironment,
+  );
+  assert.notEqual(ambiguous.code, 0);
+  assert.match(ambiguous.stderr, /Multiple environments attached/u);
+  cases.push({
+    name: "second link attaches; ambiguous commands are rejected",
+    status: "passed",
+  });
   const ask = await runCli(
-    cli,
+    recipientCli,
     [
       "ask",
       "--target",
@@ -256,7 +420,7 @@ try {
     status: "passed",
   });
   const proposed = await runCli(
-    cli,
+    recipientCli,
     [
       "propose",
       "--target",
@@ -308,7 +472,7 @@ try {
     status: "passed",
   });
   const refreshed = await runCli(
-    cli,
+    recipientCli,
     [
       "ask",
       "--target",
@@ -330,7 +494,7 @@ try {
   });
   await owner.call("revoke_share", { environmentId });
   const denied = await runCli(
-    cli,
+    recipientCli,
     [
       "ask",
       "--target",
@@ -349,11 +513,15 @@ try {
     name: "packaged owner revoke; recipient denied",
     status: "passed",
   });
-  const canonicalModelCacheAfter = createHash("sha256")
-    .update(await readFile(canonicalModelCachePath))
-    .digest("hex");
-  assert.equal(canonicalModelCacheAfter, canonicalModelCacheBefore);
-  report.canonicalModelMetadata.afterSha256 = canonicalModelCacheAfter;
+  if (!freshModelCache) {
+    const canonicalModelCacheAfter = createHash("sha256")
+      .update(await readFile(canonicalModelCachePath))
+      .digest("hex");
+    assert.equal(canonicalModelCacheAfter, canonicalModelCacheBefore);
+    report.canonicalModelMetadata.afterSha256 = canonicalModelCacheAfter;
+  } else {
+    await assert.rejects(readFile(canonicalModelCachePath), { code: "ENOENT" });
+  }
   report.canonicalModelMetadata.unchanged = true;
 } catch (error) {
   failed = error;
@@ -362,31 +530,47 @@ try {
       ? error.message.replace(/https?:\/\/\S+#[^\s]+/gu, "[capability omitted]")
       : String(error);
 } finally {
-  if (environmentId !== undefined) {
-    const remaining = await findOwnedEnvironment(environmentId, ownerState);
-    if (remaining !== undefined) {
-      try {
+  let retainFixture = false;
+  try {
+    const failures = await revokeHandoffFixtures({
+      closeOwner: async () => owner?.close(),
+      loadOwned: async () =>
+        (await loadEnvironmentState(ownerState)).ownedEnvironments,
+      revoke: async (remaining) => {
+        assert.equal(remaining.relayOrigin, relay);
         await new EnvironmentRelayClient(relay).revoke(
-          environmentId,
+          remaining.environmentId,
           remaining.revokeCapability,
         );
-      } catch (error) {
-        failed ??= error;
-        report.cleanupError = "Local fixture revocation failed";
-      }
-    }
+      },
+    });
+    if (failures.length > 0) throw new Error("Fixture revocation failed");
+  } catch (error) {
+    failed ??= error;
+    retainFixture = true;
+    report.cleanupError =
+      "Test-share cleanup incomplete; private fixture retained for recovery";
+    report.recoveryStatePath = ownerState;
   }
-  await owner?.close();
+  handoffServer.closeAllConnections();
+  await new Promise((done) => handoffServer.close(() => done()));
   server.closeAllConnections();
   await new Promise((done) => server.close(() => done()));
-  await rm(root, { recursive: true, force: true });
+  if (!retainFixture) await rm(root, { recursive: true, force: true });
   report.finishedAt = new Date().toISOString();
   report.status = failed === undefined ? "passed" : "failed";
-  const reportPath = resolve("artifacts", "local-packaged-handoff.json");
+  const reportPath = resolve(
+    "artifacts",
+    publicRelay
+      ? "public-packaged-handoff.json"
+      : freshModelCache
+        ? "local-packaged-handoff-fresh-models.json"
+        : "local-packaged-handoff.json",
+  );
   await mkdir(resolve("artifacts"), { recursive: true });
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   console.log(
-    `Local packaged handoff ${report.status}; ${cases.length} stages. Non-promotable diagnostic. Report: ${reportPath}`,
+    `${publicRelay ? "Public" : "Local"} packaged handoff ${report.status}; ${cases.length} stages. Non-promotable diagnostic. Report: ${reportPath}`,
   );
 }
 if (failed !== undefined) process.exitCode = 1;
@@ -405,11 +589,22 @@ function startMcp(cli, env, statePath) {
     const value = JSON.parse(line);
     if (value.method === "elicitation/create") {
       // Explicit synthetic fixture consent. Never use this client with real/private content.
+      const properties = value.params?.requestedSchema?.properties;
+      assert(properties);
+      const content = properties.files
+        ? { files: "both", access: "read_propose", duration: "3600" }
+        : { confirmation: "approve" };
+      for (const [key, selected] of Object.entries(content)) {
+        assert(
+          properties[key]?.oneOf?.some((item) => item.const === selected),
+          `Synthetic choice is missing from real form: ${key}`,
+        );
+      }
       child.stdin.write(
         JSON.stringify({
           jsonrpc: "2.0",
           id: value.id,
-          result: { action: "accept", content: { confirm: true } },
+          result: { action: "accept", content },
         }) + "\n",
       );
       return;

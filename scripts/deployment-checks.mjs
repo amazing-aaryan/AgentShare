@@ -304,14 +304,17 @@ export async function smokeDeployment({
     fetcher,
   });
   securityHeaders(page.response, { cache: "no-store", html: true });
+  const pageText = page.bytes.toString("utf8");
+  requireThat(pageText.includes("AgentShare"), "v2 handoff content missing");
+  const setupPath = /href="([^"]+\/bootstrap\.json)"/u.exec(pageText)?.[1];
   requireThat(
-    page.bytes.toString("utf8").includes("AgentShare"),
-    "v2 handoff content missing",
+    setupPath === `/e/${id}/bootstrap.json`,
+    "v2 setup link missing or unexpected",
   );
-  const metadata = await readBoundedResponse(
-    `${handoff}/e/${id}/bootstrap.json${query}`,
-    { fetcher },
-  );
+  // Follow exactly the page's link: browsers do not inherit ?relay= here.
+  const metadata = await readBoundedResponse(`${handoff}${setupPath}`, {
+    fetcher,
+  });
   securityHeaders(metadata.response, { cache: "public, max-age=300" });
   requireThat(
     isDeepStrictEqual(JSON.parse(metadata.bytes.toString("utf8")), bootstrap),

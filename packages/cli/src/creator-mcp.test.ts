@@ -6,7 +6,11 @@ import { createInterface } from "node:readline";
 import { describe, expect, it, vi } from "vitest";
 import { createRelayHandler, InMemoryRelayStore } from "@agentshare/relay";
 import { EnvironmentRelayClient } from "./environment/relay-client.js";
-import { createCreatorRuntime, runCreatorMcpServer } from "./creator-mcp.js";
+import {
+  createCreatorRuntime,
+  creatorDoctor,
+  runCreatorMcpServer,
+} from "./creator-mcp.js";
 import type { DraftReview } from "./environment/drafts.js";
 
 async function fixture() {
@@ -54,6 +58,93 @@ async function fixture() {
 }
 
 describe("creator MCP consent boundary", () => {
+  it.each(["install", "cancel", "host-cancel", "incomplete"] as const)(
+    "offers first-use setup and writes skills only after native %s choice",
+    async (choice) => {
+      const input = new PassThrough();
+      const output = new PassThrough();
+      const messages: Array<Record<string, unknown>> = [];
+      const installSkills = vi.fn(() => Promise.resolve(["managed skill"]));
+      const installCli = vi.fn();
+      const reader = createInterface({ input: output });
+      const received = new Promise<void>((resolve) => {
+        reader.on("line", (line) => {
+          const message = JSON.parse(line) as Record<string, unknown>;
+          messages.push(message);
+          if (message.method === "elicitation/create")
+            input.write(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: message.id,
+                result:
+                  choice === "host-cancel"
+                    ? { action: "cancel" }
+                    : {
+                        action: "accept",
+                        content: {
+                          setup: choice === "incomplete" ? "yes" : choice,
+                        },
+                      },
+              }) + "\n",
+            );
+          if (message.id === 2) resolve();
+        });
+      });
+      const running = runCreatorMcpServer({
+        input,
+        output,
+        installSkills,
+        installCli,
+        cliCurrent: () => false,
+        skillsCurrent: () => Promise.resolve(false),
+        approvalTimeoutMs: 1000,
+      });
+      input.write(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { capabilities: { elicitation: { form: {} } } },
+        }) + "\n",
+      );
+      input.write(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: { name: "setup_agentshare", arguments: {} },
+        }) + "\n",
+      );
+      await received;
+      input.end();
+      await running;
+      reader.close();
+      output.end();
+      const reply = messages.find((message) => message.id === 2);
+      const initialization = messages.find((message) => message.id === 1)
+        ?.result as { instructions?: string } | undefined;
+      expect(initialization?.instructions).toContain("setup_agentshare");
+      if (choice === "install") {
+        expect(installSkills).toHaveBeenCalledOnce();
+        expect(installCli).toHaveBeenCalledOnce();
+        expect(reply?.result).toMatchObject({ isError: false });
+      } else {
+        expect(installSkills).not.toHaveBeenCalled();
+        expect(installCli).not.toHaveBeenCalled();
+        expect(reply?.result).toMatchObject({
+          isError: choice === "incomplete",
+        });
+      }
+    },
+  );
+
+  it("points Codex 0.155.1 users to /permissions, not the removed /approvals command", () => {
+    const next = creatorDoctor().next;
+    expect(next).toContain("/permissions");
+    expect(next).toContain("no /approvals command");
+    expect(next).not.toContain("run /approvals");
+  });
+
   it("returns bounded retained review, rejects fake approval arguments and unknown sessions", async () => {
     const f = await fixture();
     await writeFile(join(f.root, "notes.txt"), "unreviewed later content");
@@ -98,6 +189,9 @@ describe("creator MCP consent boundary", () => {
     "unsupported",
     "decline",
     "cancel",
+    "accepted-without-confirmation",
+    "wrong-confirmation",
+    "host-error",
     "wrong-request",
     "timeout",
   ] as const)(
@@ -125,10 +219,24 @@ describe("creator MCP consent boundary", () => {
                   scenario === "wrong-request"
                     ? "unrelated-consent-request"
                     : message.id,
-                result:
-                  scenario === "wrong-request"
-                    ? { action: "accept", content: { confirm: true } }
-                    : { action: scenario },
+                ...(scenario === "host-error"
+                  ? { error: { code: -32603, message: "Host form failed" } }
+                  : {
+                      result:
+                        scenario === "wrong-request"
+                          ? {
+                              action: "accept",
+                              content: { confirmation: "approve" },
+                            }
+                          : scenario === "accepted-without-confirmation"
+                            ? { action: "accept", content: {} }
+                            : scenario === "wrong-confirmation"
+                              ? {
+                                  action: "accept",
+                                  content: { confirmation: "NO" },
+                                }
+                              : { action: scenario },
+                    }),
               }) + "\n",
             );
           }
@@ -171,10 +279,255 @@ describe("creator MCP consent boundary", () => {
       output.end();
       const reply = messages.find((message) => message.id === 2);
       expect(reply?.result).toMatchObject({ isError: true });
+      const error = (reply?.result as { content: Array<{ text: string }> })
+        .content[0]?.text;
+      if (
+        scenario === "accepted-without-confirmation" ||
+        scenario === "wrong-confirmation"
+      )
+        expect(error).toContain("HUMAN_APPROVAL_INCOMPLETE");
+      if (scenario === "host-error")
+        expect(error).toContain("HUMAN_APPROVAL_UNAVAILABLE");
+      if (scenario === "decline" || scenario === "cancel")
+        expect(error).toContain("HUMAN_APPROVAL_DECLINED");
+      if (scenario === "timeout" || scenario === "wrong-request")
+        expect(error).toContain("HUMAN_APPROVAL_TIMEOUT");
       expect(
         messages.some((message) => message.method === "elicitation/create"),
       ).toBe(supportsForm);
       expect(f.fetcher).not.toHaveBeenCalled();
     },
   );
+  it("publishes only after an explicit native select choice", async () => {
+    const f = await fixture();
+    const input = new PassThrough(),
+      output = new PassThrough();
+    const messages: Array<Record<string, unknown>> = [];
+    const reader = createInterface({ input: output });
+    const received = new Promise<void>((resolve) => {
+      reader.on("line", (line) => {
+        const message = JSON.parse(line) as Record<string, unknown>;
+        messages.push(message);
+        if (message.method === "elicitation/create") {
+          const params = message.params as {
+            requestedSchema: { properties: Record<string, unknown> };
+          };
+          expect(params.requestedSchema.properties).toHaveProperty(
+            "confirmation",
+          );
+          expect(params.requestedSchema.properties).not.toHaveProperty(
+            "confirm",
+          );
+          expect(params.requestedSchema.properties.confirmation).toMatchObject({
+            type: "string",
+            title: "Choose an action",
+            oneOf: [
+              { const: "approve", title: "Publish exact reviewed draft" },
+              { const: "cancel", title: "Cancel" },
+            ],
+          });
+          input.write(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: message.id,
+              result: {
+                action: "accept",
+                content: { confirmation: "approve" },
+              },
+            }) + "\n",
+          );
+        }
+        if (message.id === 2) resolve();
+      });
+    });
+    const running = runCreatorMcpServer({
+      statePath: f.options.statePath,
+      client: f.options.client,
+      capture: f.options.capture,
+      relayOrigin: f.options.relayOrigin,
+      handoffOrigin: f.options.handoffOrigin,
+      input,
+      output,
+    });
+    input.write(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: { elicitation: { form: {} } },
+        },
+      }) + "\n",
+    );
+    input.write(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "commit_share",
+          arguments: { draftId: f.draft.draftId, digest: f.draft.digest },
+        },
+      }) + "\n",
+    );
+    await received;
+    input.end();
+    await running;
+    reader.close();
+    output.end();
+    const reply = messages.find((message) => message.id === 2);
+    expect(reply?.result).toMatchObject({ isError: false });
+    expect(f.fetcher).toHaveBeenCalled();
+  });
+  it("uses native arrow-key choices for share options and binds them server-side", async () => {
+    const f = await fixture();
+    const input = new PassThrough(),
+      output = new PassThrough();
+    const messages: Array<Record<string, unknown>> = [];
+    const reader = createInterface({ input: output });
+    const completed = new Promise<void>((resolve, reject) => {
+      reader.on("line", (line) => {
+        try {
+          const message = JSON.parse(line) as Record<string, unknown>;
+          messages.push(message);
+          if (message.method === "elicitation/create") {
+            const params = message.params as {
+              requestedSchema: {
+                properties: Record<string, Record<string, unknown>>;
+              };
+            };
+            expect(params.requestedSchema.properties).toHaveProperty("files");
+            expect(params.requestedSchema.properties).toHaveProperty("access");
+            expect(params.requestedSchema.properties).toHaveProperty(
+              "duration",
+            );
+            for (const property of ["files", "access", "duration"]) {
+              expect(
+                params.requestedSchema.properties[property],
+              ).toHaveProperty("type", "string");
+              expect(
+                Array.isArray(
+                  params.requestedSchema.properties[property]?.oneOf,
+                ),
+              ).toBe(true);
+            }
+            expect(params.requestedSchema).toMatchObject({
+              required: ["files", "access", "duration"],
+            });
+            input.write(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: message.id,
+                result: {
+                  action: "accept",
+                  content: {
+                    files: "both",
+                    access: "read_propose",
+                    duration: "86400",
+                  },
+                },
+              }) + "\n",
+            );
+          }
+          if (message.id === 2) {
+            const result = message.result as {
+              content: Array<{ text: string }>;
+            };
+            const resolved = JSON.parse(result.content[0]?.text ?? "") as {
+              sessionRef: string;
+            };
+            input.write(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: 3,
+                method: "tools/call",
+                params: {
+                  name: "select_share_options",
+                  arguments: { sessionRef: resolved.sessionRef },
+                },
+              }) + "\n",
+            );
+          }
+          if (message.id === 3) {
+            const result = message.result as {
+              content: Array<{ text: string }>;
+            };
+            const selected = JSON.parse(result.content[0]?.text ?? "") as {
+              sessionRef: string;
+            };
+            input.write(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                id: 4,
+                method: "tools/call",
+                params: {
+                  name: "prepare_share",
+                  arguments: {
+                    sessionRef: selected.sessionRef,
+                    scope: "conversation",
+                    access: "read",
+                    ttlSeconds: 3600,
+                  },
+                },
+              }) + "\n",
+            );
+          }
+          if (message.id === 4) resolve();
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+    });
+    const running = runCreatorMcpServer({
+      statePath: f.options.statePath,
+      client: f.options.client,
+      capture: f.options.capture,
+      relayOrigin: f.options.relayOrigin,
+      handoffOrigin: f.options.handoffOrigin,
+      input,
+      output,
+    });
+    input.write(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: { elicitation: { form: {} } },
+        },
+      }) + "\n",
+    );
+    input.write(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "resolve_creator_session",
+          arguments: { threadId: "explicit-fixture" },
+        },
+      }) + "\n",
+    );
+    await completed;
+    input.end();
+    await running;
+    reader.close();
+    output.end();
+    const reply = messages.find((message) => message.id === 4);
+    expect(reply?.result).toMatchObject({ isError: false });
+    const prepared = JSON.parse(
+      (reply?.result as { content: Array<{ text: string }> }).content[0]
+        ?.text ?? "",
+    ) as { policy: Record<string, unknown>; ttlSeconds: number };
+    expect(prepared).toMatchObject({
+      policy: {
+        includeConversation: true,
+        includeWorkspace: true,
+        proposalsEnabled: true,
+      },
+      ttlSeconds: 86400,
+    });
+  });
 });

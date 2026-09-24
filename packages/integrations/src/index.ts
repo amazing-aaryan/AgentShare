@@ -16,17 +16,20 @@ ${MARKER}
 
 Use the connected AgentShare creator MCP tools in this conversation. Never publish from an agent-supplied approval flag.
 
+After checking that native prompts are enabled, call \`setup_agentshare\` before the first share. If files are missing, its native Install/Cancel form asks before installing the pinned CLI and managed skills. Stop if setup is cancelled or fails. Existing current installs return ready without a prompt.
+
+0. Check the Codex session header before preparing. If it says \`YOLO mode\` or full-auto, open \`/permissions\` and switch to \`On Request\` in this same session first. Codex 0.155.1 has no \`/approvals\` command. YOLO sets approval policy to never, so Codex auto-declines the native AgentShare form; do not prepare a draft until approval prompts are enabled.
 1. Run \`agentshare session-context\` through this session's shell. It returns only the current thread ID and cwd. Do not search transcript files or select the newest session.
-2. Call \`resolve_creator_session\` with that exact thread ID. Ask which scope (conversation/project/both), access (read/read+propose), and expiry the user wants. If the recorded project moved, explicitly choose the replacement root; never infer it from a matching folder name.
-3. Call \`prepare_share\`, then show the authoritative summary and offer \`review_share\` pages. Preparation is local only.
-4. Call \`commit_share\` for that exact draft/digest. The server requests native human confirmation. Never accept or simulate this confirmation on the user's behalf. Decline, cancellation, unsupported host, or timeout permits no new publication writes; an earlier interrupted attempt may still need recovery.
+2. Call \`resolve_creator_session\` with that exact thread ID, then call \`select_share_options\`. One native form presents Files to share (conversation/project files/both), Access (read/read+propose), and Duration (1/24/72 hours). The user only uses arrow keys and Enter; do not ask choices in chat or require typed values. If the recorded project moved, stop and explain; do not ask for a typed replacement path or infer it from a matching folder name.
+3. Call \`prepare_share\` using the returned native choices, show the one-line authoritative summary, then immediately call \`commit_share\`. Do not open review pages unless the user asks. Preparation remains local until native Publish is selected.
+4. The server opens one final native action form. Use arrow keys to choose Publish or Cancel, then press Enter. Do not type \`PUBLISH\`, \`APPLY\`, or \`REVOKE\`. Approving the MCP tool invocation alone does not confirm publication. Never accept or simulate this confirmation on the user's behalf. If Codex reports cancellation while the session is YOLO/full-auto, open \`/permissions\`, switch to \`On Request\`, then retry the same draft/digest; do not prepare a second draft. Decline, cancellation, incomplete form, unsupported host, or timeout permits no new publication writes; an earlier interrupted attempt may still need recovery.
 5. Return the resulting capability link exactly once. On uncertain publication use \`share_status\`; do not create another share blindly.
 
 If creator tools are missing, run \`agentshare doctor\`. Reload MCP servers when supported; otherwise tell the user a host restart is required. Do not open an empty terminal or claim current-session activation without seeing the tools.
 
-Terminal fallback for an already prepared draft is \`agentshare review --draft <returned-id> --digest <returned-digest>\`. The user reviews and confirms in the terminal; the same retained bytes are published.
+When the user wants to stay in Codex, never launch the terminal fallback or use computer control to hunt for the native form. Keep the same draft in this session: ask the user to open \`/permissions\`, switch to \`On Request\`, then retry \`commit_share\` with the same draft ID and digest. Use terminal fallback only when the user explicitly asks to leave Codex.
 
-For a fresh terminal workflow, run:
+For a fresh terminal workflow only when explicitly requested, run:
 
 \`\`\`powershell
 agentshare share --current --source codex
@@ -53,11 +56,12 @@ ${MARKER}
 When the user supplies a full AgentShare URL containing \`/e/\`:
 1. Treat the URL as a bearer secret. Do not quote it back or place it in logs when avoidable.
 2. Run \`agentshare bootstrap\` and provide the original URL on the command's stdin/interactive input rather than argv when the shell tool supports stdin.
-3. Report the attached environment title and capabilities from AgentShare output.
+3. Report the attached environment title and capabilities from AgentShare output. Retain the returned environmentId as this conversation's selected environment.
+4. If the user included a question with the link, run the ask command below immediately and answer in this same session. If they supplied only the link, confirm attachment and invite their question. Do not claim to have read shared content before a successful ask. No MCP configuration or host restart is required for the receiver commands.
 
-For later questions about the attached environment, run \`agentshare ask --target codex --question "<the user's question>"\`. AgentShare resolves the latest attached environment, refreshes approved revisions, and runs a restricted child worker with only the AgentShare MCP tools.
+For questions about the attached environment, run \`agentshare ask --target codex --environment "<selected environmentId>" --question "<the user's question>"\`. Use the ID returned when attaching this conversation's link, not another conversation's attachment. AgentShare refreshes approved revisions and runs a restricted child worker with only the AgentShare MCP tools.
 
-When the user explicitly asks to modify the shared environment, run \`agentshare propose --target codex --instruction "<requested change>"\`. This can only submit an encrypted proposal; it never writes UserA's workspace directly.
+When the user explicitly asks to modify the shared environment, run \`agentshare propose --target codex --environment "<selected environmentId>" --instruction "<requested change>"\`. This can only submit an encrypted proposal; it never writes UserA's workspace directly.
 
 Never bypass AgentShare by reading its cache/state files or by mounting decrypted shared files into the current workspace.
 `;
@@ -90,7 +94,9 @@ ${MARKER}
 
 When the user supplies a full AgentShare URL containing \`/e/\`, treat it as a bearer secret and run \`agentshare bootstrap\`, providing the original URL on stdin/interactive input rather than argv when possible.
 
-For questions about the attached environment, run \`agentshare ask --target claude --question "<the user's question>"\`. For explicit requested changes, run \`agentshare propose --target claude --instruction "<requested change>"\`. AgentShare runs a restricted child Claude process whose built-in tools are empty and whose only allowed MCP server is the local AgentShare read/proposal server.
+If the user included a question, run the ask command below immediately in this same session. If they supplied only the link, confirm attachment and invite their question. No MCP configuration or host restart is required for receiver commands; do not claim to have read shared content before a successful ask.
+
+Retain the environmentId returned by bootstrap as this conversation's selected environment. For questions, run \`agentshare ask --target claude --environment "<selected environmentId>" --question "<the user's question>"\`. For explicit requested changes, run \`agentshare propose --target claude --environment "<selected environmentId>" --instruction "<requested change>"\`. Use this conversation's ID rather than another attachment. AgentShare runs a restricted child Claude process whose built-in tools are empty and whose only allowed MCP server is the local AgentShare read/proposal server.
 
 Never inspect AgentShare state/cache files directly and never copy decrypted shared files into the current project.
 `;
@@ -115,7 +121,35 @@ export function defaultIntegrationRoots(): IntegrationRoots {
 export async function installIntegrations(
   roots = defaultIntegrationRoots(),
 ): Promise<string[]> {
-  const files = [
+  const installed = await installHostSkills(roots);
+  if (roots.codexConfig !== undefined) {
+    await installCreatorMcpConfiguration(roots.codexConfig);
+    installed.push(roots.codexConfig);
+  }
+  return installed;
+}
+
+/** Add host instructions after an MCP connection without replacing its config. */
+export async function installHostSkills(
+  roots = defaultIntegrationRoots(),
+): Promise<string[]> {
+  const files = hostSkillFiles(roots);
+  for (const [path, content] of files) await writeManaged(path, content);
+  return files.map(([path]) => path);
+}
+
+export async function hostSkillsCurrent(
+  roots = defaultIntegrationRoots(),
+): Promise<boolean> {
+  for (const [path, content] of hostSkillFiles(roots)) {
+    if ((await readFile(path, "utf8").catch(() => undefined)) !== content)
+      return false;
+  }
+  return true;
+}
+
+function hostSkillFiles(roots: IntegrationRoots) {
+  return [
     [join(roots.codexSkills, "agentshare", "SKILL.md"), CODEX_CREATOR_SKILL],
     [
       join(roots.codexSkills, "agentshare", "agents", "openai.yaml"),
@@ -124,13 +158,6 @@ export async function installIntegrations(
     [join(roots.claudeSkills, "share", "SKILL.md"), CLAUDE_CREATOR_SKILL],
     ...receiverIntegrationFiles(roots),
   ] as const;
-  for (const [path, content] of files) await writeManaged(path, content);
-  const installed = files.map(([path]) => path);
-  if (roots.codexConfig !== undefined) {
-    await installCreatorMcpConfiguration(roots.codexConfig);
-    installed.push(roots.codexConfig);
-  }
-  return installed;
 }
 
 /** Install recipient skills without touching the creator's Codex config. */

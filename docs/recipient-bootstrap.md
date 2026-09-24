@@ -21,18 +21,36 @@ Maximum privacy alternative.
   "environmentProtocol": "agentshare-environment-v2",
   "minimumNodeVersion": "22",
   "release": {
-    "version": "0.2.0",
-    "packageUrl": "https://github.com/amazing-aaryan/AgentShare/releases/download/v0.2.0/agentshare-0.2.0.tgz"
+    "version": "0.3.14",
+    "packageUrl": "https://github.com/amazing-aaryan/AgentShare/releases/download/v0.3.14/agentshare-0.3.14.tgz"
   },
   "actions": {
+    "install": {
+      "command": "npm install --global --ignore-scripts https://github.com/amazing-aaryan/AgentShare/releases/download/v0.3.14/agentshare-0.3.14.tgz"
+    },
     "accept": {
       "command": "agentshare bootstrap"
+    },
+    "ask": {
+      "codex": "agentshare ask --target codex --environment \"<environmentId from bootstrap>\" --question \"<user question>\"",
+      "claude": "agentshare ask --target claude --environment \"<environmentId from bootstrap>\" --question \"<user question>\""
+    },
+    "propose": {
+      "codex": "agentshare propose --target codex --environment \"<environmentId from bootstrap>\" --instruction \"<requested change>\"",
+      "claude": "agentshare propose --target claude --environment \"<environmentId from bootstrap>\" --instruction \"<requested change>\""
     }
   }
 }
 ```
 
 The bootstrap document contains no read/proposal capability or encryption key.
+It is public installation metadata and does not require a `relay` query. The
+handoff page's setup anchor can therefore be followed exactly, even though a
+relative URL does not inherit the original link's query string.
+
+The handoff page includes the installation and follow-up commands directly so a
+fresh agent session can use them before newly installed skills are discovered.
+The user stays in that session; no SDK or manual MCP registration is needed.
 
 ## Installed receiver skills
 
@@ -63,8 +81,14 @@ Bootstrap is idempotent:
 8. return the environment ID, title, revision, file count, conversation-event
    count, proposal permission, and expiry.
 
-Subsequent `ask` and `propose` calls resolve the most recently attached active
-environment when no ID is supplied.
+Subsequent `ask` and `propose` calls pass the `environmentId` returned during
+attachment. Without an explicit ID, commands work only when exactly one active
+environment is attached; multiple attachments require a selection.
+
+On Windows, if Codex's model metadata is absent or older than the installed
+runtime, AgentShare asks the authenticated Codex app server for fresh metadata
+in a private temporary home. It then applies the same model/tool restrictions.
+This starts no model turn and does not change the user's canonical cache.
 
 ## Same-link updates
 
