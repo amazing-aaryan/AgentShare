@@ -22,10 +22,11 @@ function executable(source: string) {
 }
 const protocol = `
 const lines = require('node:readline').createInterface({input: process.stdin});
+const canonical = path => require('node:fs').realpathSync(path).toLowerCase();
 lines.on('line', line => {
   const request = JSON.parse(line);
   if (request.method === 'initialize') {
-    if (!process.env.CODEX_HOME || process.cwd().toLowerCase() !== process.env.CODEX_HOME.toLowerCase()) process.exit(3);
+    if (!process.env.CODEX_HOME || canonical(process.cwd()) !== canonical(process.env.CODEX_HOME)) process.exit(3);
     process.stdout.write('null\\n');
     process.stdout.write(JSON.stringify({id: 1, result: {}}) + '\\n');
   } else if (request.method === 'model/list') {
