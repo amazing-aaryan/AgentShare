@@ -30,9 +30,9 @@ Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 > regulated data, or other high-risk material. Review the final normalized text,
 > included files, exclusions, and redactions before publication.
 
-> [!NOTE] This repository contains the **v0.3.14 candidate**. Native Codex
+> [!NOTE] This repository contains the **v0.3.15 candidate**. Native Codex
 > approval and the full real-host handoff still require fresh acceptance under
-> the [v0.3.14 release notes](docs/release-v0.3.14.md). Green CI alone is not
+> the [v0.3.15 release notes](docs/release-v0.3.15.md). Green CI alone is not
 > stable sign-off. Use the current stable GitHub release rather than candidate
 > source for ordinary installation, and keep the public-beta data warning above.
 
@@ -66,19 +66,22 @@ continue**
 ### 1. Connect AgentShare in Codex
 
 Requirements: Node.js 22 or newer and a supported, signed-in agent CLI. After
-v0.3.14 is published, a new Codex user can add its MCP server with one command:
+v0.3.15 is published, a new Codex user can add its MCP server with one command:
 
 ```powershell
-codex mcp add agentshare_creator -- cmd.exe /d /s /c npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.3.14/agentshare-0.3.14.tgz -- agentshare creator-mcp
+codex mcp add agentshare_creator -- cmd.exe /d /s /c npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.3.15/agentshare-0.3.15.tgz -- agentshare creator-mcp
 ```
 
 On macOS/Linux, use `npm` in place of `cmd.exe /d /s /c npm`. The pinned
 AgentShare program is downloaded when Codex first starts the MCP server. At
-first use, call `setup_agentshare`; its native Install/Cancel choice asks before
-installing the same pinned CLI globally and writing six managed Codex and Claude
-skill files. Cancel writes no files. Continue sharing through the connected MCP
-tools in that session; new sessions also discover the skills. Native choices
-require Codex interactive permissions (`On Request`).
+first use, call `setup_agentshare`. Its native form asks before installing the
+same pinned CLI globally and writing managed Codex and Claude skills. It also
+offers an optional choice to save `On Request` as the user's default Codex
+approval setting for future sessions. Cancel writes no files. Continue sharing
+through the connected MCP tools in that session; new sessions discover the
+skills. If the active session is in YOLO/full-auto mode, the user must first
+switch `/permissions` to `On Request`; changing the saved default cannot change
+the active session.
 
 Existing CLI users can still refresh the MCP connection and skills with:
 

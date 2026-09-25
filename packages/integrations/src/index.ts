@@ -16,9 +16,9 @@ ${MARKER}
 
 Use the connected AgentShare creator MCP tools in this conversation. Never publish from an agent-supplied approval flag.
 
-After checking that native prompts are enabled, call \`setup_agentshare\` before the first share. If files are missing, its native Install/Cancel form asks before installing the pinned CLI and managed skills. Stop if setup is cancelled or fails. Existing current installs return ready without a prompt.
+After checking that native prompts are enabled, call \`setup_agentshare\` before the first share. If files are missing, its native form asks whether to install the pinned CLI and managed skills and whether to save Codex's \`On Request\` approval setting for future sessions. Respect both user choices. Saving that default changes the user's global Codex config, not this active session; it never approves publication. Stop if setup is cancelled or fails. Existing current installs return ready without a prompt.
 
-0. Check the Codex session header before preparing. If it says \`YOLO mode\` or full-auto, open \`/permissions\` and switch to \`On Request\` in this same session first. Codex 0.155.1 has no \`/approvals\` command. YOLO sets approval policy to never, so Codex auto-declines the native AgentShare form; do not prepare a draft until approval prompts are enabled.
+0. Check the Codex session header before setup or preparing. If it says \`YOLO mode\` or full-auto, ask the user to open \`/permissions\` and switch to \`On Request\` in this same session first. Codex 0.155.1 has no \`/approvals\` command. YOLO sets approval policy to never, so Codex auto-declines native AgentShare forms. A config edit cannot switch this active session. Do not prepare a draft until approval prompts are enabled.
 1. Run \`agentshare session-context\` through this session's shell. It returns only the current thread ID and cwd. Do not search transcript files or select the newest session.
 2. Call \`resolve_creator_session\` with that exact thread ID, then call \`select_share_options\`. One native form presents Files to share (conversation/project files/both), Access (read/read+propose), and Duration (1/24/72 hours). The user only uses arrow keys and Enter; do not ask choices in chat or require typed values. If the recorded project moved, stop and explain; do not ask for a typed replacement path or infer it from a matching folder name.
 3. Call \`prepare_share\` using the returned native choices, show the one-line authoritative summary, then immediately call \`commit_share\`. Do not open review pages unless the user asks. Preparation remains local until native Publish is selected.
@@ -104,16 +104,16 @@ Never inspect AgentShare state/cache files directly and never copy decrypted sha
 export type IntegrationRoots = {
   codexConfig?: string;
   codexSkills: string;
+  codexHomeSkills?: string;
   claudeSkills: string;
 };
 
 export function defaultIntegrationRoots(): IntegrationRoots {
+  const codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
   return {
-    codexConfig: join(
-      process.env.CODEX_HOME ?? join(homedir(), ".codex"),
-      "config.toml",
-    ),
+    codexConfig: join(codexHome, "config.toml"),
     codexSkills: join(homedir(), ".agents", "skills"),
+    codexHomeSkills: join(codexHome, "skills"),
     claudeSkills: join(homedir(), ".claude", "skills"),
   };
 }
@@ -155,6 +155,18 @@ function hostSkillFiles(roots: IntegrationRoots) {
       join(roots.codexSkills, "agentshare", "agents", "openai.yaml"),
       CODEX_CREATOR_INTERFACE,
     ],
+    ...(roots.codexHomeSkills === undefined
+      ? []
+      : ([
+          [
+            join(roots.codexHomeSkills, "agentshare", "SKILL.md"),
+            CODEX_CREATOR_SKILL,
+          ],
+          [
+            join(roots.codexHomeSkills, "agentshare", "agents", "openai.yaml"),
+            CODEX_CREATOR_INTERFACE,
+          ],
+        ] as const)),
     [join(roots.claudeSkills, "share", "SKILL.md"), CLAUDE_CREATOR_SKILL],
     ...receiverIntegrationFiles(roots),
   ] as const;
@@ -179,6 +191,23 @@ function receiverIntegrationFiles(roots: IntegrationRoots) {
       join(roots.codexSkills, "agentshare-receive", "agents", "openai.yaml"),
       CODEX_RECEIVER_INTERFACE,
     ],
+    ...(roots.codexHomeSkills === undefined
+      ? []
+      : ([
+          [
+            join(roots.codexHomeSkills, "agentshare-receive", "SKILL.md"),
+            CODEX_RECEIVER_SKILL,
+          ],
+          [
+            join(
+              roots.codexHomeSkills,
+              "agentshare-receive",
+              "agents",
+              "openai.yaml",
+            ),
+            CODEX_RECEIVER_INTERFACE,
+          ],
+        ] as const)),
     [join(roots.claudeSkills, "agentshare", "SKILL.md"), CLAUDE_RECEIVER_SKILL],
   ] as const;
 }
@@ -195,6 +224,18 @@ export async function removeIntegrations(
       join(roots.codexSkills, "agentshare-receive"),
       join(roots.codexSkills, "agentshare-receive", "SKILL.md"),
     ],
+    ...(roots.codexHomeSkills === undefined
+      ? []
+      : ([
+          [
+            join(roots.codexHomeSkills, "agentshare"),
+            join(roots.codexHomeSkills, "agentshare", "SKILL.md"),
+          ],
+          [
+            join(roots.codexHomeSkills, "agentshare-receive"),
+            join(roots.codexHomeSkills, "agentshare-receive", "SKILL.md"),
+          ],
+        ] as const)),
     [
       join(roots.claudeSkills, "share"),
       join(roots.claudeSkills, "share", "SKILL.md"),
@@ -242,6 +283,49 @@ export async function installCreatorMcpConfiguration(
   await updateCreatorConfig(path, block);
 }
 
+/** Persist interactive Codex prompts only after an explicit setup choice. */
+export async function enableCodexApprovalPromptsByDefault(
+  path = defaultIntegrationRoots().codexConfig,
+): Promise<void> {
+  if (path === undefined) throw new Error("Codex config path unavailable");
+  const existing = await readFile(path, "utf8").catch((error: unknown) => {
+    if (isNotFound(error)) return "";
+    throw error;
+  });
+  const lines = existing.split(/(?<=\n)/u);
+  const firstTable = lines.findIndex((line) => /^\s*\[[^\r\n]+\]/u.test(line));
+  const rootEnd = firstTable < 0 ? lines.length : firstTable;
+  const rootMatches = lines
+    .slice(0, rootEnd)
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) =>
+      /^\s*(?:approval_policy|"approval_policy"|'approval_policy')\s*=/u.test(
+        line,
+      ),
+    );
+  if (rootMatches.length > 1)
+    throw new Error("Duplicate Codex approval_policy; repair manually");
+  if (rootMatches.length === 1) {
+    const entry = rootMatches[0];
+    if (entry === undefined)
+      throw new Error("Codex approval_policy unavailable");
+    const { line, index } = entry;
+    const match =
+      /^(\s*approval_policy\s*=\s*)(["'])(never|on-request)\2(\s*(?:#.*)?\r?\n?)$/u.exec(
+        line,
+      );
+    if (match === null)
+      throw new Error("Unsupported Codex approval_policy; repair manually");
+    if (match[3] === "on-request") return;
+    lines[index] = `${match[1]}"on-request"${match[4]}`;
+  } else {
+    lines.unshift(
+      `approval_policy = "on-request"${existing.includes("\r\n") ? "\r\n" : "\n"}`,
+    );
+  }
+  await writeCodexConfig(path, existing, lines.join(""));
+}
+
 async function updateCreatorConfig(path: string, block: string): Promise<void> {
   const existing = await readFile(path, "utf8").catch((error: unknown) => {
     if (isNotFound(error)) return "";
@@ -270,6 +354,14 @@ async function updateCreatorConfig(path: string, block: string): Promise<void> {
     block === ""
       ? unmanaged
       : `${unmanaged}${unmanaged.endsWith("\n") || unmanaged === "" ? "" : "\n"}${block}`;
+  await writeCodexConfig(path, existing, next);
+}
+
+async function writeCodexConfig(
+  path: string,
+  existing: string,
+  next: string,
+): Promise<void> {
   if (next === existing) return;
   await mkdir(dirname(path), { recursive: true });
   if (existing !== "") {

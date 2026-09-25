@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  enableCodexApprovalPromptsByDefault,
   installCreatorMcpConfiguration,
   hostSkillsCurrent,
   installHostSkills,
@@ -21,6 +22,54 @@ afterEach(async () => {
 });
 
 describe("host integrations", () => {
+  it("sets only the root Codex approval default after explicit consent", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-approval-default-"));
+    directories.push(root);
+    const path = join(root, "config.toml");
+    const original =
+      'approval_policy = "never" # prior default\n[profiles.quiet]\napproval_policy = "never"\n';
+    await writeFile(path, original);
+    await enableCodexApprovalPromptsByDefault(path);
+    const changed = await readFile(path, "utf8");
+    expect(changed).toBe(
+      'approval_policy = "on-request" # prior default\n[profiles.quiet]\napproval_policy = "never"\n',
+    );
+    expect(await readFile(`${path}.agentshare-backup`, "utf8")).toBe(original);
+    await enableCodexApprovalPromptsByDefault(path);
+    expect(await readFile(path, "utf8")).toBe(changed);
+  });
+
+  it("inserts an absent default and refuses unsupported approval policies", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agentshare-approval-default-"));
+    directories.push(root);
+    const path = join(root, "config.toml");
+    await writeFile(path, '[mcp_servers.other]\ncommand = "other-tool"\n');
+    await enableCodexApprovalPromptsByDefault(path);
+    expect(await readFile(path, "utf8")).toBe(
+      'approval_policy = "on-request"\n[mcp_servers.other]\ncommand = "other-tool"\n',
+    );
+    const unsupported =
+      "approval_policy = { granular = { mcp_elicitations = true } }\n";
+    await writeFile(path, unsupported);
+    await expect(enableCodexApprovalPromptsByDefault(path)).rejects.toThrow(
+      "Unsupported Codex approval_policy",
+    );
+    expect(await readFile(path, "utf8")).toBe(unsupported);
+    const duplicate =
+      'approval_policy = "never"\napproval_policy = "on-request"\n';
+    await writeFile(path, duplicate);
+    await expect(enableCodexApprovalPromptsByDefault(path)).rejects.toThrow(
+      "Duplicate Codex approval_policy",
+    );
+    expect(await readFile(path, "utf8")).toBe(duplicate);
+    const quoted = `'approval_policy' = "never"\n`;
+    await writeFile(path, quoted);
+    await expect(enableCodexApprovalPromptsByDefault(path)).rejects.toThrow(
+      "Unsupported Codex approval_policy",
+    );
+    expect(await readFile(path, "utf8")).toBe(quoted);
+  });
+
   it("preserves unrelated MCP configuration and refuses unmanaged collisions", async () => {
     const root = await mkdtemp(join(tmpdir(), "agentshare-mcp-config-"));
     directories.push(root);
@@ -132,16 +181,44 @@ describe("host integrations", () => {
     const roots = {
       codexConfig: config,
       codexSkills: join(root, "codex"),
+      codexHomeSkills: join(root, "codex-home"),
       claudeSkills: join(root, "claude"),
     };
     expect(await hostSkillsCurrent(roots)).toBe(false);
     const files = await installHostSkills(roots);
-    expect(files).toHaveLength(6);
+    expect(files).toHaveLength(10);
     expect(await hostSkillsCurrent(roots)).toBe(true);
     expect(await readFile(config, "utf8")).toBe(original);
     expect(
       await readFile(join(roots.codexSkills, "agentshare", "SKILL.md"), "utf8"),
     ).toContain("select_share_options");
+    expect(
+      await readFile(
+        join(roots.codexHomeSkills, "agentshare", "SKILL.md"),
+        "utf8",
+      ),
+    ).toBe(
+      await readFile(join(roots.codexSkills, "agentshare", "SKILL.md"), "utf8"),
+    );
+    expect(
+      await readFile(
+        join(roots.codexHomeSkills, "agentshare-receive", "SKILL.md"),
+        "utf8",
+      ),
+    ).toBe(
+      await readFile(
+        join(roots.codexSkills, "agentshare-receive", "SKILL.md"),
+        "utf8",
+      ),
+    );
+    await removeIntegrations({
+      codexSkills: roots.codexSkills,
+      codexHomeSkills: roots.codexHomeSkills,
+      claudeSkills: roots.claudeSkills,
+    });
+    await expect(
+      readFile(join(roots.codexHomeSkills, "agentshare", "SKILL.md"), "utf8"),
+    ).rejects.toThrow();
   });
 
   it("refreshes older AgentShare-managed integration content", async () => {

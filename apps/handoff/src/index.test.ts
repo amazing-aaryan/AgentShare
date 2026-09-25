@@ -51,7 +51,7 @@ describe("trusted handoff worker", () => {
     );
     await expect(bootstrap.json()).resolves.toMatchObject({
       environmentProtocol: "agentshare-environment-v2",
-      release: { version: "0.3.14" },
+      release: { version: "0.3.15" },
       actions: { accept: { command: "agentshare bootstrap" } },
     });
   });
@@ -67,7 +67,7 @@ describe("trusted handoff worker", () => {
     );
     expect(html).not.toContain("fetch(original.origin");
     expect(html).not.toMatch(/fetch\([^)]*fragmentKey/u);
-    expect(html).toContain("agentshare-0.3.14.tgz");
+    expect(html).toContain("agentshare-0.3.15.tgz");
     expect(html).not.toContain("agentshare-0.3.2.tgz");
   });
 

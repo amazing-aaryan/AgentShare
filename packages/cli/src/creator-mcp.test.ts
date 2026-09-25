@@ -58,7 +58,15 @@ async function fixture() {
 }
 
 describe("creator MCP consent boundary", () => {
-  it.each(["install", "cancel", "host-cancel", "incomplete"] as const)(
+  it.each([
+    "install",
+    "install-set-default",
+    "cancel",
+    "cancel-with-default",
+    "host-cancel",
+    "incomplete",
+    "missing-default",
+  ] as const)(
     "offers first-use setup and writes skills only after native %s choice",
     async (choice) => {
       const input = new PassThrough();
@@ -66,6 +74,7 @@ describe("creator MCP consent boundary", () => {
       const messages: Array<Record<string, unknown>> = [];
       const installSkills = vi.fn(() => Promise.resolve(["managed skill"]));
       const installCli = vi.fn();
+      const enableApprovalDefault = vi.fn(() => Promise.resolve());
       const reader = createInterface({ input: output });
       const received = new Promise<void>((resolve) => {
         reader.on("line", (line) => {
@@ -82,7 +91,23 @@ describe("creator MCP consent boundary", () => {
                     : {
                         action: "accept",
                         content: {
-                          setup: choice === "incomplete" ? "yes" : choice,
+                          setup:
+                            choice === "incomplete"
+                              ? "yes"
+                              : choice === "install-set-default"
+                                ? "install"
+                                : choice === "cancel-with-default"
+                                  ? "cancel"
+                                  : choice === "missing-default"
+                                    ? "install"
+                                    : choice,
+                          approvalDefault:
+                            choice === "install-set-default" ||
+                            choice === "cancel-with-default"
+                              ? "on_request"
+                              : choice === "missing-default"
+                                ? undefined
+                                : "keep",
                         },
                       },
               }) + "\n",
@@ -95,6 +120,7 @@ describe("creator MCP consent boundary", () => {
         output,
         installSkills,
         installCli,
+        enableApprovalDefault,
         cliCurrent: () => false,
         skillsCurrent: () => Promise.resolve(false),
         approvalTimeoutMs: 1000,
@@ -124,15 +150,19 @@ describe("creator MCP consent boundary", () => {
       const initialization = messages.find((message) => message.id === 1)
         ?.result as { instructions?: string } | undefined;
       expect(initialization?.instructions).toContain("setup_agentshare");
-      if (choice === "install") {
+      if (choice === "install" || choice === "install-set-default") {
         expect(installSkills).toHaveBeenCalledOnce();
         expect(installCli).toHaveBeenCalledOnce();
+        expect(enableApprovalDefault).toHaveBeenCalledTimes(
+          choice === "install-set-default" ? 1 : 0,
+        );
         expect(reply?.result).toMatchObject({ isError: false });
       } else {
         expect(installSkills).not.toHaveBeenCalled();
         expect(installCli).not.toHaveBeenCalled();
+        expect(enableApprovalDefault).not.toHaveBeenCalled();
         expect(reply?.result).toMatchObject({
-          isError: choice === "incomplete",
+          isError: choice === "incomplete" || choice === "missing-default",
         });
       }
     },

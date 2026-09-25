@@ -105,4 +105,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Verify public handoff, bootstrap and relay routing
-        run: node scripts/check-deployment.mjs smoke
+        run: |
+          for attempt in {1..12}; do
+            if node scripts/check-deployment.mjs smoke; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 12 ]; then
+              exit 1
+            fi
+            sleep 5
+          done
