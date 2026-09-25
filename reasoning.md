@@ -983,3 +983,8 @@ native acceptance remains mandatory before stable readiness.
 **Decision:** Add an explicit native setup choice to save Codex `approval_policy = "on-request"` for future sessions, and install matching skills in both standard and Codex home skill directories.
 **Why:** The user wants setup to request consent before changing a global default; Codex `never` auto-cancels native forms, and a crowded skills catalog omitted the standard creator skill on this machine. Current-session `/permissions` remains a required first switch under YOLO.
 **Impact:** v0.3.15 candidate keeps publication confirmation separate and never changes config on cancel/incomplete form. A config edit preserves unrelated settings and has a private backup. Focused tests, lint, build, package, 381-test coverage run, release tools, conformance, edge dry runs, dependency audit, and nine-stage local packaged handoff pass; native UI acceptance remains unverified.
+
+## [2026-09-24 22:34] Bound public smoke retries after Worker deployment
+**Decision:** Retry the exact public handoff/bootstrap/relay smoke at five-second intervals for at most one minute after deploying the handoff Worker.
+**Why:** The v0.3.14 handoff upload succeeded, but the immediate smoke fetched the previous pin; the same smoke passed shortly afterward. A bounded retry recognizes deployment propagation without hiding a persistent mismatch.
+**Impact:** The v0.3.15 production workflow still fails if the public pin or security checks remain wrong after 12 attempts. Release-tool tests pass.

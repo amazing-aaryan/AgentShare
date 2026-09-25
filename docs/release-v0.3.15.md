@@ -17,6 +17,11 @@ Codex's own skills directory. A fresh-session check on a machine with a large
 skills catalog found the creator skill only after adding the Codex-directory
 copy. The managed copies have identical content and are removed together.
 
+The protected deployment workflow retries its public read-only smoke for up to
+one minute after Worker upload. The v0.3.14 rollout initially observed an old
+handoff pin immediately after upload; the same smoke passed once Cloudflare
+served the new Worker. A persistent mismatch still fails deployment.
+
 This file describes candidate behavior. Native UI setup, actual creator and
 recipient flows, public deployment, and release promotion require separate
 evidence. Real Claude Code acceptance remains unverified.
