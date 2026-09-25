@@ -17,7 +17,7 @@ than through a proprietary server-side session store.
 
 Requires Node.js 22 or newer.
 
-> [!NOTE] This package is the **v0.3.14 candidate** for collaborative
+> [!NOTE] This package is the **v0.3.15 candidate** for collaborative
 > environments. Native Windows Codex acceptance and public deployment
 > verification remain required before stable promotion. Do not infer readiness
 > from the package version alone. Use the published stable GitHub release for
@@ -27,10 +27,11 @@ Requires Node.js 22 or newer.
 
 In Codex, connect the pinned MCP package (see the
 [project setup](../../README.md)) and call `setup_agentshare` at first use. The
-native Install/Cancel choice installs the pinned global CLI and local
-integration files only when accepted. Existing CLI users can run
-`agentshare init` and start a new host session after the MCP configuration
-changes.
+native setup choice installs the pinned global CLI and local integration files
+only when accepted. It can also save Codex `On Request` prompts as the default
+for future sessions, but only if the user selects that option. Existing CLI
+users can run `agentshare init` and start a new host session after the MCP
+configuration changes.
 
 Use `$agentshare` in Codex or `/share` in Claude Code. The direct CLI
 equivalents are:

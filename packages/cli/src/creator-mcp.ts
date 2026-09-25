@@ -28,7 +28,11 @@ import { revokeOwnedEnvironment } from "./commands/runtime-v2.js";
 import { renderProposalDiff } from "./tui/proposal-review.js";
 import { listOwnedProposals } from "./proposals/inbox.js";
 import { sanitizeTerminalText } from "./terminal.js";
-import { hostSkillsCurrent, installHostSkills } from "@agentshare/integrations";
+import {
+  enableCodexApprovalPromptsByDefault,
+  hostSkillsCurrent,
+  installHostSkills,
+} from "@agentshare/integrations";
 import { installPinnedGlobalCli, pinnedGlobalCliInstalled } from "./update.js";
 
 const RELAY = "https://agentshare-relay.carnation-vermicelli.workers.dev";
@@ -59,7 +63,7 @@ const tool = (
 export const CREATOR_TOOLS = [
   tool(
     "setup_agentshare",
-    "First use after connecting this MCP: ask the user through a native form whether to install the pinned global CLI and local Codex/Claude integration files. Call before other AgentShare tools. Cancel writes nothing.",
+    "First use after connecting this MCP: ask through a native form whether to install the pinned CLI and host skills, with an optional choice to save Codex On Request prompts as the default. Call before other AgentShare tools. Cancel writes nothing. If the host auto-cancels forms, the user must select /permissions → On Request in this session first.",
     {},
     [],
     false,
@@ -494,6 +498,7 @@ export async function runCreatorMcpServer(
     skillsCurrent?: typeof hostSkillsCurrent;
     installCli?: () => void;
     cliCurrent?: () => boolean;
+    enableApprovalDefault?: typeof enableCodexApprovalPromptsByDefault;
   } = {},
 ): Promise<void> {
   const input = options.input ?? process.stdin,
@@ -544,7 +549,7 @@ export async function runCreatorMcpServer(
         params: {
           mode: "form",
           message:
-            "AgentShare is connected. Install the pinned AgentShare CLI globally and six managed Codex/Claude integration files? The CLI is needed for session capture and opening links. This downloads the same version already used by this MCP server and writes skill files in your home directory. Use arrow keys and Enter.",
+            "AgentShare is connected. Install the pinned AgentShare CLI and managed Codex/Claude skills? You can also choose to make Codex approval prompts the default for future sessions. This changes your global Codex setting, not this session; publishing still requires separate confirmation. Use arrow keys and Enter.",
           requestedSchema: {
             type: "object",
             properties: {
@@ -556,8 +561,19 @@ export async function runCreatorMcpServer(
                   { const: "cancel", title: "Cancel" },
                 ],
               },
+              approvalDefault: {
+                type: "string",
+                title: "Future Codex sessions",
+                oneOf: [
+                  { const: "keep", title: "Keep current permission default" },
+                  {
+                    const: "on_request",
+                    title: "Ask for approval by default",
+                  },
+                ],
+              },
             },
-            required: ["setup"],
+            required: ["setup", "approvalDefault"],
           },
         },
       });
@@ -571,6 +587,10 @@ export async function runCreatorMcpServer(
       isRecord(result) && isRecord(result.content)
         ? result.content.setup
         : undefined;
+    const approvalDefault =
+      isRecord(result) && isRecord(result.content)
+        ? result.content.approvalDefault
+        : undefined;
     if (
       isRecord(result) &&
       (["decline", "cancel"].includes(String(result.action)) ||
@@ -580,18 +600,24 @@ export async function runCreatorMcpServer(
     if (
       !isRecord(result) ||
       result.action !== "accept" ||
-      selected !== "install"
+      selected !== "install" ||
+      !["keep", "on_request"].includes(String(approvalDefault))
     )
       throw new Error(
-        "SETUP_INCOMPLETE: choose Install or Cancel; no files installed",
+        "SETUP_INCOMPLETE: choose Install or Cancel and a future-session permission default; no files installed",
       );
     if (!cliCurrent) (options.installCli ?? installPinnedGlobalCli)();
     const files = skillsCurrent
       ? []
       : await (options.installSkills ?? installHostSkills)();
+    if (approvalDefault === "on_request")
+      await (
+        options.enableApprovalDefault ?? enableCodexApprovalPromptsByDefault
+      )();
     return {
       status: "ready",
       installedFiles: files.length,
+      approvalDefault,
       next: "AgentShare works in this session. New sessions also discover the installed skills.",
     };
   };
@@ -824,7 +850,7 @@ export async function runCreatorMcpServer(
           },
           capabilities: { tools: {} },
           instructions:
-            "On first use, call setup_agentshare to offer the native Install/Cancel choice for the pinned global CLI and local integration files. If accepted, continue in this session; no restart needed for MCP tools. Sharing requires an explicit user request: resolve the exact current thread, open native file/access/duration choices, prepare, show a concise summary, then commit. Final Publish/Cancel uses a native form; never impersonate consent. Do not inspect private state or raw transcript storage.",
+            "On first use, call setup_agentshare to offer native choices for pinned CLI/skills installation and optionally saving On Request as the Codex default. If this session auto-cancels native forms, tell the user to select /permissions → On Request in this session and retry; changing config alone cannot change the active session. Setup cancellation writes nothing. Sharing requires an explicit user request: resolve the exact current thread, open native file/access/duration choices, prepare, show a concise summary, then commit. Final Publish/Cancel uses a native form; never impersonate consent. Do not inspect private state or raw transcript storage.",
         });
       } else if (message.method === "tools/list")
         reply({ tools: CREATOR_TOOLS });

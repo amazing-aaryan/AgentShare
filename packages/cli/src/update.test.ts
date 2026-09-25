@@ -38,7 +38,7 @@ describe("AgentShare update discovery", () => {
         return {
           status: 0,
           stdout: JSON.stringify({
-            dependencies: { agentshare: { version: "0.3.14" } },
+            dependencies: { agentshare: { version: "0.3.15" } },
           }),
           stderr: "",
         };
@@ -48,7 +48,7 @@ describe("AgentShare update discovery", () => {
     const options = {
       runProcess,
       platform: "linux" as const,
-      version: "0.3.14",
+      version: "0.3.15",
       cliEntrypoint,
     };
     expect(pinnedGlobalCliInstalled(options)).toBe(true);
@@ -60,7 +60,7 @@ describe("AgentShare update discovery", () => {
       "install",
       "--global",
       "--ignore-scripts",
-      buildReleasePackageUrl("0.3.14"),
+      buildReleasePackageUrl("0.3.15"),
     ]);
     expect(calls.filter((args) => args.includes("root"))).toHaveLength(3);
   });
