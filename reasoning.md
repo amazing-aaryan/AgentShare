@@ -988,3 +988,13 @@ native acceptance remains mandatory before stable readiness.
 **Decision:** Retry the exact public handoff/bootstrap/relay smoke at five-second intervals for at most one minute after deploying the handoff Worker.
 **Why:** The v0.3.14 handoff upload succeeded, but the immediate smoke fetched the previous pin; the same smoke passed shortly afterward. A bounded retry recognizes deployment propagation without hiding a persistent mismatch.
 **Impact:** The v0.3.15 production workflow still fails if the public pin or security checks remain wrong after 12 attempts. Release-tool tests pass.
+
+## [2026-10-02 14:30] Stage v0.3.16 after current audit blocks the previous rollout
+**Decision:** Refresh affected build dependency chains, create exact codex-native-windows-v6 evidence for AgentShare 0.3.16 and Codex 0.155.1, and prepare a new immutable candidate in an isolated worktree. Preserve prior release bytes and frozen evidence profiles.
+**Why:** Fresh npm installation found high-severity brace-expansion and undici advisories in the old lockfile. The mandatory production audit would reject v0.3.15. Current native runtime is Windows 10.0.26200, Node 24.14.0 and Codex 0.155.1; historical profiles stop at 0.3.4.
+**Impact:** The waiting v0.3.15 deployment was cancelled before any Worker writes. Master now requires PRs and the six GitHub Actions CI matrix checks with admin enforcement, current base and no force pushes/deletion. Native human consent, required production review and final stable sign-off remain separate gates; no synthetic test proves those observations.
+
+## [2026-10-02 14:32] Independent adversarial review approves v0.3.16 candidate changes
+**Decision:** Approve the reviewed working-tree candidate diff against 1bbbfdffd3625695c2faa3d4e50b3644bf119f22; no actionable correctness, security, compatibility, provenance or false-certification finding survived focused review.
+**Why:** Historical evidence profiles stay frozen, v6 pins exact AgentShare 0.3.16/Codex 0.155.1 identities, file verification stays nonpromotable, all public source pins agree, and deployment preflight requires an existing immutable asset. Independent checks passed: 111 release-evidence tests, seven public handoff/bootstrap tests, and full npm audit with zero advisories.
+**Impact:** Approval covers candidate source/docs/lock only. Real terminal/native chat consent, fresh-recipient setup observations, exact published bytes, six-job candidate CI, production review/provenance and explicit stable authorization remain distinct release gates. Implementation files were not changed by this reviewer.

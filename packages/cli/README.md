@@ -17,7 +17,7 @@ than through a proprietary server-side session store.
 
 Requires Node.js 22 or newer.
 
-> [!NOTE] This package is the **v0.3.15 candidate** for collaborative
+> [!NOTE] This package is the **v0.3.16 candidate** for collaborative
 > environments. Native Windows Codex acceptance and public deployment
 > verification remain required before stable promotion. Do not infer readiness
 > from the package version alone. Use the published stable GitHub release for
