@@ -12,6 +12,16 @@ updates the affected dependency chains within their declared ranges. The
 packaged CLI has no installed production dependency graph; the clean
 production-only audit does not replace the required full build/deployment audit.
 
+This candidate also repairs native Windows recipient model selection when the
+desktop app and CLI share `CODEX_HOME` but use different Codex versions. A newer
+desktop cache can contain a model alias unavailable to the installed CLI even
+when no minimum client version is advertised. AgentShare now requires cache
+metadata from the exact executable version and refreshes mismatches using that
+CLI in its private authenticated home. It preserves the creator's canonical
+cache and hardens the refreshed catalog with the same tool restrictions. This
+applies to both query and environment recipients and does not override a model
+or import the creator's configuration.
+
 ## Exact native Windows profile
 
 Use `codex-native-windows-v6` only for AgentShare **0.3.16**, Windows release
@@ -82,21 +92,26 @@ explicit stable-release authorization remain required.
 
 Claude execution is outside this Codex-only stable profile. A real Claude
 diagnostic is useful separate compatibility evidence and must not be reported as
-satisfying the native Codex gate. Any changed package bytes require another
-immutable candidate version.
+satisfying the native Codex gate. Any changed published package bytes require
+another immutable candidate version.
 
 ## Recorded local candidate validation
 
-On 2026-10-02, the candidate passed build/lint/formatting, 381 Vitest tests with
+On 2026-10-02, the candidate passed build/lint/formatting, 383 Vitest tests with
 eight opt-in skips and coverage thresholds, 126 release-tool tests, ACB
 conformance, isolated package installation, edge runtime, both Worker deployment
 dry runs, and a full dependency audit with zero advisories. Independent
 adversarial source review reported no actionable findings.
 
-The exact locally packaged CLI also passed all nine Codex handoff diagnostic
-stages with no initial model cache. This used synthetic fixture consent and a
-loopback relay and is explicitly nonpromotable; terminal/native human consent
-and public published-artifact acceptance remain unverified.
+The rebuilt exact locally packaged CLI passed all nine Codex handoff diagnostic
+stages with desktop model metadata newer than the installed CLI. Private refresh
+worked and the test's canonical metadata copy retained the same before/after
+hash. Two separate real Codex checks passed hostile write/network isolation and
+grounded two-turn continuity. The earlier pre-fix package also passed a
+nine-stage diagnostic with no initial model cache. These runs used synthetic
+fixture consent and a loopback relay and are explicitly nonpromotable;
+terminal/native human consent and public published-artifact acceptance remain
+unverified.
 
 A separate real Claude diagnostic reached the provider but failed because its
 OAuth session had expired and could not be refreshed. A reported signed-in

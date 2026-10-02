@@ -1,6 +1,6 @@
 - **Project:** AgentShare, free/open encrypted context handoff without accounts.
 - **Stack:** TypeScript, Node 22+, Vitest, Cloudflare, GitHub Actions.
-- **Focus:** Stage v0.3.16 with patched build tools and native evidence v6.
+- **Focus:** v0.3.16 draft; require exact CLI model metadata.
 - **Public:** v0.3.14 live; immutable v0.3.15 remains unchanged.
 - **Repo:** PRs and six CI checks required; no force pushes or deletion.
 - **Human gates:** Production review, native consent and stable sign-off.

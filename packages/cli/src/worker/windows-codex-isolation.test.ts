@@ -113,7 +113,7 @@ async function writeAuth(codexHome: string): Promise<void> {
 }
 
 describe("native Windows Codex catalog preparation", () => {
-  it.each(["missing", "older"])(
+  it.each(["missing", "older", "newer"])(
     "refreshes a %s cache privately without changing the user's home",
     async (state) => {
       const root = await temporaryRoot();
@@ -121,6 +121,7 @@ describe("native Windows Codex catalog preparation", () => {
       await mkdir(canonical);
       await writeAuth(canonical);
       if (state === "older") await writeReviewedCache(canonical, "0.152.1");
+      if (state === "newer") await writeReviewedCache(canonical, "0.159.2");
       const before = await readFile(
         join(canonical, "models_cache.json"),
         "utf8",
@@ -155,20 +156,26 @@ describe("native Windows Codex catalog preparation", () => {
     },
   );
 
-  it("still refuses stale metadata after a refresh attempt", async () => {
-    const root = await temporaryRoot();
-    await mkdir(join(root, ".codex"));
-    await expect(
-      windowsIsolation.prepareNativeWindowsCodexIsolation(
-        "win32",
-        "codex-cli 0.155.1",
-        {},
-        root,
-        join(root, "output"),
-        async (privateHome) => writeReviewedCache(privateHome, "0.155.0"),
-      ),
-    ).rejects.toThrow("older than running Codex 0.155.1");
-  });
+  it.each([
+    ["0.155.0", "older"],
+    ["0.159.2", "newer"],
+  ])(
+    "still refuses mismatched metadata %s after a refresh attempt",
+    async (clientVersion, direction) => {
+      const root = await temporaryRoot();
+      await mkdir(join(root, ".codex"));
+      await expect(
+        windowsIsolation.prepareNativeWindowsCodexIsolation(
+          "win32",
+          "codex-cli 0.155.1",
+          {},
+          root,
+          join(root, "output"),
+          async (privateHome) => writeReviewedCache(privateHome, clientVersion),
+        ),
+      ).rejects.toThrow(`${direction} than running Codex 0.155.1`);
+    },
+  );
 
   it("derives a private static catalog from Codex's reviewed cache", async () => {
     const root = await temporaryRoot();
@@ -230,7 +237,7 @@ describe("native Windows Codex catalog preparation", () => {
     ).rejects.toThrow("CODEX_HOME points to");
   });
 
-  it("accepts supported Windows runtimes with same-or-newer canonical model metadata", async () => {
+  it("accepts supported Windows runtimes with exact-version canonical model metadata", async () => {
     const root = await temporaryRoot();
     const defaultHome = join(root, "home");
     const codexHome = join(defaultHome, ".codex");
@@ -269,6 +276,17 @@ describe("native Windows Codex catalog preparation", () => {
     ).rejects.toThrow("older than running Codex 0.153.4");
 
     await writeReviewedCache(codexHome, "0.154.0");
+    await expect(
+      prepareNativeIsolation()(
+        "win32",
+        "codex-cli 0.153.4",
+        {},
+        defaultHome,
+        join(root, "private-output-newer"),
+      ),
+    ).rejects.toThrow("newer than running Codex 0.153.4");
+
+    await writeReviewedCache(codexHome, "0.153.4");
     const canonicalCacheBefore = await readFile(
       join(codexHome, "models_cache.json"),
     );
@@ -295,6 +313,7 @@ describe("native Windows Codex catalog preparation", () => {
     );
 
     const baselineOutput = join(root, "private-output-baseline");
+    await writeReviewedCache(codexHome, "0.152.1");
     const baselineResult = await prepareNativeIsolation()(
       "win32",
       "codex-cli 0.152.1",

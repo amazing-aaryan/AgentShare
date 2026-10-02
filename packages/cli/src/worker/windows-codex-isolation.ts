@@ -224,6 +224,13 @@ export function hardenCodexModelsCache(
       `Codex models cache version ${value.client_version} is older than running Codex ${runningClientVersion}; refresh Codex model metadata before retrying AgentShare`,
     );
   }
+  // A newer desktop runtime can share CODEX_HOME but receive model aliases
+  // unavailable to this CLI. Client minimums alone do not establish availability.
+  if (compareVersions(cacheVersion, runningVersion) > 0) {
+    throw new Error(
+      `Codex models cache version ${value.client_version} is newer than running Codex ${runningClientVersion}; refresh Codex model metadata before retrying AgentShare`,
+    );
+  }
   if (!Array.isArray(value.models) || value.models.length === 0) {
     throw new Error("Codex models cache must contain at least one model");
   }
