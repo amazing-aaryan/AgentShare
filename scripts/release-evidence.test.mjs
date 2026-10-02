@@ -18,6 +18,9 @@ import {
   REQUIRED_OBSERVATIONS,
   RUNTIME,
   SCHEMA_VERSION,
+  SETUP_NATIVE_WINDOWS_OBSERVATIONS,
+  SETUP_NATIVE_WINDOWS_PROFILE,
+  SETUP_NATIVE_WINDOWS_RUNTIME,
   runEvidenceCli,
   validateReleaseEvidence,
   verifyReleaseEvidenceFiles,
@@ -843,6 +846,116 @@ test("explicit profile cannot be silently substituted and native evidence still 
       runEvidenceCli(["--profile", "codex-native-windows-v2", ...args])
         .promotable,
       false,
+    );
+  });
+});
+
+function setupFixture() {
+  const { report, candidate } = fixture();
+  candidate.profile = SETUP_NATIVE_WINDOWS_PROFILE;
+  candidate.artifact.version = "0.3.16";
+  candidate.artifact.url =
+    "https://registry.example.test/agentshare-0.3.16.tgz";
+  report.profile = candidate.profile;
+  report.artifact = structuredClone(candidate.artifact);
+  report.runtime = { ...SETUP_NATIVE_WINDOWS_RUNTIME };
+  for (const check of report.checks) {
+    check.observations = {
+      ...SETUP_NATIVE_WINDOWS_OBSERVATIONS[check.id.split(".")[1]],
+    };
+  }
+  return { report, candidate };
+}
+
+test("current setup candidate has its own exact runtime and all 18 native checks", () => {
+  const { report, candidate } = setupFixture();
+  assert.equal(SETUP_NATIVE_WINDOWS_PROFILE, "codex-native-windows-v6");
+  assert.deepEqual(SETUP_NATIVE_WINDOWS_RUNTIME, {
+    platform: "win32",
+    osRelease: "10.0.26200",
+    nodeVersion: "24.14.0",
+    agent: "codex",
+    agentVersion: "0.155.1",
+  });
+  assert.equal(Object.isFrozen(SETUP_NATIVE_WINDOWS_RUNTIME), true);
+  assert.equal(Object.isFrozen(SETUP_NATIVE_WINDOWS_OBSERVATIONS), true);
+  assert.deepEqual(validateReleaseEvidence(report, candidate), {
+    profile: SETUP_NATIVE_WINDOWS_PROFILE,
+    runId: candidate.runId,
+    checks: 18,
+  });
+});
+
+for (const [label, mutate] of [
+  [
+    "prior package",
+    (r, c) => {
+      c.artifact.version = "0.3.15";
+      r.artifact.version = "0.3.15";
+    },
+  ],
+  [
+    "prior host runtime",
+    (r) => {
+      r.runtime.agentVersion = "0.153.4";
+    },
+  ],
+  [
+    "synthetic diagnostic",
+    (r) => {
+      r.evidenceKind = "local-protocol-diagnostic";
+    },
+  ],
+  [
+    "missing human consent",
+    (r) => {
+      r.checks[0].observations.explicitCreatorApproval = false;
+    },
+  ],
+  [
+    "incomplete native journey",
+    (r) => {
+      r.checks.pop();
+    },
+  ],
+  [
+    "unfinished cleanup",
+    (r) => {
+      r.cleanup.processes[0].exited = false;
+    },
+  ],
+]) {
+  test(`current native profile rejects ${label}`, () => {
+    const { report, candidate } = setupFixture();
+    mutate(report, candidate);
+    assert.throws(
+      () => validateReleaseEvidence(report, candidate),
+      /Release evidence rejected/,
+    );
+  });
+}
+
+test("current profile file verification remains nonpromotable and rejects substitution", () => {
+  onDisk(({ paths }) => {
+    const { report, candidate } = setupFixture();
+    writeFileSync(paths.evidence, JSON.stringify(report));
+    writeFileSync(paths.candidate, JSON.stringify(candidate));
+    const args = [
+      "--candidate",
+      paths.candidate,
+      "--evidence",
+      paths.evidence,
+      "--artifact",
+      paths.artifact,
+    ];
+    assert.equal(
+      runEvidenceCli(["--profile", SETUP_NATIVE_WINDOWS_PROFILE, ...args])
+        .promotable,
+      false,
+    );
+    assert.throws(
+      () => runEvidenceCli(["--profile", "codex-native-windows-v5", ...args]),
+      /explicit --profile mismatch/,
     );
   });
 });
