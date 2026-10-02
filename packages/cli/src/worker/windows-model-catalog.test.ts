@@ -44,11 +44,11 @@ describe("Windows Codex model catalog isolation", () => {
     expect(windowsVersionReviewer()("0.153.4")).toBe(false);
   });
 
-  it("accepts same-or-newer cache metadata, removes local tool capabilities, and filters future-only models", () => {
+  it("accepts exact-version cache metadata, removes local tool capabilities, and filters future-only models", () => {
     const input = {
       fetched_at: "2026-09-12T00:00:00Z",
       etag: "test-etag",
-      client_version: "0.154.0",
+      client_version: "0.153.4",
       models: [
         {
           slug: "gpt-5.6-codex",
@@ -92,7 +92,7 @@ describe("Windows Codex model catalog isolation", () => {
     });
   });
 
-  it("fails closed for older, malformed, empty, or incompatible model caches", () => {
+  it("fails closed for mismatched, malformed, empty, or incompatible model caches", () => {
     expect(() => hardener()(null, "0.153.4")).toThrow(
       "Codex models cache must be a JSON object",
     );
@@ -102,6 +102,12 @@ describe("Windows Codex model catalog isolation", () => {
         "0.153.4",
       ),
     ).toThrow("older than running Codex 0.153.4");
+    expect(() =>
+      hardener()(
+        { client_version: "0.159.2", models: [{ slug: "desktop-only-alias" }] },
+        "0.155.1",
+      ),
+    ).toThrow("newer than running Codex 0.155.1");
     expect(() =>
       hardener()(
         { client_version: "nightly", models: [{ slug: "model" }] },
@@ -117,7 +123,7 @@ describe("Windows Codex model catalog isolation", () => {
     expect(() =>
       hardener()(
         {
-          client_version: "0.154.0",
+          client_version: "0.153.4",
           models: [
             {
               slug: "future-only-model",
