@@ -102,7 +102,7 @@ describe.skipIf(!relay)("public AgentShare v2 environment", () => {
         )
         .catch(() => undefined);
     }
-  });
+  }, 120_000);
 });
 
 function requiredRelay(): string {
