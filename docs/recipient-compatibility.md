@@ -58,14 +58,25 @@ eligible for the legacy query path but not for the v2 MCP collaboration path.
 Native Windows v2 recipients add another fail-closed gate. Stable Codex CLI
 releases at or above **0.152.1** may use the reviewed Windows restricted-tool
 profile only after the general `exec` and v2 MCP capability probes pass. The
-canonical `models_cache.json` may have been refreshed by a newer Codex App/CLI;
-AgentShare therefore accepts cache metadata from the running version or a newer
-stable version, rejects cache metadata older than the running executable, drops
-models whose `minimal_client_version` is newer than that executable, and writes
-a private hardened catalog with local tool capabilities disabled. This runtime
-policy is forward-compatible, but it does not rewrite frozen release evidence:
-the `codex-native-windows-v2` profile for AgentShare 0.3.1 remains pinned to
-Codex 0.152.1.
+canonical `models_cache.json` may have been refreshed by a different Codex
+App/CLI version. Since AgentShare v0.3.16, metadata must match the **exact
+running CLI version**. Missing metadata or an older/newer stable cache triggers
+a refresh through that executable in a private authenticated Codex home;
+unusable or still mismatched metadata fails closed. AgentShare reads the
+canonical cache without writing it, drops models whose `minimal_client_version`
+is newer than the executable, and writes a private hardened catalog with local
+tool capabilities disabled. This preserves runtime capability checks for newer
+CLI versions without accepting another runtime's model aliases or rewriting
+historical evidence. The `codex-native-windows-v2` profile for AgentShare 0.3.1
+remains pinned to Codex 0.152.1; the v0.3.16 frozen v6 profile pins 0.155.1.
+
+The [v0.3.16 verification record](releases/v0.3.16-release-verification.md)
+documents delegated native/terminal journeys at Codex 0.155.1 and a separate
+grounded MCP read at 0.160.0. Two quiet native recipient windows retained
+identical canonical metadata hashes. Earlier hashes differed while a creator
+host was active, without an observed writer; that historical drift is not
+reported as unchanged-cache evidence. The Windows restricted-tool profile does
+not provide an OS-enforced filesystem read-deny boundary.
 
 ### Claude Code
 

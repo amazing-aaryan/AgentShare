@@ -5,7 +5,7 @@ It is directional rather than a release promise.
 
 ## Current Implementation Status
 
-The v0.2 candidate now implements the concrete foundation needed for the current
+The stable v0.3.16 release implements the foundation for the current
 open-context vision:
 
 - reviewed v2 collaborative environments with explicit conversation/project
@@ -32,9 +32,12 @@ claims of completion:
 - additional agent adapters remain demand-driven and blocked until exact creator
   extraction and recipient-isolation contracts can be reviewed and tested.
 
-A v0.2 implementation being present in the repository is not the same as a
-published stable release. Public deployment, immutable-package verification, and
-authenticated real Codex/Claude release gates remain release prerequisites.
+v0.3.16 is published, immutable and deployed. Its
+[release record](releases/v0.3.16-release-verification.md) documents live
+Windows Codex testing under owner delegation and the separate stable decision.
+Claude execution was excluded; macOS/Linux CI does not claim the same live
+journey. Future releases still need exact-package verification, deployment
+checks and the live evidence required by their documented scope.
 
 ## North Star
 
