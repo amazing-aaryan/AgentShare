@@ -7,6 +7,12 @@ release was reviewed.
 
 They are **not** the canonical source of the current project vision.
 
+Current published release:
+
+- [v0.3.16 verification](v0.3.16-release-verification.md) — immutable
+  stable/latest identity, delegated Windows Codex live testing, release decision
+  and explicit coverage limits.
+
 For current direction, read:
 
 1. [`../VISION.md`](../VISION.md) — AgentShare as a free/open, account-free,

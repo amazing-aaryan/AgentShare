@@ -30,11 +30,14 @@ Read the [project vision](docs/VISION.md), [roadmap](docs/ROADMAP.md), and
 > regulated data, or other high-risk material. Review the final normalized text,
 > included files, exclusions, and redactions before publication.
 
-> [!NOTE] This repository contains the **v0.3.16 candidate**. Native Codex
-> approval and the full real-host handoff still require fresh acceptance under
-> the [v0.3.16 release notes](docs/release-v0.3.16.md). Green CI alone is not
-> stable sign-off. Use the current stable GitHub release rather than candidate
-> source for ordinary installation, and keep the public-beta data warning above.
+> [!NOTE] **v0.3.16 is the current stable, immutable release.** Windows Codex
+> terminal and native handoffs were tested against the published package and
+> live services under the owner's explicit delegation. Claude was excluded from
+> this release's live testing; macOS/Linux passed CI without the same live
+> journey. See the
+> [release verification record](docs/releases/v0.3.16-release-verification.md)
+> for exact identities and evidence limits. The public-beta data warning above
+> still applies.
 
 ## Principles
 
@@ -65,8 +68,8 @@ continue**
 
 ### 1. Connect AgentShare in Codex
 
-Requirements: Node.js 22 or newer and a supported, signed-in agent CLI. After
-v0.3.16 is published, a new Codex user can add its MCP server with one command:
+Requirements: Node.js 22 or newer and a supported, signed-in agent CLI. A new
+Codex user can connect the published v0.3.16 MCP server with one command:
 
 ```powershell
 codex mcp add agentshare_creator -- cmd.exe /d /s /c npm exec --yes --package=https://github.com/amazing-aaryan/AgentShare/releases/download/v0.3.16/agentshare-0.3.16.tgz -- agentshare creator-mcp
@@ -402,12 +405,14 @@ npm audit --audit-level=high
 ```
 
 CI runs the same core gate across Ubuntu, macOS, and Windows on Node.js 22
-and 24. Stable promotion additionally requires the release-specific live
-evidence recorded in the deployment runbook. For the v0.3 collaboration line,
-that is the authenticated Codex `codex-only-v1` profile: live split-origin
-deployment, published-artifact bootstrap, terminal and native Codex creation,
-actual MCP read/proposal/inbox/approval/refresh behavior, isolation, revocation,
-and cleanup. Claude live execution is not part of that v0.3 promotion profile.
+and 24. Stable promotion additionally requires release-specific live evidence
+and an explicit release decision. The
+[v0.3.16 record](docs/releases/v0.3.16-release-verification.md) documents
+delegated Windows Codex testing and approval. Its frozen
+`codex-native-windows-v6` personal-human acceptance contract remains separate;
+that certificate is not claimed, and the offline verifier remains nonpromotable.
+Historical profiles retain their own requirements. Claude live execution was
+excluded from the v0.3.16 release decision.
 
 The broader two-agent diagnostic remains available when both authenticated
 reviewed hosts are present:
