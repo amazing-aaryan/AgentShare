@@ -63,7 +63,7 @@ const tool = (
 export const CREATOR_TOOLS = [
   tool(
     "setup_agentshare",
-    "First use after connecting this MCP: ask through a native form whether to install the pinned CLI and host skills, with an optional choice to save Codex On Request prompts as the default. Call before other AgentShare tools. Cancel writes nothing. If the host auto-cancels forms, the user must select /permissions → On Request in this session first.",
+    "First native use: offer pinned CLI/skills installation and optional future-session On Request through a native form. Cancel writes nothing. Some desktop hosts cannot display forms; use the separate desktop-share browser workflow only on explicit user request before any draft exists. Never simulate consent.",
     {},
     [],
     false,
@@ -174,8 +174,11 @@ export function creatorDoctor() {
     creatorCommand: "agentshare creator-mcp",
     sessionContextCommand: "agentshare session-context",
     nativeApproval: "requires-host-verification",
-    support: "Windows/Codex candidate; not yet release-certified",
-    next: "If the Codex header says YOLO/full-auto, open /permissions and choose On Request in this same session. Codex 0.155.1 has no /approvals command. Reload MCP servers if supported; otherwise restart the host. Call resolve_creator_session with the exact current thread ID. Publishing requires native form confirmation in this session.",
+    support:
+      "Verify native forms on the actual host; local browser review is a separate approval transport",
+    desktopReviewCommand:
+      "agentshare desktop-share --session-id <exact thread ID from session-context>",
+    next: "CLI users can select /permissions → On Request (Codex 0.155.1 has no /approvals command). Do not promise desktop permission controls exist. If desktop native forms are unavailable, an explicit user request can use desktop-share before a draft exists. Obtain the exact current ID with session-context; open the private loopback review URL in the Codex browser panel. User chooses, reviews and clicks Publish; never automate that approval. Existing drafts require their own status/recovery, never a blind new share.",
   };
 }
 
@@ -850,7 +853,7 @@ export async function runCreatorMcpServer(
           },
           capabilities: { tools: {} },
           instructions:
-            "On first use, call setup_agentshare to offer native choices for pinned CLI/skills installation and optionally saving On Request as the Codex default. If this session auto-cancels native forms, tell the user to select /permissions → On Request in this session and retry; changing config alone cannot change the active session. Setup cancellation writes nothing. Sharing requires an explicit user request: resolve the exact current thread, open native file/access/duration choices, prepare, show a concise summary, then commit. Final Publish/Cancel uses a native form; never impersonate consent. Do not inspect private state or raw transcript storage.",
+            "On first native use call setup_agentshare; setup cancellation writes nothing. Sharing requires an explicit user request and exact current thread. Native flow: options, prepare, summary, separate Publish/Cancel. Do not assume desktop permission controls exist. If native forms are unavailable and no draft exists, the user's explicit desktop-sharing request may use the separate desktop-share local browser workflow. Never automate real-user browser approval or impersonate native consent. Existing drafts need status/recovery, not a fresh share. Do not inspect private state or raw transcript storage.",
         });
       } else if (message.method === "tools/list")
         reply({ tools: CREATOR_TOOLS });

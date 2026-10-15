@@ -35,6 +35,14 @@ describe("public CLI arguments", () => {
     );
     expect(result.stdout).toContain("agentshare creator-mcp");
     expect(result.stdout).toContain("agentshare session-context");
+    expect(result.stdout).toContain("agentshare desktop-share --session-id ID");
+  });
+
+  it("requires an exact desktop session and rejects approval bypass flags", () => {
+    expect(runCli("desktop-share").stderr).toContain("requires --session-id");
+    expect(runCli("desktop-share", "--yes").stderr).toContain(
+      "Unknown option: --yes",
+    );
   });
 
   it("exposes only exact current thread and cwd through the read-only session helper", () => {

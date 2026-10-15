@@ -136,6 +136,13 @@ describe("host integrations", () => {
     expect(codexCreatorSkill).toContain("On Request");
     expect(codexCreatorSkill).toContain("never launch the terminal fallback");
     expect(codexCreatorSkill).toContain("agentshare session-context");
+    expect(codexCreatorSkill).toContain(
+      "agentshare desktop-share --session-id",
+    );
+    expect(codexCreatorSkill).toContain("Never submit browser Publish");
+    expect(codexCreatorSkill).not.toContain(
+      "Do not prepare a draft until approval prompts are enabled",
+    );
     expect(claudeReceiver).toContain("/e/");
     expect(claudeReceiver).toContain("agentshare ask");
     expect(codexCreator).toContain("allow_implicit_invocation: false");

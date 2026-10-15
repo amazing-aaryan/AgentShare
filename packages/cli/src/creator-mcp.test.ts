@@ -173,6 +173,7 @@ describe("creator MCP consent boundary", () => {
     expect(next).toContain("/permissions");
     expect(next).toContain("no /approvals command");
     expect(next).not.toContain("run /approvals");
+    expect(next).toContain("desktop-share");
   });
 
   it("returns bounded retained review, rejects fake approval arguments and unknown sessions", async () => {

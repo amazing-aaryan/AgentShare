@@ -1,5 +1,36 @@
 # Security Policy
 
+## Local desktop review
+
+The unreleased source desktop-review workflow is a separate local browser
+approval transport for hosts that cannot display native MCP forms. It does not
+change the active host's permission policy or impersonate native confirmation.
+The published immutable v0.3.16 package does not include this workflow.
+
+Its HTTP server binds only `127.0.0.1` on an ephemeral port. A random one-use
+launch capability travels in the URL fragment, is removed from browser history
+by the page, and exchanges for an HttpOnly, SameSite cookie. API requests check
+the exact Host, Origin when present, Fetch Metadata when present and a CSRF
+token. POST requests require the exact same origin and JSON content type.
+Responses prohibit caching and referrers; a restrictive CSP prevents framing,
+external scripts and remote connections. Retained context is rendered as text.
+
+The user separately chooses scope, prepares a private immutable draft, reviews
+the retained bytes and clicks Publish. Publication binds that current draft's
+ID, digest, browser confirmation nonce and expiry, then reuses the existing
+draft integrity checks and publication lock. There is no public CLI approval
+flag. Concurrent actions, stale previews, cancellation and expiry fail closed.
+Uncertain attempts retain draft identity and cannot silently create a new share.
+
+The launch URL and browser session are local bearer capabilities, not
+cryptographic proof of a human click. A local process that obtains them can act
+as that browser. This transport therefore trusts the signed-in local user and
+their processes; it is not a defense against a malicious privileged local agent.
+Agents are explicitly prohibited from driving real-user selection, preparation
+or Publish endpoints. Browser approval must not be relabelled as native-host
+consent or frozen personal-human release certification. Synthetic isolated tests
+may exercise those endpoints without sharing real user context.
+
 AgentShare is a public beta and does not yet provide a production security
 guarantee. Report vulnerabilities through
 [GitHub private vulnerability reporting](https://github.com/amazing-aaryan/AgentShare/security/advisories/new),

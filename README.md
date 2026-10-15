@@ -82,9 +82,10 @@ same pinned CLI globally and writing managed Codex and Claude skills. It also
 offers an optional choice to save `On Request` as the user's default Codex
 approval setting for future sessions. Cancel writes no files. Continue sharing
 through the connected MCP tools in that session; new sessions discover the
-skills. If the active session is in YOLO/full-auto mode, the user must first
-switch `/permissions` to `On Request`; changing the saved default cannot change
-the active session.
+skills. CLI users can switch `/permissions` to `On Request` when native forms
+auto-cancel; changing the saved default cannot change an active session. Some
+desktop hosts cancel native forms and expose no permission control. Do not
+assume the CLI command or a desktop dropdown is available there.
 
 Existing CLI users can still refresh the MCP connection and skills with:
 
@@ -95,6 +96,35 @@ agentshare init
 Start a new Codex or Claude Code session after changing its MCP configuration.
 Recipient compatibility policy and reviewed evidence are tracked in
 [recipient compatibility](docs/recipient-compatibility.md).
+
+#### Desktop review without native forms (source candidate)
+
+The source now includes a separate local browser review workflow for a desktop
+host that cannot display native forms. **Published v0.3.16 does not include this
+command.** Use a reviewed desktop-enabled build; a source build can run:
+
+```powershell
+node packages/cli/dist/bin.js desktop-share --session-id ID
+```
+
+The agent obtains `ID` from `agentshare session-context` in the exact chat,
+keeps the process running, and opens its private loopback review URL in the
+Codex browser panel. You choose conversation/project scope, access and expiry,
+prepare a private preview, inspect retained text/files/redactions, then
+separately click **Publish encrypted share**. No terminal interaction, host
+restart or global permission change is needed for this workflow. The agent must
+never operate your real review or Publish controls.
+
+The local review link expires after 15 minutes. Preparation and cancellation
+before publication send nothing. Successful publication keeps authenticated
+status available for one minute if the browser loses the response. If the result
+is uncertain, keep that page/process and check its status; do not start another
+share. A `recovery-required` result retains the exact draft ID/digest for
+explicit recovery.
+
+This is a separate browser approval transport, with the local bearer-capability
+trust boundary described in [SECURITY.md](SECURITY.md#local-desktop-review). It
+does not establish native-host or frozen personal-human certification.
 
 ### 2. Create a collaborative environment
 

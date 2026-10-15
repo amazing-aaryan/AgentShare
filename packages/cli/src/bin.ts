@@ -28,6 +28,7 @@ import {
   updateAgentShare,
 } from "./update.js";
 import { AGENTSHARE_VERSION } from "./version.js";
+import { startDesktopShare } from "./desktop-review.js";
 
 const DEFAULT_RELAY_ORIGIN =
   "https://agentshare-relay.carnation-vermicelli.workers.dev";
@@ -52,6 +53,26 @@ try {
     assertKnownOptions(args, new Set(["--state-path"]));
     const statePath = option(args, "--state-path");
     await runCreatorMcpServer(statePath === undefined ? {} : { statePath });
+  } else if (command === "desktop-share") {
+    assertKnownOptions(args, new Set(["--session-id", "--state-path"]));
+    const threadId = option(args, "--session-id");
+    if (threadId === undefined)
+      throw new Error(
+        "Desktop sharing requires --session-id from agentshare session-context",
+      );
+    const statePath = option(args, "--state-path");
+    const review = await startDesktopShare({
+      threadId,
+      ...(statePath === undefined ? {} : { statePath }),
+    });
+    process.stdout.write(
+      `${JSON.stringify({ status: "review", reviewUrl: review.reviewUrl, expiresAt: review.expiresAt })}\n`,
+    );
+    const published = await review.result;
+    process.stdout.write(
+      `${JSON.stringify(published === undefined ? { status: "closed", publicationAttempted: false } : "status" in published ? published : { status: "published", ...published })}\n`,
+    );
+    await review.closed;
   } else if (command === "doctor") {
     assertKnownOptions(args, new Set());
     process.stdout.write(`${JSON.stringify(creatorDoctor())}\n`);
@@ -482,6 +503,9 @@ function usage(): void {
   process.stdout.write(`  agentshare creator-mcp [--state-path PATH]\n`);
   process.stdout.write(`  agentshare doctor\n`);
   process.stdout.write(`  agentshare session-context\n`);
+  process.stdout.write(
+    `  agentshare desktop-share --session-id ID [--state-path PATH]\n`,
+  );
   process.stdout.write(
     `  agentshare share-v1 <file>|--current [--new] [--ttl SECONDS] [--relay URL] [--handoff URL]\n`,
   );
