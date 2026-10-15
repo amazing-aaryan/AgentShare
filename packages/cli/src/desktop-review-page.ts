@@ -1,6 +1,6 @@
 /** Static shell only: shared text is inserted through textContent after login. */
 export function desktopReviewPage(nonce: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AgentShare — review this chat</title>
+  return String.raw`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AgentShare — review this chat</title>
 <style nonce="${nonce}">
 :root{color-scheme:light dark;font:16px system-ui;line-height:1.5}body{max-width:880px;margin:40px auto;padding:0 24px}h1{font-size:2rem}label{display:block;margin:16px 0}select,button{font:inherit;padding:10px 14px;border:1px solid #888;border-radius:8px}select{display:block;min-width:260px}button{cursor:pointer;margin:8px 8px 8px 0}button:disabled{opacity:.5;cursor:default}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:light-dark(#f4f5f7,#20242a);padding:18px;border-radius:10px;max-height:480px;overflow:auto}.muted{opacity:.75}#error{color:light-dark(#a52117,#ffaba4)}[hidden]{display:none!important}#link{display:block;overflow-wrap:anywhere}details{margin:14px 0}summary{cursor:pointer;font-weight:600}.primary{background:#17614b;color:white;border-color:#17614b}input{margin-right:10px}
 </style></head><body><h1>Share this chat</h1><p>Choose what to include. Review the exact snapshot before publishing an encrypted link.</p><p id="identity" class="muted"></p><p id="error" role="alert"></p>
