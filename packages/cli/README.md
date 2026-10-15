@@ -1,5 +1,20 @@
 # AgentShare CLI
 
+The source candidate also includes a separate local browser review workflow for
+desktop hosts without native MCP forms. **Published v0.3.16 does not include
+`desktop-share`.** From a reviewed source build, run
+`node packages/cli/dist/bin.js desktop-share --session-id ID` at the repository
+root, using the exact ID returned by `agentshare session-context` in the chat.
+Open the returned private loopback URL in the Codex browser panel and keep the
+process running. The user chooses scope/access/lifetime, prepares and reviews
+the retained snapshot, then separately clicks Publish. No terminal interaction
+or global permission change is required. Agents must never operate real-user
+selection, preparation or approval endpoints. Keep the same draft/page on
+uncertain publication and use status/recovery; do not create another share. This
+local bearer-capability transport does not prove human identity or replace
+historical native-host certification. See
+[security](../../SECURITY.md#local-desktop-review).
+
 **Free, open, review-before-send AI context handoff by capability link.**
 
 AgentShare lets you select useful context from a supported agent, review what
