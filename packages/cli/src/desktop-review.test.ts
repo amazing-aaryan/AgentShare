@@ -112,7 +112,9 @@ async function fixture(lifetimeMs = 20_000) {
 
 describe("desktop local review boundary", () => {
   it("emits a browser script that compiles before any user action", () => {
-    const script = /<script nonce="[^"]+">([\s\S]*?)<\/script>/u.exec(desktopReviewPage("synthetic-nonce"))?.[1];
+    const script = /<script nonce="[^"]+">([\s\S]*?)<\/script>/u.exec(
+      desktopReviewPage("synthetic-nonce"),
+    )?.[1];
     if (script === undefined) throw new Error("Missing browser review script");
     expect(() => new Script(script)).not.toThrow();
   });
