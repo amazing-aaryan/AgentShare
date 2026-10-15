@@ -3,6 +3,8 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { request as httpRequest } from "node:http";
+import { Script } from "node:vm";
+import { desktopReviewPage } from "./desktop-review-page.js";
 import { createRelayHandler, InMemoryRelayStore } from "@agentshare/relay";
 import { EnvironmentRelayClient } from "./environment/relay-client.js";
 import { startDesktopShare } from "./desktop-review.js";
@@ -109,6 +111,11 @@ async function fixture(lifetimeMs = 20_000) {
 }
 
 describe("desktop local review boundary", () => {
+  it("emits a browser script that compiles before any user action", () => {
+    const script = /<script nonce="[^"]+">([\s\S]*?)<\/script>/u.exec(desktopReviewPage("synthetic-nonce"))?.[1];
+    if (script === undefined) throw new Error("Missing browser review script");
+    expect(() => new Script(script)).not.toThrow();
+  });
   it("closes after expiry during a pending prepare and permits idempotent close", async () => {
     const f = await fixture(1000);
     await f.login();
